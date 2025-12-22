@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Motion Pong</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: white;
+            touch-action: none;
+        }
+        
+        #gameContainer {
+            width: 100%;
+            max-width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #startScreen {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        #startScreen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        #startScreen p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+        
+        #startBtn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #startBtn:active {
+            background: #45a049;
+        }
+        
+        canvas {
+            border: 2px solid #333;
+            display: none;
+            max-width: 100vw;
+            max-height: 100vh;
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 32px;
+            z-index: 10;
+        }
+        
+        #debugInfo {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 12px;
+            opacity: 0.5;
+        }
+
+        #calibrateBtn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+
+        #calibrateBtn:active {
+            background: rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="startScreen">
+            <h1>🏓 Motion Pong</h1>
+            <p>Положите телефон экраном вверх<br>Поднимайте и опускайте телефон для управления</p>
+            <button id="startBtn">Начать игру</button>
+        </div>
+        
+        <div id="score" style="display: none;">
+            <span id="playerScore">0</span> : <span id="aiScore">0</span>
+        </div>
+        
+        <canvas id="gameCanvas"></canvas>
+
+        <button id="calibrateBtn">Калибровка (нажмите)</button>
+
+        <div id="debugInfo"></div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const startBtn = document.getElementById('startBtn');
+        const scoreDisplay = document.getElementById('score');
+        const debugInfo = document.getElementById('debugInfo');
+        const calibrateBtn = document.getElementById('calibrateBtn');
+
+        // Установка размера canvas
+        function resizeCanvas() {
+            canvas.width = Math.min(window.innerWidth, 600);
+            canvas.height = Math.min(window.innerHeight, 800);
+        }
+        resizeCanvas();
+
+        // Игровые объекты
+        const paddle = {
+            width: 10,
+            height: 100,
+            x: 20,
+            y: canvas.height / 2 - 50,
+            speed: 8
+        };
+
+        const aiPaddle = {
+            width: 10,
+            height: 100,
+            x: canvas.width - 30,
+            y: canvas.height / 2 - 50,
+            speed: 4
+        };
+
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 8,
+            speedX: 5,
+            speedY: 5
+        };
+
+        let playerScore = 0;
+        let aiScore = 0;
+        let gameRunning = false;
+        let motionY = 0;
+        let velocityY = 0;
+        let positionY = 0;
+        let lastTimestamp = 0;
+
+        // Запрос разрешения на использование датчиков
+        startBtn.addEventListener('click', async () => {
+            try {
+                if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                    const permission = await DeviceMotionEvent.requestPermission();
+                    if (permission === 'granted') {
+                        startGame();
+                    } else {
+                        alert('Нужен доступ к датчикам движения');
+                    }
+                } else {
+                    // Android или старые iOS
+                    startGame();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Ошибка доступа к датчикам: ' + error.message);
+            }
+        });
+
+        function startGame() {
+            startScreen.style.display = 'none';
+            canvas.style.display = 'block';
+            scoreDisplay.style.display = 'block';
+            calibrateBtn.style.display = 'block';
+            gameRunning = true;
+
+            // Калибровка начального положения
+            window.addEventListener('devicemotion', handleMotion);
+
+            // Небольшая задержка для калибровки
+            setTimeout(() => {
+                requestAnimationFrame(gameLoop);
+            }, 500);
+        }
+
+        // Калибровка по нажатию кнопки
+        calibrateBtn.addEventListener('click', () => {
+            positionY = 0;
+            velocityY = 0;
+            motionY = 0;
+        });
+
+        function handleMotion(event) {
+            if (!gameRunning) return;
+
+            // Используем ускорение БЕЗ гравитации для отслеживания движения
+            const accel = event.acceleration;
+
+            if (accel && accel.z !== null) {
+                const currentTime = event.timeStamp || Date.now();
+
+                if (lastTimestamp === 0) {
+                    lastTimestamp = currentTime;
+                    return;
+                }
+
+                const deltaTime = (currentTime - lastTimestamp) / 1000; // в секундах
+                lastTimestamp = currentTime;
+
+                // Используем ось Z (вертикальное движение когда телефон лежит экраном вверх)
+                const accelerationZ = accel.z;
+
+                // Применяем фильтр для уменьшения шума
+                const alpha = 0.8;
+                motionY = alpha * motionY + (1 - alpha) * accelerationZ;
+
+                // Интегрируем ускорение для получения скорости
+                velocityY += motionY * deltaTime;
+
+                // Применяем затухание к скорости для стабилизации
+                velocityY *= 0.95;
+
+                // Интегрируем скорость для получения позиции
+                positionY += velocityY * deltaTime;
+
+                // Ограничиваем позицию чтобы избежать дрейфа
+                positionY = Math.max(-100, Math.min(100, positionY));
+
+                // Отладочная информация
+                debugInfo.innerHTML = `Accel: ${motionY.toFixed(2)}<br>Velocity: ${velocityY.toFixed(2)}<br>Position: ${positionY.toFixed(2)}`;
+            }
+        }
+
+        function updatePaddle() {
+            // Маппинг вертикальной позиции телефона на позицию платформы
+            // Положительное значение = телефон поднят вверх = платформа вверх
+            const sensitivity = 3;
+
+            // Преобразуем позицию (-100 до 100) в позицию на экране
+            const normalizedPosition = (positionY + 100) / 200; // 0 до 1
+            const targetY = (1 - normalizedPosition) * (canvas.height - paddle.height);
+
+            // Плавное движение
+            paddle.y += (targetY - paddle.y) * 0.2;
+
+            // Ограничение движения
+            if (paddle.y < 0) paddle.y = 0;
+            if (paddle.y > canvas.height - paddle.height) {
+                paddle.y = canvas.height - paddle.height;
+            }
+        }
+
+        function updateAI() {
+            // Простой AI
+            const paddleCenter = aiPaddle.y + aiPaddle.height / 2;
+            const ballCenter = ball.y;
+
+            if (paddleCenter < ballCenter - 35) {
+                aiPaddle.y += aiPaddle.speed;
+            } else if (paddleCenter > ballCenter + 35) {
+                aiPaddle.y -= aiPaddle.speed;
+            }
+
+            // Ограничение движения
+            if (aiPaddle.y < 0) aiPaddle.y = 0;
+            if (aiPaddle.y > canvas.height - aiPaddle.height) {
+                aiPaddle.y = canvas.height - aiPaddle.height;
+            }
+        }
+
+        function updateBall() {
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+
+            // Отскок от верха и низа
+            if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+                ball.speedY = -ball.speedY;
+            }
+
+            // Столкновение с платформой игрока
+            if (ball.x - ball.radius < paddle.x + paddle.width &&
+                ball.y > paddle.y && 
+                ball.y < paddle.y + paddle.height) {
+                ball.speedX = Math.abs(ball.speedX);
+                
+                // Добавляем угол отскока в зависимости от места удара
+                const hitPos = (ball.y - paddle.y) / paddle.height;
+                ball.speedY = (hitPos - 0.5) * 10;
+            }
+
+            // Столкновение с AI платформой
+            if (ball.x + ball.radius > aiPaddle.x &&
+                ball.y > aiPaddle.y && 
+                ball.y < aiPaddle.y + aiPaddle.height) {
+                ball.speedX = -Math.abs(ball.speedX);
+                
+                const hitPos = (ball.y - aiPaddle.y) / aiPaddle.height;
+                ball.speedY = (hitPos - 0.5) * 10;
+            }
+
+            // Гол
+            if (ball.x < 0) {
+                aiScore++;
+                document.getElementById('aiScore').textContent = aiScore;
+                resetBall();
+            } else if (ball.x > canvas.width) {
+                playerScore++;
+                document.getElementById('playerScore').textContent = playerScore;
+                resetBall();
+            }
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.speedX = -ball.speedX;
+            ball.speedY = (Math.random() - 0.5) * 8;
+        }
+
+        function draw() {
+            // Очистка экрана
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Центральная линия
+            ctx.strokeStyle = '#333';
+            ctx.setLineDash([5, 15]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Платформа игрока
+            ctx.fillStyle = '#4CAF50';
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+            // Платформа AI
+            ctx.fillStyle = '#F44336';
+            ctx.fillRect(aiPaddle.x, aiPaddle.y, aiPaddle.width, aiPaddle.height);
+
+            // Мяч
+            ctx.fillStyle = '#FFF';
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            updatePaddle();
+            updateAI();
+            updateBall();
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Обработка изменения размера окна
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            // Корректируем позиции после изменения размера
+            paddle.y = Math.min(paddle.y, canvas.height - paddle.height);
+            aiPaddle.x = canvas.width - 30;
+            aiPaddle.y = Math.min(aiPaddle.y, canvas.height - aiPaddle.height);
+        });
+    </script>
+</body>
+</html>

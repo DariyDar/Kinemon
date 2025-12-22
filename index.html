@@ -134,7 +134,7 @@
 
         <button id="calibrateBtn">Калибровка (нажмите)</button>
 
-        <div id="version">v1.3</div>
+        <div id="version">v1.4</div>
 
         <div id="debugInfo"></div>
     </div>
@@ -169,15 +169,15 @@
             height: 100,
             x: canvas.width - 30,
             y: canvas.height / 2 - 50,
-            speed: 4
+            speed: 2
         };
 
         const ball = {
             x: canvas.width / 2,
             y: canvas.height / 2,
             radius: 8,
-            speedX: 5,
-            speedY: 5
+            speedX: 2,
+            speedY: 2
         };
 
         let playerScore = 0;
@@ -290,7 +290,7 @@
         function updatePaddle() {
             // Управление через ускорение и скорость
             // Положительное значение = телефон поднят вверх = платформа вверх
-            const sensitivity = 80;
+            const sensitivity = 20;
 
             // Двигаем платформу напрямую через ускорение
             paddle.y -= motionY * sensitivity;

@@ -134,7 +134,7 @@
 
         <button id="calibrateBtn">Калибровка (нажмите)</button>
 
-        <div id="version">v1.4</div>
+        <div id="version">v1.5</div>
 
         <div id="debugInfo"></div>
     </div>
@@ -185,8 +185,6 @@
         let gameRunning = false;
         let motionY = 0;
         let velocityY = 0;
-        let positionY = 0;
-        let lastTimestamp = 0;
 
         // Запрос разрешения на использование датчиков
         startBtn.addEventListener('click', async () => {
@@ -226,7 +224,6 @@
 
         // Калибровка по нажатию кнопки
         calibrateBtn.addEventListener('click', () => {
-            positionY = 0;
             velocityY = 0;
             motionY = 0;
         });
@@ -234,7 +231,7 @@
         function handleMotion(event) {
             if (!gameRunning) return;
 
-            // Пробуем оба варианта ускорения
+            // ТОЛЬКО acceleration (без гравитации) для отслеживания движения
             const accel = event.acceleration;
             const accelWithGravity = event.accelerationIncludingGravity;
 
@@ -242,58 +239,39 @@
             let debugText = `accel: ${accel ? 'OK' : 'null'}<br>`;
             debugText += `accelG: ${accelWithGravity ? 'OK' : 'null'}<br>`;
 
-            // Выбираем доступный источник данных
-            const activeAccel = accel || accelWithGravity;
-
-            if (activeAccel && activeAccel.z !== null) {
-                const currentTime = event.timeStamp || Date.now();
-
-                if (lastTimestamp === 0) {
-                    lastTimestamp = currentTime;
-                    return;
-                }
-
-                const deltaTime = (currentTime - lastTimestamp) / 1000; // в секундах
-                lastTimestamp = currentTime;
-
-                // Используем ось Z (вертикальное движение когда телефон лежит экраном вверх)
-                const accelerationZ = activeAccel.z;
+            if (accel && accel.z !== null) {
+                // Используем ТОЛЬКО acceleration.z (движение без влияния гравитации)
+                const accelerationZ = accel.z;
 
                 // Применяем фильтр для уменьшения шума
-                const alpha = 0.8;
+                const alpha = 0.7;
                 motionY = alpha * motionY + (1 - alpha) * accelerationZ;
 
-                // Интегрируем ускорение для получения скорости
-                velocityY += motionY * deltaTime;
-
-                // Применяем затухание к скорости для стабилизации
-                velocityY *= 0.95;
-
-                // Интегрируем скорость для получения позиции
-                positionY += velocityY * deltaTime;
-
-                // Ограничиваем позицию чтобы избежать дрейфа
-                positionY = Math.max(-100, Math.min(100, positionY));
+                // Интегрируем в скорость для плавности
+                velocityY += motionY;
+                velocityY *= 0.85; // Сильное затухание
 
                 // Отладочная информация
-                debugText += `Raw Z: ${accelerationZ.toFixed(2)}<br>`;
-                debugText += `Motion: ${motionY.toFixed(2)}<br>`;
-                debugText += `Velocity: ${velocityY.toFixed(2)}<br>`;
-                debugText += `Position: ${positionY.toFixed(2)}<br>`;
+                debugText += `Raw Z: ${accelerationZ.toFixed(3)}<br>`;
+                debugText += `Motion: ${motionY.toFixed(3)}<br>`;
+                debugText += `Velocity: ${velocityY.toFixed(3)}<br>`;
                 debugText += `Paddle Y: ${paddle.y.toFixed(0)}`;
                 debugInfo.innerHTML = debugText;
+            } else if (accelWithGravity && accelWithGravity.z !== null) {
+                // Фоллбек: если acceleration недоступен, показываем это
+                debugInfo.innerHTML = debugText + '<br>WARNING: Using accelG (with gravity)<br>Motion control may not work correctly!';
             } else {
                 debugInfo.innerHTML = debugText + 'NO Z DATA';
             }
         }
 
         function updatePaddle() {
-            // Управление через ускорение и скорость
+            // Управление через скорость (интегрированное ускорение)
             // Положительное значение = телефон поднят вверх = платформа вверх
-            const sensitivity = 20;
+            const sensitivity = 0.3;
 
-            // Двигаем платформу напрямую через ускорение
-            paddle.y -= motionY * sensitivity;
+            // Двигаем платформу через скорость (уже затухающую)
+            paddle.y -= velocityY * sensitivity;
 
             // Ограничение движения
             if (paddle.y < 0) paddle.y = 0;

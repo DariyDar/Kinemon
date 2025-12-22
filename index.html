@@ -92,7 +92,7 @@
     <div id="gameContainer">
         <div id="startScreen">
             <h1>🏓 Motion Pong</h1>
-            <p>Положите телефон экраном вверх<br>Наклоняйте вверх/вниз для управления</p>
+            <p>Положите телефон экраном вверх<br>Поднимайте/опускайте телефон для управления</p>
             <button id="startBtn">Начать игру</button>
         </div>
         
@@ -189,27 +189,27 @@
         function handleMotion(event) {
             if (!gameRunning) return;
 
-            // Используем ускорение с гравитацией по оси Y
+            // Используем ускорение с гравитацией по оси Z (вертикальное движение)
             const accel = event.accelerationIncludingGravity;
             
-            if (accel && accel.y !== null) {
+            if (accel && accel.z !== null) {
                 // Калибруем на первом кадре
                 if (calibrationOffset === 0) {
-                    calibrationOffset = accel.y;
+                    calibrationOffset = accel.z;
                 }
                 
-                motionY = accel.y - calibrationOffset;
+                motionY = accel.z - calibrationOffset;
                 
                 // Отладочная информация
-                debugInfo.textContent = `Y: ${motionY.toFixed(2)} | Calibration: ${calibrationOffset.toFixed(2)}`;
+                debugInfo.textContent = `Z: ${motionY.toFixed(2)} | Calibration: ${calibrationOffset.toFixed(2)}`;
             }
         }
 
         function updatePaddle() {
-            // Маппинг значения наклона (-10 до 10) на позицию платформы
-            // Положительное значение Y = телефон наклонён вниз = платформа вниз
-            const sensitivity = 20;
-            const targetY = paddle.y - (motionY * sensitivity);
+            // Маппинг значения высоты (-10 до 10) на позицию платформы
+            // Положительное значение Z = телефон поднят вверх = платформа вверх
+            const sensitivity = 15;
+            const targetY = paddle.y + (motionY * sensitivity);
             
             // Плавное движение
             paddle.y += (targetY - paddle.y) * 0.3;

@@ -8,8 +8,10 @@ class MotionController {
         this.isActive = false;
         this.currentTilt = 0; // Normalized tilt (0-1)
         this.rawBeta = 0; // Raw beta value from sensor
+        this.rawGamma = 0; // Raw gamma value from sensor
         this.minTilt = 0;
         this.maxTilt = 0;
+        this.activeAxis = 'beta'; // Which axis to use for normalized tilt
         this.onTiltChange = null; // Callback function
     }
 
@@ -51,9 +53,11 @@ class MotionController {
     /**
      * Set calibration values
      */
-    setCalibration(minTilt, maxTilt) {
+    setCalibration(minTilt, maxTilt, axis = 'beta') {
         this.minTilt = minTilt;
         this.maxTilt = maxTilt;
+        this.activeAxis = axis;
+        console.log(`Calibration set: ${axis} [${minTilt.toFixed(1)}, ${maxTilt.toFixed(1)}]`);
     }
 
     /**
@@ -62,32 +66,34 @@ class MotionController {
     _handleOrientation(event) {
         if (!this.isActive) return;
 
-        // When phone is lying screen-up, we use beta (front-to-back tilt)
-        // beta: -180 to 180 degrees
-        // When phone is flat: beta ≈ 0
-        // Tilted towards user (top up): beta < 0
-        // Tilted away from user (top down): beta > 0
+        // beta: front-to-back tilt (-180 to 180)
+        // gamma: left-to-right tilt (-90 to 90)
         const beta = event.beta;
+        const gamma = event.gamma;
 
-        if (beta === null) return;
+        if (beta === null || gamma === null) return;
 
-        // Store raw beta
+        // Store raw values
         this.rawBeta = beta;
+        this.rawGamma = gamma;
 
-        // Map the current beta to normalized value between min and max calibration
+        // Use the active axis for normalization
+        const rawValue = this.activeAxis === 'beta' ? beta : gamma;
+
+        // Map to normalized value between min and max calibration
         if (this.minTilt !== 0 || this.maxTilt !== 0) {
             // Calibrated mode
             const range = this.maxTilt - this.minTilt;
-            const normalized = (beta - this.minTilt) / range;
+            const normalized = (rawValue - this.minTilt) / range;
             this.currentTilt = Math.max(0, Math.min(1, normalized)); // Clamp to 0-1
         } else {
-            // Uncalibrated mode - just pass through raw beta
-            this.currentTilt = beta;
+            // Uncalibrated mode - just pass through raw value
+            this.currentTilt = rawValue;
         }
 
         // Call callback if set
         if (this.onTiltChange) {
-            this.onTiltChange(this.currentTilt, beta);
+            this.onTiltChange(this.currentTilt, rawValue);
         }
     }
 
@@ -111,7 +117,18 @@ class MotionController {
     getCalibrationData() {
         return {
             min: this.minTilt,
-            max: this.maxTilt
+            max: this.maxTilt,
+            axis: this.activeAxis
+        };
+    }
+
+    /**
+     * Get raw orientation values
+     */
+    getRawOrientation() {
+        return {
+            beta: this.rawBeta,
+            gamma: this.rawGamma
         };
     }
 }

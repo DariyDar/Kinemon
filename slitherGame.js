@@ -15,8 +15,8 @@ class SlitherGame {
         // Constants
         this.SEGMENT_SIZE = 15;
         this.PIZZA_SIZE = 18;
-        this.INITIAL_LENGTH = 3;
-        this.MOVE_SPEED = 2.5;
+        this.INITIAL_LENGTH = 6; // Increased from 3 to 6 (2x)
+        this.MOVE_SPEED = 1.8; // Decreased from 2.5
 
         // Determine which axis to use (the one with greater range during calibration)
         const calibrationData = this.motionController.getCalibrationData();
@@ -302,7 +302,7 @@ class SlitherGame {
         // Tilt 0.5 = center = no rotation
         // Tilt 0 or 1 = max rotation
         const tiltDeviation = (tilt - 0.5) * 2; // -1 to 1
-        const rotationSpeed = tiltDeviation * maxRotationSpeed;
+        const rotationSpeed = tiltDeviation * maxRotationSpeed * 1.2; // Increased by 20%
 
         // Update angle
         this.snake.angle += rotationSpeed;
@@ -352,13 +352,18 @@ class SlitherGame {
             }
         }
 
-        // Check self-collision (skip first few segments)
-        for (let i = 4; i < this.snake.segments.length; i++) {
+        // Check self-collision
+        // Skip segments that are too close to the head (can't physically collide)
+        // Need at least 2*circleRadius worth of segments to make a full circle and collide
+        const minSegmentsForCollision = Math.ceil((2 * Math.PI * 3 * this.SEGMENT_SIZE) / this.SEGMENT_SIZE);
+
+        for (let i = minSegmentsForCollision; i < this.snake.segments.length; i++) {
             const seg = this.snake.segments[i];
             const dist = Math.hypot(head.x - seg.x, head.y - seg.y);
 
-            if (dist < this.SEGMENT_SIZE) {
+            if (dist < this.SEGMENT_SIZE * 0.8) { // Slightly smaller for better feel
                 // Hit self!
+                console.log('Self collision at segment', i, 'distance', dist);
                 this.die();
                 return;
             }

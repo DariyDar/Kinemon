@@ -6,8 +6,10 @@
 class Calibration {
     constructor(motionController) {
         this.motionController = motionController;
-        this.minValue = null;
-        this.maxValue = null;
+        this.minBeta = null;
+        this.maxBeta = null;
+        this.minGamma = null;
+        this.maxGamma = null;
         this.isCalibrating = false;
         this.currentStep = 'idle'; // 'idle', 'waiting_min', 'waiting_max', 'complete'
 
@@ -35,8 +37,11 @@ class Calibration {
     setMinPosition() {
         if (this.currentStep !== 'waiting_min') return;
 
-        const currentTilt = this.motionController.getRawTilt();
-        this.minValue = currentTilt;
+        const orientation = this.motionController.getRawOrientation();
+        this.minBeta = orientation.beta;
+        this.minGamma = orientation.gamma;
+
+        console.log('Min position set:', orientation);
 
         this.currentStep = 'waiting_max';
         if (this.onStepChange) {
@@ -50,22 +55,40 @@ class Calibration {
     setMaxPosition() {
         if (this.currentStep !== 'waiting_max') return;
 
-        const currentTilt = this.motionController.getRawTilt();
-        this.maxValue = currentTilt;
+        const orientation = this.motionController.getRawOrientation();
+        this.maxBeta = orientation.beta;
+        this.maxGamma = orientation.gamma;
 
-        // Ensure min is actually less than max
-        if (this.minValue > this.maxValue) {
-            [this.minValue, this.maxValue] = [this.maxValue, this.minValue];
+        console.log('Max position set:', orientation);
+
+        // Calculate ranges for both axes
+        const betaRange = Math.abs(this.maxBeta - this.minBeta);
+        const gammaRange = Math.abs(this.maxGamma - this.minGamma);
+
+        console.log('Ranges - Beta:', betaRange, 'Gamma:', gammaRange);
+
+        // Choose axis with greater range
+        const useAxis = betaRange >= gammaRange ? 'beta' : 'gamma';
+        let minValue, maxValue;
+
+        if (useAxis === 'beta') {
+            minValue = Math.min(this.minBeta, this.maxBeta);
+            maxValue = Math.max(this.minBeta, this.maxBeta);
+        } else {
+            minValue = Math.min(this.minGamma, this.maxGamma);
+            maxValue = Math.max(this.minGamma, this.maxGamma);
         }
 
+        console.log(`Using ${useAxis} axis: [${minValue.toFixed(1)}, ${maxValue.toFixed(1)}]`);
+
         // Apply calibration to motion controller
-        this.motionController.setCalibration(this.minValue, this.maxValue);
+        this.motionController.setCalibration(minValue, maxValue, useAxis);
 
         this.currentStep = 'complete';
         this.isCalibrating = false;
 
         if (this.onComplete) {
-            this.onComplete(this.minValue, this.maxValue);
+            this.onComplete(minValue, maxValue);
         }
     }
 
@@ -87,20 +110,19 @@ class Calibration {
      * Reset calibration
      */
     reset() {
-        this.minValue = null;
-        this.maxValue = null;
+        this.minBeta = null;
+        this.maxBeta = null;
+        this.minGamma = null;
+        this.maxGamma = null;
         this.currentStep = 'idle';
         this.isCalibrating = false;
-        this.motionController.setCalibration(0, 0);
+        this.motionController.setCalibration(0, 0, 'beta');
     }
 
     /**
      * Get calibration values
      */
     getCalibration() {
-        return {
-            min: this.minValue,
-            max: this.maxValue
-        };
+        return this.motionController.getCalibrationData();
     }
 }

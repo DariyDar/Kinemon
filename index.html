@@ -255,21 +255,17 @@
                 positionY = Math.max(-100, Math.min(100, positionY));
 
                 // Отладочная информация
-                debugInfo.innerHTML = `Accel: ${motionY.toFixed(2)}<br>Velocity: ${velocityY.toFixed(2)}<br>Position: ${positionY.toFixed(2)}`;
+                debugInfo.innerHTML = `Accel: ${motionY.toFixed(2)}<br>Velocity: ${velocityY.toFixed(2)}<br>Position: ${positionY.toFixed(2)}<br>Paddle Y: ${paddle.y.toFixed(0)}`;
             }
         }
 
         function updatePaddle() {
-            // Маппинг вертикальной позиции телефона на позицию платформы
+            // Управление через ускорение и скорость
             // Положительное значение = телефон поднят вверх = платформа вверх
-            const sensitivity = 3;
+            const sensitivity = 80;
 
-            // Преобразуем позицию (-100 до 100) в позицию на экране
-            const normalizedPosition = (positionY + 100) / 200; // 0 до 1
-            const targetY = (1 - normalizedPosition) * (canvas.height - paddle.height);
-
-            // Плавное движение
-            paddle.y += (targetY - paddle.y) * 0.2;
+            // Двигаем платформу напрямую через ускорение
+            paddle.y -= motionY * sensitivity;
 
             // Ограничение движения
             if (paddle.y < 0) paddle.y = 0;

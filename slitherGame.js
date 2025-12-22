@@ -20,9 +20,11 @@ class SlitherGame {
 
         // Determine which axis to use (the one with greater range during calibration)
         const calibrationData = this.motionController.getCalibrationData();
+        console.log('SlitherGame calibration data:', calibrationData);
         this.useAxis = this.determineAxis(calibrationData);
         this.centerPosition = (calibrationData.min + calibrationData.max) / 2;
         this.axisRange = calibrationData.max - calibrationData.min;
+        console.log('Center position:', this.centerPosition, 'Range:', this.axisRange);
 
         // Snake state
         this.snake = {
@@ -107,6 +109,17 @@ class SlitherGame {
         const currentTilt = this.motionController.getRawTilt();
         const deviation = Math.abs(currentTilt - this.centerPosition);
         const deviationPercent = deviation / this.axisRange;
+
+        // Debug logging
+        if (Math.random() < 0.1) { // Log 10% of frames to avoid spam
+            console.log('Centering:', {
+                currentTilt,
+                centerPosition: this.centerPosition,
+                deviation,
+                deviationPercent,
+                axisRange: this.axisRange
+            });
+        }
 
         // Check if within 5% of center
         const isCentered = deviationPercent <= 0.05;

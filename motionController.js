@@ -6,7 +6,8 @@
 class MotionController {
     constructor() {
         this.isActive = false;
-        this.currentTilt = 0; // Current tilt value (-1 to 1, where -1 is max tilt down, 1 is max tilt up)
+        this.currentTilt = 0; // Normalized tilt (0-1)
+        this.rawBeta = 0; // Raw beta value from sensor
         this.minTilt = 0;
         this.maxTilt = 0;
         this.onTiltChange = null; // Callback function
@@ -70,6 +71,9 @@ class MotionController {
 
         if (beta === null) return;
 
+        // Store raw beta
+        this.rawBeta = beta;
+
         // Map the current beta to normalized value between min and max calibration
         if (this.minTilt !== 0 || this.maxTilt !== 0) {
             // Calibrated mode
@@ -88,10 +92,10 @@ class MotionController {
     }
 
     /**
-     * Get current raw tilt value
+     * Get current raw tilt value (raw beta from sensor)
      */
     getRawTilt() {
-        return this.currentTilt;
+        return this.rawBeta;
     }
 
     /**

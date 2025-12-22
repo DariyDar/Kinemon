@@ -134,7 +134,7 @@
 
         <button id="calibrateBtn">Калибровка (нажмите)</button>
 
-        <div id="version">v1.5</div>
+        <div id="version">v1.6</div>
 
         <div id="debugInfo"></div>
     </div>
@@ -184,7 +184,7 @@
         let aiScore = 0;
         let gameRunning = false;
         let motionY = 0;
-        let velocityY = 0;
+        let paddleVelocity = 0;
 
         // Запрос разрешения на использование датчиков
         startBtn.addEventListener('click', async () => {
@@ -224,8 +224,9 @@
 
         // Калибровка по нажатию кнопки
         calibrateBtn.addEventListener('click', () => {
-            velocityY = 0;
+            paddleVelocity = 0;
             motionY = 0;
+            paddle.y = canvas.height / 2 - paddle.height / 2;
         });
 
         function handleMotion(event) {
@@ -244,17 +245,18 @@
                 const accelerationZ = accel.z;
 
                 // Применяем фильтр для уменьшения шума
-                const alpha = 0.7;
+                const alpha = 0.8;
                 motionY = alpha * motionY + (1 - alpha) * accelerationZ;
 
-                // Интегрируем в скорость для плавности
-                velocityY += motionY;
-                velocityY *= 0.85; // Сильное затухание
+                // Преобразуем ускорение в скорость платформы напрямую
+                // Положительное ускорение = движение вверх = скорость вверх (отрицательная)
+                const sensitivity = 15;
+                paddleVelocity = -motionY * sensitivity;
 
                 // Отладочная информация
                 debugText += `Raw Z: ${accelerationZ.toFixed(3)}<br>`;
-                debugText += `Motion: ${motionY.toFixed(3)}<br>`;
-                debugText += `Velocity: ${velocityY.toFixed(3)}<br>`;
+                debugText += `Filtered: ${motionY.toFixed(3)}<br>`;
+                debugText += `Velocity: ${paddleVelocity.toFixed(2)}<br>`;
                 debugText += `Paddle Y: ${paddle.y.toFixed(0)}`;
                 debugInfo.innerHTML = debugText;
             } else if (accelWithGravity && accelWithGravity.z !== null) {
@@ -266,12 +268,9 @@
         }
 
         function updatePaddle() {
-            // Управление через скорость (интегрированное ускорение)
-            // Положительное значение = телефон поднят вверх = платформа вверх
-            const sensitivity = 0.3;
-
-            // Двигаем платформу через скорость (уже затухающую)
-            paddle.y -= velocityY * sensitivity;
+            // Двигаем платформу со скоростью, установленной датчиком
+            // Скорость напрямую зависит от текущего ускорения
+            paddle.y += paddleVelocity;
 
             // Ограничение движения
             if (paddle.y < 0) paddle.y = 0;

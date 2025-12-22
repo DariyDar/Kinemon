@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Kinemon Pong</title>
+    <title>Kinemon Games</title>
     <style>
         * {
             margin: 0;
@@ -37,6 +37,7 @@
             text-align: center;
             padding: 20px;
             display: none;
+            max-width: 500px;
         }
 
         .screen.active {
@@ -45,6 +46,11 @@
 
         .screen h1 {
             font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .screen h2 {
+            font-size: 32px;
             margin-bottom: 20px;
         }
 
@@ -65,6 +71,8 @@
             cursor: pointer;
             font-weight: bold;
             margin: 10px;
+            display: inline-block;
+            min-width: 200px;
         }
 
         .btn:active {
@@ -77,6 +85,21 @@
 
         .btn-secondary:active {
             background: #0b7dda;
+        }
+
+        .btn-danger {
+            background: #F44336;
+        }
+
+        .btn-danger:active {
+            background: #da190b;
+        }
+
+        .game-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
         }
 
         canvas {
@@ -104,10 +127,34 @@
             display: block;
         }
 
+        #exitBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(244, 67, 54, 0.8);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 100;
+            display: none;
+        }
+
+        #exitBtn.active {
+            display: block;
+        }
+
+        #exitBtn:active {
+            background: rgba(244, 67, 54, 1);
+        }
+
         #version {
             position: absolute;
             top: 10px;
-            right: 10px;
+            left: 10px;
             font-size: 14px;
             opacity: 0.7;
             background: rgba(0, 0, 0, 0.5);
@@ -136,47 +183,102 @@
             border-radius: 10px;
             margin: 20px 0;
         }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .overlay.active {
+            display: flex;
+        }
+
+        .overlay-content {
+            text-align: center;
+            padding: 40px;
+            background: #222;
+            border-radius: 20px;
+            max-width: 400px;
+        }
+
+        .countdown {
+            font-size: 72px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
     <div id="gameContainer">
-        <!-- Start Screen -->
-        <div id="startScreen" class="screen active">
-            <h1>🏓 Kinemon Pong</h1>
-            <p>Управляйте платформой наклоном телефона<br>Положите телефон экраном вверх</p>
-            <button id="startBtn" class="btn">Начать</button>
+        <!-- Main Menu -->
+        <div id="mainMenu" class="screen active">
+            <h1>🎮 Kinemon Games</h1>
+            <p>Управляйте играми наклоном телефона</p>
+            <div class="game-list">
+                <button class="btn" data-game="pong">🏓 Pong</button>
+                <button class="btn" data-game="snake">🐍 Pizza Snake</button>
+            </div>
         </div>
 
         <!-- Calibration Screen - Min Position -->
         <div id="calibrationMinScreen" class="screen">
-            <h1>Калибровка</h1>
+            <h2>Калибровка</h2>
             <div class="calibration-indicator">⬇️</div>
             <div class="instruction">
                 <p><strong>Шаг 1 из 2</strong></p>
-                <p>Наклоните телефон в положение<br>для НИЖНЕЙ позиции платформы</p>
+                <p>Наклоните телефон в положение<br>для НИЖНЕЙ позиции</p>
             </div>
-            <button id="setMinBtn" class="btn">Зафиксировать нижнее</button>
+            <button id="setMinBtn" class="btn">Зафиксировать</button>
         </div>
 
         <!-- Calibration Screen - Max Position -->
         <div id="calibrationMaxScreen" class="screen">
-            <h1>Калибровка</h1>
+            <h2>Калибровка</h2>
             <div class="calibration-indicator">⬆️</div>
             <div class="instruction">
                 <p><strong>Шаг 2 из 2</strong></p>
-                <p>Наклоните телефон в положение<br>для ВЕРХНЕЙ позиции платформы</p>
+                <p>Наклоните телефон в положение<br>для ВЕРХНЕЙ позиции</p>
             </div>
-            <button id="setMaxBtn" class="btn">Зафиксировать верхнее</button>
+            <button id="setMaxBtn" class="btn">Зафиксировать</button>
         </div>
 
-        <!-- Game Screen -->
+        <!-- Centering Screen (for Snake) -->
+        <div id="centeringScreen" class="screen">
+            <h2>Подготовка</h2>
+            <p>Выровняйте голову змейки<br>в центральное положение</p>
+            <canvas id="centeringCanvas" width="400" height="400"></canvas>
+            <p id="centeringStatus" style="margin-top: 20px; font-size: 24px;">Держите ровно...</p>
+        </div>
+
+        <!-- Game Canvas -->
         <div id="score">
             <span id="playerScore">0</span> : <span id="aiScore">0</span>
         </div>
 
+        <button id="exitBtn">Выход</button>
+
         <canvas id="gameCanvas"></canvas>
 
-        <div id="version">v2.0</div>
+        <!-- Death Overlay -->
+        <div id="deathOverlay" class="overlay">
+            <div class="overlay-content">
+                <h2>Игра окончена!</h2>
+                <p style="font-size: 36px; margin: 20px 0;">Очки: <span id="finalScore">0</span></p>
+                <button id="restartBtn" class="btn">Заново</button>
+                <button id="menuBtn" class="btn btn-secondary">В меню</button>
+            </div>
+        </div>
+
+        <div id="version">v2.1</div>
         <div id="debugInfo"></div>
     </div>
 
@@ -184,71 +286,95 @@
     <script src="motionController.js"></script>
     <script src="calibration.js"></script>
     <script src="game.js"></script>
+    <script src="slitherGame.js"></script>
 
     <script>
+        // Game state
+        let currentGame = null;
+        let currentGameType = null;
+
         // Initialize controllers
         const motionController = new MotionController();
         const calibration = new Calibration(motionController);
-        const game = new PongGame('gameCanvas', motionController);
 
         // UI elements
-        const startScreen = document.getElementById('startScreen');
+        const mainMenu = document.getElementById('mainMenu');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
         const calibrationMaxScreen = document.getElementById('calibrationMaxScreen');
+        const centeringScreen = document.getElementById('centeringScreen');
         const canvas = document.getElementById('gameCanvas');
         const scoreDisplay = document.getElementById('score');
+        const exitBtn = document.getElementById('exitBtn');
         const debugInfo = document.getElementById('debugInfo');
+        const deathOverlay = document.getElementById('deathOverlay');
 
         // Buttons
-        const startBtn = document.getElementById('startBtn');
         const setMinBtn = document.getElementById('setMinBtn');
         const setMaxBtn = document.getElementById('setMaxBtn');
-
-        // Update score display
-        function updateScore() {
-            const score = game.getScore();
-            document.getElementById('playerScore').textContent = score.player;
-            document.getElementById('aiScore').textContent = score.ai;
-        }
+        const restartBtn = document.getElementById('restartBtn');
+        const menuBtn = document.getElementById('menuBtn');
 
         // Show specific screen
         function showScreen(screenName) {
             // Hide all screens
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            canvas.classList.remove('active');
+            scoreDisplay.classList.remove('active');
+            exitBtn.classList.remove('active');
+            deathOverlay.classList.remove('active');
 
             // Show requested screen
-            if (screenName === 'start') {
-                startScreen.classList.add('active');
-                canvas.classList.remove('active');
-                scoreDisplay.classList.remove('active');
+            if (screenName === 'menu') {
+                mainMenu.classList.add('active');
             } else if (screenName === 'calibration-min') {
                 calibrationMinScreen.classList.add('active');
             } else if (screenName === 'calibration-max') {
                 calibrationMaxScreen.classList.add('active');
+            } else if (screenName === 'centering') {
+                centeringScreen.classList.add('active');
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
-                scoreDisplay.classList.add('active');
+                exitBtn.classList.add('active');
+                if (currentGameType === 'pong') {
+                    scoreDisplay.classList.add('active');
+                }
+            } else if (screenName === 'death') {
+                deathOverlay.classList.add('active');
             }
         }
 
-        // Update debug info
-        motionController.onTiltChange = (normalized, raw) => {
-            debugInfo.innerHTML = `Tilt: ${normalized.toFixed(3)}<br>Raw β: ${raw.toFixed(1)}°<br>Paddle: ${game.paddle.y.toFixed(0)}`;
-        };
+        // Update score display
+        function updateScore() {
+            if (!currentGame) return;
+            const score = currentGame.getScore();
+            if (currentGameType === 'pong') {
+                document.getElementById('playerScore').textContent = score.player;
+                document.getElementById('aiScore').textContent = score.ai;
+            }
+        }
 
-        // Start button - request permission and start calibration
-        startBtn.addEventListener('click', async () => {
+        // Game selection
+        document.querySelectorAll('[data-game]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                currentGameType = btn.dataset.game;
+                await startGameFlow();
+            });
+        });
+
+        // Start game flow (permission -> calibration -> game)
+        async function startGameFlow() {
             try {
+                // Request permission
                 await motionController.requestPermission();
                 motionController.start();
 
-                // Start calibration process
+                // Start calibration
                 await calibration.start();
                 showScreen('calibration-min');
             } catch (error) {
                 alert('Ошибка доступа к датчикам: ' + error.message);
             }
-        });
+        }
 
         // Set minimum position button
         setMinBtn.addEventListener('click', () => {
@@ -264,16 +390,95 @@
         // Calibration complete callback
         calibration.onComplete = (min, max) => {
             console.log('Calibration complete:', min, max);
-            showScreen('game');
-            game.start();
 
-            // Update score periodically
-            setInterval(updateScore, 100);
+            // Create appropriate game
+            if (currentGameType === 'pong') {
+                currentGame = new PongGame('gameCanvas', motionController);
+                showScreen('game');
+                currentGame.start();
+                setInterval(updateScore, 100);
+            } else if (currentGameType === 'snake') {
+                currentGame = new SlitherGame('gameCanvas', motionController);
+                // Snake needs centering screen
+                showCenteringScreen();
+            }
+
+            // Update debug info
+            motionController.onTiltChange = (normalized, raw) => {
+                if (currentGame && currentGame.paddle) {
+                    debugInfo.innerHTML = `Tilt: ${normalized.toFixed(3)}<br>Raw: ${raw.toFixed(1)}°<br>Paddle: ${currentGame.paddle.y.toFixed(0)}`;
+                } else if (currentGame && currentGame.snake) {
+                    debugInfo.innerHTML = `Tilt: ${normalized.toFixed(3)}<br>Raw: ${raw.toFixed(1)}°<br>Angle: ${(currentGame.snake.angle * 180 / Math.PI).toFixed(1)}°`;
+                }
+            };
         };
+
+        // Show centering screen for snake
+        function showCenteringScreen() {
+            showScreen('centering');
+            currentGame.startCentering((countdown) => {
+                const status = document.getElementById('centeringStatus');
+                if (countdown > 0) {
+                    status.textContent = `Отлично! Начинаем через ${countdown}...`;
+                    status.style.color = '#4CAF50';
+                } else if (countdown === 0) {
+                    // Start game
+                    showScreen('game');
+                    currentGame.start();
+                    // Update score for snake
+                    currentGame.onScoreChange = (score) => {
+                        scoreDisplay.innerHTML = `Очки: ${score}`;
+                        scoreDisplay.classList.add('active');
+                    };
+                    // Death handler
+                    currentGame.onDeath = (score) => {
+                        document.getElementById('finalScore').textContent = score;
+                        showScreen('death');
+                    };
+                } else {
+                    status.textContent = 'Выровняйте голову змейки';
+                    status.style.color = '#F44336';
+                }
+            });
+        }
+
+        // Exit button
+        exitBtn.addEventListener('click', () => {
+            if (currentGame) {
+                currentGame.stop();
+                currentGame = null;
+            }
+            motionController.stop();
+            calibration.reset();
+            showScreen('menu');
+        });
+
+        // Restart button (death screen)
+        restartBtn.addEventListener('click', async () => {
+            if (currentGame) {
+                currentGame.stop();
+                currentGame = null;
+            }
+            calibration.reset();
+            await startGameFlow();
+        });
+
+        // Menu button (death screen)
+        menuBtn.addEventListener('click', () => {
+            if (currentGame) {
+                currentGame.stop();
+                currentGame = null;
+            }
+            motionController.stop();
+            calibration.reset();
+            showScreen('menu');
+        });
 
         // Handle window resize
         window.addEventListener('resize', () => {
-            game.resizeCanvas();
+            if (currentGame && currentGame.resizeCanvas) {
+                currentGame.resizeCanvas();
+            }
         });
     </script>
 </body>

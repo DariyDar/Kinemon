@@ -100,4 +100,14 @@ class MotionController {
     getNormalizedTilt() {
         return this.currentTilt;
     }
+
+    /**
+     * Get calibration data
+     */
+    getCalibrationData() {
+        return {
+            min: this.minTilt,
+            max: this.maxTilt
+        };
+    }
 }

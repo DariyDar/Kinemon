@@ -17,6 +17,7 @@ class SlitherGame {
         this.PIZZA_SIZE = 18;
         this.INITIAL_LENGTH = 6; // Increased from 3 to 6 (2x)
         this.MOVE_SPEED = 1.8; // Decreased from 2.5
+        this.turnSpeedMultiplier = 1; // Default 1x, can be set from settings
 
         // Determine which axis to use (the one with greater range during calibration)
         const calibrationData = this.motionController.getCalibrationData();
@@ -302,7 +303,7 @@ class SlitherGame {
         // Tilt 0.5 = center = no rotation
         // Tilt 0 or 1 = max rotation
         const tiltDeviation = (tilt - 0.5) * 2; // -1 to 1
-        const rotationSpeed = tiltDeviation * maxRotationSpeed * 1.2; // Increased by 20%
+        const rotationSpeed = tiltDeviation * maxRotationSpeed * 2.4 * this.turnSpeedMultiplier; // 2x base (was 1.2), then multiplied by settings
 
         // Update angle
         this.snake.angle += rotationSpeed;

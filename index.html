@@ -163,6 +163,76 @@
             z-index: 100;
         }
 
+        #settingsBtn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(76, 175, 80, 0.8);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            z-index: 100;
+        }
+
+        #settingsBtn:active {
+            background: rgba(76, 175, 80, 1);
+        }
+
+        #settingsDropdown {
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 20px;
+            display: none;
+            z-index: 150;
+            min-width: 250px;
+        }
+
+        #settingsDropdown.active {
+            display: block;
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-group label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .setting-group select {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            background: #222;
+            color: white;
+            border: 1px solid #4CAF50;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .setting-group select:focus {
+            outline: none;
+            border-color: #66BB6A;
+        }
+
+        .setting-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
         #debugInfo {
             position: absolute;
             bottom: 10px;
@@ -278,7 +348,24 @@
             </div>
         </div>
 
-        <div id="version">v2.2</div>
+        <div id="version">v2.3</div>
+
+        <button id="settingsBtn">⚙️ Настройки</button>
+
+        <div id="settingsDropdown">
+            <div class="setting-group">
+                <label for="snakeTurnSpeed">Скорость поворота змейки</label>
+                <select id="snakeTurnSpeed">
+                    <option value="1">1x - Медленно</option>
+                    <option value="2">2x - Нормально</option>
+                    <option value="3">3x - Быстро</option>
+                    <option value="4">4x - Очень быстро</option>
+                    <option value="5">5x - Экстремально</option>
+                </select>
+                <div class="setting-info">Влияет на скорость поворота змейки</div>
+            </div>
+        </div>
+
         <div id="debugInfo"></div>
     </div>
 
@@ -292,6 +379,11 @@
         // Game state
         let currentGame = null;
         let currentGameType = null;
+
+        // Game settings
+        const gameSettings = {
+            snakeTurnSpeed: 2 // Default 2x
+        };
 
         // Initialize controllers
         const motionController = new MotionController();
@@ -307,12 +399,47 @@
         const exitBtn = document.getElementById('exitBtn');
         const debugInfo = document.getElementById('debugInfo');
         const deathOverlay = document.getElementById('deathOverlay');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsDropdown = document.getElementById('settingsDropdown');
 
         // Buttons
         const setMinBtn = document.getElementById('setMinBtn');
         const setMaxBtn = document.getElementById('setMaxBtn');
         const restartBtn = document.getElementById('restartBtn');
         const menuBtn = document.getElementById('menuBtn');
+
+        // Settings
+        const snakeTurnSpeedSelect = document.getElementById('snakeTurnSpeed');
+
+        // Load saved settings from localStorage
+        if (localStorage.getItem('snakeTurnSpeed')) {
+            gameSettings.snakeTurnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed'));
+            snakeTurnSpeedSelect.value = gameSettings.snakeTurnSpeed;
+        }
+
+        // Settings button toggle
+        settingsBtn.addEventListener('click', () => {
+            settingsDropdown.classList.toggle('active');
+        });
+
+        // Close settings when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
+                settingsDropdown.classList.remove('active');
+            }
+        });
+
+        // Save snake turn speed setting
+        snakeTurnSpeedSelect.addEventListener('change', () => {
+            gameSettings.snakeTurnSpeed = parseInt(snakeTurnSpeedSelect.value);
+            localStorage.setItem('snakeTurnSpeed', gameSettings.snakeTurnSpeed);
+
+            // Apply to current game if it's a snake game
+            if (currentGame && currentGame.turnSpeedMultiplier !== undefined) {
+                currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
+                console.log('Turn speed updated to', gameSettings.snakeTurnSpeed);
+            }
+        });
 
         // Show specific screen
         function showScreen(screenName) {
@@ -399,6 +526,9 @@
                 setInterval(updateScore, 100);
             } else if (currentGameType === 'snake') {
                 currentGame = new SlitherGame('gameCanvas', motionController);
+                // Apply settings
+                currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
+                console.log('Applied turn speed:', gameSettings.snakeTurnSpeed);
                 // Snake needs centering screen
                 showCenteringScreen();
             }

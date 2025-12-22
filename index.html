@@ -105,6 +105,17 @@
         #calibrateBtn:active {
             background: rgba(255, 255, 255, 0.4);
         }
+
+        #version {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 14px;
+            opacity: 0.7;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -122,6 +133,8 @@
         <canvas id="gameCanvas"></canvas>
 
         <button id="calibrateBtn">Калибровка (нажмите)</button>
+
+        <div id="version">v1.3</div>
 
         <div id="debugInfo"></div>
     </div>
@@ -221,10 +234,18 @@
         function handleMotion(event) {
             if (!gameRunning) return;
 
-            // Используем ускорение БЕЗ гравитации для отслеживания движения
+            // Пробуем оба варианта ускорения
             const accel = event.acceleration;
+            const accelWithGravity = event.accelerationIncludingGravity;
 
-            if (accel && accel.z !== null) {
+            // Отладочная информация о доступных данных
+            let debugText = `accel: ${accel ? 'OK' : 'null'}<br>`;
+            debugText += `accelG: ${accelWithGravity ? 'OK' : 'null'}<br>`;
+
+            // Выбираем доступный источник данных
+            const activeAccel = accel || accelWithGravity;
+
+            if (activeAccel && activeAccel.z !== null) {
                 const currentTime = event.timeStamp || Date.now();
 
                 if (lastTimestamp === 0) {
@@ -236,7 +257,7 @@
                 lastTimestamp = currentTime;
 
                 // Используем ось Z (вертикальное движение когда телефон лежит экраном вверх)
-                const accelerationZ = accel.z;
+                const accelerationZ = activeAccel.z;
 
                 // Применяем фильтр для уменьшения шума
                 const alpha = 0.8;
@@ -255,7 +276,14 @@
                 positionY = Math.max(-100, Math.min(100, positionY));
 
                 // Отладочная информация
-                debugInfo.innerHTML = `Accel: ${motionY.toFixed(2)}<br>Velocity: ${velocityY.toFixed(2)}<br>Position: ${positionY.toFixed(2)}<br>Paddle Y: ${paddle.y.toFixed(0)}`;
+                debugText += `Raw Z: ${accelerationZ.toFixed(2)}<br>`;
+                debugText += `Motion: ${motionY.toFixed(2)}<br>`;
+                debugText += `Velocity: ${velocityY.toFixed(2)}<br>`;
+                debugText += `Position: ${positionY.toFixed(2)}<br>`;
+                debugText += `Paddle Y: ${paddle.y.toFixed(0)}`;
+                debugInfo.innerHTML = debugText;
+            } else {
+                debugInfo.innerHTML = debugText + 'NO Z DATA';
             }
         }
 

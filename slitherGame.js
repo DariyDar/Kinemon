@@ -9,7 +9,6 @@ class SlitherGame {
         this.motionController = motionController;
 
         this.isRunning = false;
-        this.isCentering = false;
         this.score = 0;
 
         // Constants
@@ -17,7 +16,7 @@ class SlitherGame {
         this.BASE_PIZZA_SIZE = 18;
         this.BASE_MOVE_SPEED = 1.8;
         this.INITIAL_LENGTH = 7; // Starting length (0 points)
-        this.BOUNDARY_MARGIN = 30; // Visible boundary margin
+        this.BOUNDARY_MARGIN_BOTTOM = 40; // Bottom boundary margin only
 
         // Settings multipliers (can be set from settings)
         this.turnSpeedMultiplier = 1; // 1x-5x
@@ -49,14 +48,8 @@ class SlitherGame {
         this.pizzas = [];
         this.pizzaCount = 1;
 
-        // Swallowing animation
-        this.swallowingPizzas = []; // Array of {segmentIndex: number, progress: 0-1}
-
-        // Centering
-        this.centeringCallback = null;
-        this.centeringTime = 0;
-        this.centeringCanvas = document.getElementById('centeringCanvas');
-        this.centeringCtx = this.centeringCanvas ? this.centeringCanvas.getContext('2d') : null;
+        // Swallowing animation - track positions where pizza was eaten
+        this.swallowPositions = []; // Array of {x, y, frame: 0-N} for bulge at eating position
 
         // Callbacks
         this.onScoreChange = null;
@@ -102,138 +95,6 @@ class SlitherGame {
         }
     }
 
-    /**
-     * Start centering process
-     */
-    startCentering(callback) {
-        this.isCentering = true;
-        this.centeringCallback = callback;
-        this.centeringTime = 0;
-        this.initSnake();
-        this.centeringLoop();
-    }
-
-    /**
-     * Centering animation loop
-     */
-    centeringLoop() {
-        if (!this.isCentering) return;
-
-        // Get current tilt
-        const currentTilt = this.motionController.getRawTilt();
-        const deviation = Math.abs(currentTilt - this.centerPosition);
-        const deviationPercent = deviation / this.axisRange;
-
-        // Debug logging
-        if (Math.random() < 0.1) { // Log 10% of frames to avoid spam
-            console.log('Centering:', {
-                currentTilt,
-                centerPosition: this.centerPosition,
-                deviation,
-                deviationPercent,
-                axisRange: this.axisRange
-            });
-        }
-
-        // Check if within 5% of center
-        const isCentered = deviationPercent <= 0.05;
-
-        // Draw centering visualization
-        this.drawCenteringScreen(isCentered, Math.ceil(3 - this.centeringTime));
-
-        if (isCentered) {
-            this.centeringTime += 1/60; // Assuming 60 FPS
-
-            if (this.centeringTime >= 3) {
-                // Centering complete!
-                this.isCentering = false;
-                if (this.centeringCallback) {
-                    this.centeringCallback(0);
-                }
-                return;
-            } else {
-                // Still centering, show countdown
-                if (this.centeringCallback) {
-                    this.centeringCallback(Math.ceil(3 - this.centeringTime));
-                }
-            }
-        } else {
-            // Reset timer if not centered
-            this.centeringTime = 0;
-            if (this.centeringCallback) {
-                this.centeringCallback(-1);
-            }
-        }
-
-        requestAnimationFrame(() => this.centeringLoop());
-    }
-
-    /**
-     * Draw centering screen visualization
-     */
-    drawCenteringScreen(isCentered, countdown) {
-        if (!this.centeringCtx) return;
-
-        const ctx = this.centeringCtx;
-        const canvas = this.centeringCanvas;
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-
-        // Clear
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Snake color based on alignment
-        const snakeColor = isCentered ? '#4CAF50' : '#F44336';
-        const snakeBodyColor = isCentered ? '#4CAF50' : '#F44336';
-
-        // Draw 7-segment snake in a horizontal line
-        // Head at exact center, body extending to the left
-        const segmentSpacing = this.SEGMENT_SIZE;
-
-        // Get current tilt to show rotation
-        const currentTilt = this.motionController.getNormalizedTilt();
-        const headAngle = (currentTilt - 0.5) * Math.PI; // -90° to +90°
-
-        // Draw body segments (segments 1-6, from left to right)
-        ctx.fillStyle = snakeBodyColor;
-        for (let i = 6; i >= 1; i--) {
-            const segX = centerX - i * segmentSpacing;
-            const segY = centerY;
-            ctx.beginPath();
-            ctx.arc(segX, segY, this.SEGMENT_SIZE / 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        // Draw head (segment 0) at exact center with rotation
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.rotate(headAngle);
-
-        // Head circle
-        ctx.fillStyle = isCentered ? '#66BB6A' : '#EF5350';
-        ctx.beginPath();
-        ctx.arc(0, 0, this.SEGMENT_SIZE / 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Eyes
-        ctx.fillStyle = '#FFF';
-        ctx.beginPath();
-        ctx.arc(4, -3, 2, 0, Math.PI * 2);
-        ctx.arc(4, 3, 2, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
-
-        // Countdown
-        if (isCentered && countdown > 0) {
-            ctx.fillStyle = '#4CAF50';
-            ctx.font = 'bold 72px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(countdown, centerX, centerY + 80);
-        }
-    }
 
     /**
      * Start the game
@@ -251,7 +112,6 @@ class SlitherGame {
      */
     stop() {
         this.isRunning = false;
-        this.isCentering = false;
     }
 
     /**
@@ -268,11 +128,11 @@ class SlitherGame {
      * Spawn a single pizza
      */
     spawnPizza() {
-        const margin = this.BOUNDARY_MARGIN + this.PIZZA_SIZE;
+        const margin = this.PIZZA_SIZE;
         const minX = margin;
         const maxX = this.canvas.width - margin;
         const minY = margin;
-        const maxY = this.canvas.height - margin;
+        const maxY = this.canvas.height - this.BOUNDARY_MARGIN_BOTTOM - margin;
 
         this.pizzas.push({
             x: minX + Math.random() * (maxX - minX),
@@ -305,21 +165,15 @@ class SlitherGame {
      * Update swallowing animation
      */
     updateSwallowingAnimation() {
-        for (let i = this.swallowingPizzas.length - 1; i >= 0; i--) {
-            const swallow = this.swallowingPizzas[i];
+        const ANIMATION_FRAMES = 20; // ~0.33 seconds at 60fps
 
-            // Progress the animation (move down the snake)
-            swallow.progress += 0.15; // Speed of bulge traveling
+        for (let i = this.swallowPositions.length - 1; i >= 0; i--) {
+            const swallow = this.swallowPositions[i];
+            swallow.frame++;
 
-            // When progress >= 1, move to next segment
-            if (swallow.progress >= 1) {
-                swallow.progress = 0;
-                swallow.segmentIndex++;
-
-                // If reached the tail, remove from animation
-                if (swallow.segmentIndex >= this.snake.segments.length) {
-                    this.swallowingPizzas.splice(i, 1);
-                }
+            // Remove animation after specified frames
+            if (swallow.frame >= ANIMATION_FRAMES) {
+                this.swallowPositions.splice(i, 1);
             }
         }
     }
@@ -350,11 +204,11 @@ class SlitherGame {
         this.snake.headX += Math.cos(this.snake.angle) * this.MOVE_SPEED;
         this.snake.headY += Math.sin(this.snake.angle) * this.MOVE_SPEED;
 
-        // Wrap around screen with boundaries
-        const minX = this.BOUNDARY_MARGIN;
-        const maxX = this.canvas.width - this.BOUNDARY_MARGIN;
-        const minY = this.BOUNDARY_MARGIN;
-        const maxY = this.canvas.height - this.BOUNDARY_MARGIN;
+        // Wrap around screen (sides wrap, bottom has boundary)
+        const minX = 0;
+        const maxX = this.canvas.width;
+        const minY = 0;
+        const maxY = this.canvas.height - this.BOUNDARY_MARGIN_BOTTOM;
 
         if (this.snake.headX < minX) this.snake.headX = maxX;
         if (this.snake.headX > maxX) this.snake.headX = minX;
@@ -386,14 +240,15 @@ class SlitherGame {
 
             if (dist < this.SEGMENT_SIZE + this.PIZZA_SIZE / 2) {
                 // Ate pizza!
-                this.pizzas.splice(i, 1);
+                const eatenPizza = this.pizzas.splice(i, 1)[0];
                 this.score++;
                 this.spawnPizza();
 
-                // Start swallowing animation
-                this.swallowingPizzas.push({
-                    segmentIndex: 0,
-                    progress: 0
+                // Add swallow position at current head location
+                this.swallowPositions.push({
+                    x: head.x,
+                    y: head.y,
+                    frame: 0
                 });
 
                 if (this.onScoreChange) {
@@ -438,15 +293,13 @@ class SlitherGame {
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw boundaries
+        // Draw bottom boundary only
         this.ctx.strokeStyle = '#FFF';
-        this.ctx.lineWidth = 2;
-        this.ctx.strokeRect(
-            this.BOUNDARY_MARGIN,
-            this.BOUNDARY_MARGIN,
-            this.canvas.width - this.BOUNDARY_MARGIN * 2,
-            this.canvas.height - this.BOUNDARY_MARGIN * 2
-        );
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, this.canvas.height - this.BOUNDARY_MARGIN_BOTTOM);
+        this.ctx.lineTo(this.canvas.width, this.canvas.height - this.BOUNDARY_MARGIN_BOTTOM);
+        this.ctx.stroke();
 
         // Draw pizzas
         this.drawPizzas();
@@ -489,57 +342,32 @@ class SlitherGame {
      * Draw snake
      */
     drawSnake() {
-        // Draw body segments with bulges
+        // Draw body segments
         this.ctx.fillStyle = '#4CAF50';
         for (let i = 1; i < this.snake.segments.length; i++) {
             const seg = this.snake.segments[i];
-
-            // Check if there's a swallowing pizza at this segment
-            let bulgeSize = this.SEGMENT_SIZE / 2;
-            for (const swallow of this.swallowingPizzas) {
-                if (Math.floor(swallow.segmentIndex) === i) {
-                    // Create bulge effect - pizza makes segment bigger
-                    const bulgeFactor = 1 + (this.PIZZA_SIZE / this.SEGMENT_SIZE) * 0.5;
-                    bulgeSize = (this.SEGMENT_SIZE / 2) * bulgeFactor;
-                }
-            }
-
             this.ctx.beginPath();
-            this.ctx.arc(seg.x, seg.y, bulgeSize, 0, Math.PI * 2);
+            this.ctx.arc(seg.x, seg.y, this.SEGMENT_SIZE / 2, 0, Math.PI * 2);
             this.ctx.fill();
+        }
 
-            // Draw pizza inside bulge
-            for (const swallow of this.swallowingPizzas) {
-                if (Math.floor(swallow.segmentIndex) === i) {
-                    // Draw mini pizza
-                    const pizzaSize = this.PIZZA_SIZE * 0.4;
+        // Draw swallow bulges at fixed positions
+        for (const swallow of this.swallowPositions) {
+            const ANIMATION_FRAMES = 20;
+            const progress = swallow.frame / ANIMATION_FRAMES; // 0 to 1
 
-                    this.ctx.fillStyle = '#D32F2F';
-                    this.ctx.beginPath();
-                    this.ctx.arc(seg.x, seg.y, pizzaSize / 2, 0, Math.PI * 2);
-                    this.ctx.fill();
+            // Fade out effect
+            const alpha = 1 - progress;
 
-                    // Cheese triangles
-                    this.ctx.fillStyle = '#FDD835';
-                    for (let j = 0; j < 4; j++) {
-                        const angle = (j / 4) * Math.PI * 2;
-                        const x1 = seg.x + Math.cos(angle) * pizzaSize / 4;
-                        const y1 = seg.y + Math.sin(angle) * pizzaSize / 4;
-                        const x2 = seg.x + Math.cos(angle + Math.PI / 4) * pizzaSize / 3;
-                        const y2 = seg.y + Math.sin(angle + Math.PI / 4) * pizzaSize / 3;
+            // Bulge size (starts bigger, shrinks)
+            const maxBulge = this.SEGMENT_SIZE * 0.6;
+            const bulgeSize = maxBulge * (1 - progress);
 
-                        this.ctx.beginPath();
-                        this.ctx.moveTo(seg.x, seg.y);
-                        this.ctx.lineTo(x1, y1);
-                        this.ctx.lineTo(x2, y2);
-                        this.ctx.closePath();
-                        this.ctx.fill();
-                    }
-
-                    // Reset to snake color
-                    this.ctx.fillStyle = '#4CAF50';
-                }
-            }
+            // Draw bulge
+            this.ctx.fillStyle = `rgba(76, 175, 80, ${alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(swallow.x, swallow.y, this.SEGMENT_SIZE / 2 + bulgeSize, 0, Math.PI * 2);
+            this.ctx.fill();
         }
 
         // Draw head with eyes

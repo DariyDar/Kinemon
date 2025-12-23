@@ -321,13 +321,6 @@
             <button id="setMaxBtn" class="btn">Зафиксировать</button>
         </div>
 
-        <!-- Centering Screen (for Snake) -->
-        <div id="centeringScreen" class="screen">
-            <h2>Подготовка</h2>
-            <p>Выровняйте голову змейки<br>в центральное положение</p>
-            <canvas id="centeringCanvas" width="400" height="400"></canvas>
-            <p id="centeringStatus" style="margin-top: 20px; font-size: 24px;">Держите ровно...</p>
-        </div>
 
         <!-- Game Canvas -->
         <div id="score">
@@ -348,7 +341,7 @@
             </div>
         </div>
 
-        <div id="version">v2.4</div>
+        <div id="version">v2.5</div>
 
         <button id="settingsBtn">⚙️ Настройки</button>
 
@@ -501,6 +494,38 @@
             }
         });
 
+        // Enter fullscreen mode
+        async function enterFullscreen() {
+            const elem = document.documentElement;
+            try {
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { // Safari
+                    await elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { // IE11
+                    await elem.msRequestFullscreen();
+                }
+                console.log('Entered fullscreen mode');
+            } catch (error) {
+                console.log('Could not enter fullscreen:', error);
+            }
+        }
+
+        // Exit fullscreen mode
+        function exitFullscreen() {
+            try {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) {
+                    document.msExitFullscreen();
+                }
+            } catch (error) {
+                console.log('Could not exit fullscreen:', error);
+            }
+        }
+
         // Show specific screen
         function showScreen(screenName) {
             // Hide all screens
@@ -513,18 +538,19 @@
             // Show requested screen
             if (screenName === 'menu') {
                 mainMenu.classList.add('active');
+                exitFullscreen();
             } else if (screenName === 'calibration-min') {
                 calibrationMinScreen.classList.add('active');
             } else if (screenName === 'calibration-max') {
                 calibrationMaxScreen.classList.add('active');
-            } else if (screenName === 'centering') {
-                centeringScreen.classList.add('active');
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
                 exitBtn.classList.add('active');
                 if (currentGameType === 'pong') {
                     scoreDisplay.classList.add('active');
                 }
+                // Enter fullscreen when starting game
+                enterFullscreen();
             } else if (screenName === 'death') {
                 deathOverlay.classList.add('active');
             }
@@ -591,8 +617,22 @@
                 currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
                 currentGame.sizeMultiplier = gameSettings.snakeSize;
                 console.log('Applied settings - Turn:', gameSettings.snakeTurnSpeed, 'Move:', gameSettings.snakeMoveSpeed, 'Size:', gameSettings.snakeSize);
-                // Snake needs centering screen
-                showCenteringScreen();
+
+                // Start game immediately
+                showScreen('game');
+                currentGame.start();
+
+                // Update score for snake
+                currentGame.onScoreChange = (score) => {
+                    scoreDisplay.innerHTML = `Очки: ${score}`;
+                    scoreDisplay.classList.add('active');
+                };
+
+                // Death handler
+                currentGame.onDeath = (score) => {
+                    document.getElementById('finalScore').textContent = score;
+                    showScreen('death');
+                };
             }
 
             // Update debug info
@@ -605,34 +645,6 @@
             };
         };
 
-        // Show centering screen for snake
-        function showCenteringScreen() {
-            showScreen('centering');
-            currentGame.startCentering((countdown) => {
-                const status = document.getElementById('centeringStatus');
-                if (countdown > 0) {
-                    status.textContent = `Отлично! Начинаем через ${countdown}...`;
-                    status.style.color = '#4CAF50';
-                } else if (countdown === 0) {
-                    // Start game
-                    showScreen('game');
-                    currentGame.start();
-                    // Update score for snake
-                    currentGame.onScoreChange = (score) => {
-                        scoreDisplay.innerHTML = `Очки: ${score}`;
-                        scoreDisplay.classList.add('active');
-                    };
-                    // Death handler
-                    currentGame.onDeath = (score) => {
-                        document.getElementById('finalScore').textContent = score;
-                        showScreen('death');
-                    };
-                } else {
-                    status.textContent = 'Выровняйте голову змейки';
-                    status.style.color = '#F44336';
-                }
-            });
-        }
 
         // Exit button
         exitBtn.addEventListener('click', () => {

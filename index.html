@@ -153,7 +153,7 @@
 
         #version {
             position: absolute;
-            top: 10px;
+            bottom: 10px;
             left: 10px;
             font-size: 14px;
             opacity: 0.7;
@@ -166,7 +166,7 @@
         #settingsBtn {
             position: absolute;
             top: 10px;
-            right: 10px;
+            left: 10px;
             background: rgba(76, 175, 80, 0.8);
             color: white;
             border: none;
@@ -185,7 +185,7 @@
         #settingsDropdown {
             position: absolute;
             top: 50px;
-            right: 10px;
+            left: 10px;
             background: rgba(0, 0, 0, 0.95);
             border: 2px solid #4CAF50;
             border-radius: 10px;
@@ -354,7 +354,7 @@
 
         <div id="settingsDropdown">
             <div class="setting-group">
-                <label for="snakeTurnSpeed">Скорость поворота змейки</label>
+                <label for="snakeTurnSpeed">Скорость поворота</label>
                 <select id="snakeTurnSpeed">
                     <option value="1">1x - Медленно</option>
                     <option value="2">2x - Нормально</option>
@@ -363,6 +363,30 @@
                     <option value="5">5x - Экстремально</option>
                 </select>
                 <div class="setting-info">Влияет на скорость поворота змейки</div>
+            </div>
+
+            <div class="setting-group">
+                <label for="snakeMoveSpeed">Скорость движения</label>
+                <select id="snakeMoveSpeed">
+                    <option value="1">1 - Очень медленно</option>
+                    <option value="2">2 - Медленно</option>
+                    <option value="3">3 - Нормально</option>
+                    <option value="4">4 - Быстро</option>
+                    <option value="5">5 - Очень быстро</option>
+                </select>
+                <div class="setting-info">Влияет на скорость движения змейки</div>
+            </div>
+
+            <div class="setting-group">
+                <label for="snakeSize">Размер змейки</label>
+                <select id="snakeSize">
+                    <option value="1">1 - Минимум</option>
+                    <option value="2">2 - Маленький</option>
+                    <option value="3">3 - Средний</option>
+                    <option value="4">4 - Большой</option>
+                    <option value="5">5 - Максимум</option>
+                </select>
+                <div class="setting-info">Влияет на размер змейки и пиццы</div>
             </div>
         </div>
 
@@ -382,7 +406,9 @@
 
         // Game settings
         const gameSettings = {
-            snakeTurnSpeed: 2 // Default 2x
+            snakeTurnSpeed: 2, // Default 2x
+            snakeMoveSpeed: 4, // Default 4 (current speed)
+            snakeSize: 1 // Default 1 (minimum)
         };
 
         // Initialize controllers
@@ -410,11 +436,21 @@
 
         // Settings
         const snakeTurnSpeedSelect = document.getElementById('snakeTurnSpeed');
+        const snakeMoveSpeedSelect = document.getElementById('snakeMoveSpeed');
+        const snakeSizeSelect = document.getElementById('snakeSize');
 
         // Load saved settings from localStorage
         if (localStorage.getItem('snakeTurnSpeed')) {
             gameSettings.snakeTurnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed'));
             snakeTurnSpeedSelect.value = gameSettings.snakeTurnSpeed;
+        }
+        if (localStorage.getItem('snakeMoveSpeed')) {
+            gameSettings.snakeMoveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed'));
+            snakeMoveSpeedSelect.value = gameSettings.snakeMoveSpeed;
+        }
+        if (localStorage.getItem('snakeSize')) {
+            gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize'));
+            snakeSizeSelect.value = gameSettings.snakeSize;
         }
 
         // Settings button toggle
@@ -438,6 +474,30 @@
             if (currentGame && currentGame.turnSpeedMultiplier !== undefined) {
                 currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
                 console.log('Turn speed updated to', gameSettings.snakeTurnSpeed);
+            }
+        });
+
+        // Save snake move speed setting
+        snakeMoveSpeedSelect.addEventListener('change', () => {
+            gameSettings.snakeMoveSpeed = parseInt(snakeMoveSpeedSelect.value);
+            localStorage.setItem('snakeMoveSpeed', gameSettings.snakeMoveSpeed);
+
+            // Apply to current game if it's a snake game
+            if (currentGame && currentGame.moveSpeedMultiplier !== undefined) {
+                currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
+                console.log('Move speed updated to', gameSettings.snakeMoveSpeed);
+            }
+        });
+
+        // Save snake size setting
+        snakeSizeSelect.addEventListener('change', () => {
+            gameSettings.snakeSize = parseInt(snakeSizeSelect.value);
+            localStorage.setItem('snakeSize', gameSettings.snakeSize);
+
+            // Apply to current game if it's a snake game
+            if (currentGame && currentGame.sizeMultiplier !== undefined) {
+                currentGame.sizeMultiplier = gameSettings.snakeSize;
+                console.log('Size updated to', gameSettings.snakeSize);
             }
         });
 
@@ -528,7 +588,9 @@
                 currentGame = new SlitherGame('gameCanvas', motionController);
                 // Apply settings
                 currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
-                console.log('Applied turn speed:', gameSettings.snakeTurnSpeed);
+                currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
+                currentGame.sizeMultiplier = gameSettings.snakeSize;
+                console.log('Applied settings - Turn:', gameSettings.snakeTurnSpeed, 'Move:', gameSettings.snakeMoveSpeed, 'Size:', gameSettings.snakeSize);
                 // Snake needs centering screen
                 showCenteringScreen();
             }

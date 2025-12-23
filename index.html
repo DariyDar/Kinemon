@@ -340,13 +340,13 @@
         <div id="deathOverlay" class="overlay">
             <div class="overlay-content">
                 <h2>Игра окончена!</h2>
-                <p style="font-size: 36px; margin: 20px 0;">Очки: <span id="finalScore">0</span></p>
+                <p style="font-size: 36px; margin: 20px 0;"><span id="finalScore">0</span></p>
                 <button id="restartBtn" class="btn">Заново</button>
                 <button id="menuBtn" class="btn btn-secondary">В меню</button>
             </div>
         </div>
 
-        <div id="version">v2.7</div>
+        <div id="version">v2.8</div>
 
         <button id="settingsBtn">⚙️ Настройки</button>
 
@@ -632,7 +632,7 @@
 
                 // Update score for snake
                 currentGame.onScoreChange = (score) => {
-                    scoreDisplay.innerHTML = `Очки: ${score}`;
+                    scoreDisplay.innerHTML = `${score}`;
                     scoreDisplay.classList.add('active');
                 };
 

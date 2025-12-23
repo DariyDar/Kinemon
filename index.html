@@ -176,6 +176,11 @@
             cursor: pointer;
             font-weight: bold;
             z-index: 100;
+            display: none;
+        }
+
+        #settingsBtn.active {
+            display: block;
         }
 
         #settingsBtn:active {
@@ -534,6 +539,8 @@
             scoreDisplay.classList.remove('active');
             exitBtn.classList.remove('active');
             deathOverlay.classList.remove('active');
+            settingsBtn.classList.remove('active');
+            settingsDropdown.classList.remove('active');
 
             // Show requested screen
             if (screenName === 'menu') {
@@ -546,6 +553,7 @@
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
                 exitBtn.classList.add('active');
+                settingsBtn.classList.add('active');
                 if (currentGameType === 'pong') {
                     scoreDisplay.classList.add('active');
                 }

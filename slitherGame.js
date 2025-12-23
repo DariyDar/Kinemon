@@ -48,9 +48,6 @@ class SlitherGame {
         this.pizzas = [];
         this.pizzaCount = 1;
 
-        // Swallowing animation - track pizzas traveling through snake
-        this.swallowingPizzas = []; // Array of {segmentIndex: number, progress: 0-1}
-
         // Callbacks
         this.onScoreChange = null;
         this.onDeath = null;
@@ -157,33 +154,7 @@ class SlitherGame {
      */
     update() {
         this.updateSnake();
-        this.updateSwallowingAnimation();
         this.checkCollisions();
-    }
-
-    /**
-     * Update swallowing animation
-     * Moves pizzas from head to tail through segments
-     */
-    updateSwallowingAnimation() {
-        const ANIMATION_SPEED = 0.08; // Progress per frame (0.08 = ~12 frames per segment)
-
-        for (let i = this.swallowingPizzas.length - 1; i >= 0; i--) {
-            const swallow = this.swallowingPizzas[i];
-            swallow.progress += ANIMATION_SPEED;
-
-            // Move to next segment when progress >= 1
-            if (swallow.progress >= 1.0) {
-                swallow.progress = 0;
-                swallow.segmentIndex++;
-
-                // Remove when pizza reaches the tail
-                if (swallow.segmentIndex >= this.snake.segments.length - 1) {
-                    this.swallowingPizzas.splice(i, 1);
-                    // The new segment has already been added by the score increment
-                }
-            }
-        }
     }
 
     /**
@@ -252,12 +223,6 @@ class SlitherGame {
                 const eatenPizza = this.pizzas.splice(i, 1)[0];
                 this.score++;
                 this.spawnPizza();
-
-                // Add pizza to swallowing animation (starts at head, segmentIndex 0)
-                this.swallowingPizzas.push({
-                    segmentIndex: 0,
-                    progress: 0
-                });
 
                 if (this.onScoreChange) {
                     this.onScoreChange(this.score);
@@ -357,45 +322,6 @@ class SlitherGame {
             this.ctx.beginPath();
             this.ctx.arc(seg.x, seg.y, this.SEGMENT_SIZE / 2, 0, Math.PI * 2);
             this.ctx.fill();
-        }
-
-        // Draw swallowing pizzas traveling through snake
-        for (const swallow of this.swallowingPizzas) {
-            // Get current and next segment
-            const currentSeg = this.snake.segments[swallow.segmentIndex];
-            const nextSeg = this.snake.segments[swallow.segmentIndex + 1];
-
-            if (!currentSeg || !nextSeg) continue;
-
-            // Interpolate position between segments based on progress
-            const pizzaX = currentSeg.x + (nextSeg.x - currentSeg.x) * swallow.progress;
-            const pizzaY = currentSeg.y + (nextSeg.y - currentSeg.y) * swallow.progress;
-
-            // Draw mini pizza (solid, same size as visual pizza but smaller to fit inside)
-            const miniPizzaSize = this.PIZZA_SIZE * 0.6; // 60% of full pizza size to fit inside segment
-
-            // Pizza base (red circle) - solid, no transparency
-            this.ctx.fillStyle = '#D32F2F';
-            this.ctx.beginPath();
-            this.ctx.arc(pizzaX, pizzaY, miniPizzaSize / 2, 0, Math.PI * 2);
-            this.ctx.fill();
-
-            // Cheese triangles (yellow)
-            this.ctx.fillStyle = '#FDD835';
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2;
-                const x1 = pizzaX + Math.cos(angle) * miniPizzaSize / 3;
-                const y1 = pizzaY + Math.sin(angle) * miniPizzaSize / 3;
-                const x2 = pizzaX + Math.cos(angle + Math.PI / 6) * miniPizzaSize / 2.5;
-                const y2 = pizzaY + Math.sin(angle + Math.PI / 6) * miniPizzaSize / 2.5;
-
-                this.ctx.beginPath();
-                this.ctx.moveTo(pizzaX, pizzaY);
-                this.ctx.lineTo(x1, y1);
-                this.ctx.lineTo(x2, y2);
-                this.ctx.closePath();
-                this.ctx.fill();
-            }
         }
 
         // Draw head with eyes

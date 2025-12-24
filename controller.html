@@ -324,7 +324,7 @@
         // Cancel scan button removed - now using native camera
 
         // Manual join
-        manualJoinBtn.addEventListener('click', () => {
+        manualJoinBtn.addEventListener('click', async () => {
             const room = roomIdInput.value.trim().toUpperCase();
             const server = serverUrlInput.value.trim();
 
@@ -333,7 +333,20 @@
                 return;
             }
 
-            connectToRoom(room, server);
+            // CRITICAL: Request sensor permission IMMEDIATELY on user click
+            // iOS only allows this during direct user interaction
+            try {
+                manualJoinBtn.textContent = 'Запрос разрешения...';
+                motionController = new MotionController();
+                await motionController.requestPermission();
+                console.log('✅ Sensor permission granted');
+
+                // Now connect to server
+                connectToRoom(room, server);
+            } catch (err) {
+                manualJoinBtn.textContent = 'Подключиться';
+                alert('❌ Необходим доступ к датчикам движения.\n\nОшибка: ' + err.message + '\n\nРазрешите доступ в настройках Safari.');
+            }
         });
 
         async function connectToRoom(room, serverUrl) {
@@ -367,18 +380,17 @@
                     manualJoinBtn.disabled = false;
                     manualJoinBtn.textContent = 'Подключиться';
 
-                    // Initialize motion controller
-                    motionController = new MotionController();
+                    // Motion controller already initialized with permission granted
+                    // Just initialize calibration
                     calibration = new Calibration(motionController);
 
-                    // Request permission and start calibration
+                    // Start motion tracking and calibration
                     try {
-                        await motionController.requestPermission();
                         motionController.start();
                         await calibration.start();
                         showScreen('calibration-min');
                     } catch (err) {
-                        alert('❌ Ошибка доступа к датчикам движения: ' + err.message);
+                        alert('❌ Ошибка калибровки: ' + err.message);
                         showScreen('room-input');
                     }
                 };

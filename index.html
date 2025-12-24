@@ -294,8 +294,29 @@
 </head>
 <body>
     <div id="gameContainer">
+        <!-- Mode Selection Screen -->
+        <div id="modeSelection" class="screen active">
+            <h1>🎮 Kinemon Games</h1>
+            <p>Выберите режим игры</p>
+            <div class="game-list">
+                <button class="btn" id="offlineBtn">📱 Оффлайн</button>
+                <button class="btn btn-secondary" id="onlineBtn">🌐 Онлайн</button>
+            </div>
+        </div>
+
+        <!-- Online Role Selection -->
+        <div id="onlineRoleSelection" class="screen">
+            <h1>🌐 Онлайн режим</h1>
+            <p>Выберите роль</p>
+            <div class="game-list">
+                <button class="btn" id="controllerRoleBtn">📱 Контроллер<br><small style="font-size: 14px;">Управление с телефона</small></button>
+                <button class="btn btn-secondary" id="displayRoleBtn">🖥️ Экран<br><small style="font-size: 14px;">Отображение на компьютере</small></button>
+            </div>
+            <button class="btn btn-danger" id="backFromOnlineBtn" style="margin-top: 20px; min-width: 150px;">← Назад</button>
+        </div>
+
         <!-- Main Menu -->
-        <div id="mainMenu" class="screen active">
+        <div id="mainMenu" class="screen">
             <h1>🎮 Kinemon Games</h1>
             <p>Управляйте играми наклоном телефона</p>
             <div class="game-list">
@@ -346,7 +367,7 @@
             </div>
         </div>
 
-        <div id="version">v2.8</div>
+        <div id="version">v3.0</div>
 
         <button id="settingsBtn">⚙️ Настройки</button>
 
@@ -414,6 +435,8 @@
         const calibration = new Calibration(motionController);
 
         // UI elements
+        const modeSelection = document.getElementById('modeSelection');
+        const onlineRoleSelection = document.getElementById('onlineRoleSelection');
         const mainMenu = document.getElementById('mainMenu');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
         const calibrationMaxScreen = document.getElementById('calibrationMaxScreen');
@@ -543,7 +566,12 @@
             settingsDropdown.classList.remove('active');
 
             // Show requested screen
-            if (screenName === 'menu') {
+            if (screenName === 'mode-selection') {
+                modeSelection.classList.add('active');
+                exitFullscreen();
+            } else if (screenName === 'online-role') {
+                onlineRoleSelection.classList.add('active');
+            } else if (screenName === 'menu') {
                 mainMenu.classList.add('active');
                 exitFullscreen();
             } else if (screenName === 'calibration-min') {
@@ -573,6 +601,27 @@
                 document.getElementById('aiScore').textContent = score.ai;
             }
         }
+
+        // Mode selection
+        document.getElementById('offlineBtn').addEventListener('click', () => {
+            showScreen('menu');
+        });
+
+        document.getElementById('onlineBtn').addEventListener('click', () => {
+            showScreen('online-role');
+        });
+
+        document.getElementById('backFromOnlineBtn').addEventListener('click', () => {
+            showScreen('mode-selection');
+        });
+
+        document.getElementById('controllerRoleBtn').addEventListener('click', () => {
+            window.location.href = 'controller.html';
+        });
+
+        document.getElementById('displayRoleBtn').addEventListener('click', () => {
+            window.location.href = 'display.html';
+        });
 
         // Game selection
         document.querySelectorAll('[data-game]').forEach(btn => {

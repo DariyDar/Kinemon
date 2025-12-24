@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinemon - Display</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .screen {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 10px;
+        }
+
+        .btn:hover {
+            background: #45a049;
+        }
+
+        input {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 2px solid #4CAF50;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        #gameCanvas {
+            border: 2px solid #333;
+            display: none;
+        }
+
+        #gameCanvas.active {
+            display: block;
+        }
+
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            min-width: 200px;
+        }
+
+        .player-score {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 18px;
+        }
+
+        .player-name {
+            font-weight: bold;
+            margin-right: 20px;
+        }
+
+        .player-status {
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        .player-status.dead {
+            color: #F44336;
+        }
+
+        .status {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+
+        .status.connected {
+            background: rgba(76, 175, 80, 0.2);
+            border: 2px solid #4CAF50;
+        }
+
+        .status.disconnected {
+            background: rgba(244, 67, 54, 0.2);
+            border: 2px solid #F44336;
+        }
+
+        /* Waiting for players screen styles */
+        #waitingScreen {
+            max-width: 600px;
+        }
+
+        .room-code {
+            font-size: 72px;
+            font-weight: bold;
+            color: #4CAF50;
+            letter-spacing: 12px;
+            margin: 30px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        #qrcode {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            display: inline-block;
+            margin: 20px 0;
+        }
+
+        .instruction {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .room-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .room-label {
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .room-id-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            letter-spacing: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- Connection Screen -->
+        <div id="connectionScreen" class="screen active">
+            <h1>🖥️ Экран отображения</h1>
+            <p>Подключитесь к серверу для начала игры</p>
+            <input type="text" id="serverUrl" placeholder="ws://localhost:8080">
+            <br>
+            <button class="btn" id="connectBtn">Подключиться</button>
+        </div>
+
+        <!-- Waiting for Players Screen -->
+        <div id="waitingScreen" class="screen">
+            <h2>Ожидание игроков</h2>
+            <div class="room-code" id="roomCodeDisplay">------</div>
+            <p style="font-size: 24px; margin: 10px 0;">Код комнаты</p>
+
+            <div id="qrcode"></div>
+
+            <div class="instruction">
+                <p><strong>Как подключиться:</strong></p>
+                <p>📱 Отсканируйте QR-код камерой телефона</p>
+                <p style="font-size: 14px; opacity: 0.5;">или</p>
+                <p>⌨️ Введите код комнаты вручную</p>
+            </div>
+
+            <p id="playerCount" style="font-size: 20px; color: #4CAF50;">Игроков: 0</p>
+        </div>
+
+        <!-- Game Display -->
+        <canvas id="gameCanvas" width="600" height="800"></canvas>
+
+        <div id="status" class="status disconnected">Отключено</div>
+
+        <div id="roomInfo" class="room-info" style="display: none;">
+            <div class="room-label">Комната</div>
+            <div class="room-id-display" id="roomIdInfo">------</div>
+        </div>
+
+        <div id="scoreboard" style="display: none;">
+            <h3>Игроки</h3>
+            <div id="playerList"></div>
+        </div>
+    </div>
+
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        let ws = null;
+        let gameState = null;
+        let roomId = null;
+
+        const connectionScreen = document.getElementById('connectionScreen');
+        const waitingScreen = document.getElementById('waitingScreen');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const serverUrlInput = document.getElementById('serverUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDisplay = document.getElementById('status');
+        const playerList = document.getElementById('playerList');
+        const roomCodeDisplay = document.getElementById('roomCodeDisplay');
+        const roomIdInfo = document.getElementById('roomIdInfo');
+        const roomInfo = document.getElementById('roomInfo');
+        const scoreboard = document.getElementById('scoreboard');
+        const playerCount = document.getElementById('playerCount');
+
+        // Set default server URL
+        // For production, use your deployed server URL (e.g., wss://kinemon-games.onrender.com)
+        // For local testing, use ws://localhost:8080
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+        const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon-games.onrender.com';
+        serverUrlInput.value = defaultServer;
+
+        function showScreen(screenName) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+            if (screenName === 'connection') {
+                connectionScreen.classList.add('active');
+                canvas.classList.remove('active');
+                roomInfo.style.display = 'none';
+                scoreboard.style.display = 'none';
+            } else if (screenName === 'waiting') {
+                waitingScreen.classList.add('active');
+                canvas.classList.remove('active');
+                roomInfo.style.display = 'none';
+                scoreboard.style.display = 'none';
+            } else if (screenName === 'game') {
+                canvas.classList.add('active');
+                roomInfo.style.display = 'block';
+                scoreboard.style.display = 'block';
+            }
+        }
+
+        connectBtn.addEventListener('click', () => {
+            const serverUrl = serverUrlInput.value.trim();
+
+            try {
+                ws = new WebSocket(serverUrl);
+
+                ws.onopen = () => {
+                    console.log('Connected to server');
+                    statusDisplay.textContent = 'Подключено';
+                    statusDisplay.className = 'status connected';
+
+                    // Request room creation
+                    ws.send(JSON.stringify({
+                        type: 'create_room'
+                    }));
+                };
+
+                ws.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    alert('Ошибка подключения к серверу');
+                };
+
+                ws.onclose = () => {
+                    console.log('Disconnected from server');
+                    statusDisplay.textContent = 'Отключено';
+                    statusDisplay.className = 'status disconnected';
+                    showScreen('connection');
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+
+                    if (data.type === 'room_created') {
+                        // Room created, show QR code
+                        roomId = data.roomId;
+                        console.log('Room created:', roomId);
+
+                        roomCodeDisplay.textContent = roomId;
+                        roomIdInfo.textContent = roomId;
+
+                        // Generate QR code with direct link (for camera scanning)
+                        document.getElementById('qrcode').innerHTML = '';
+
+                        // Build controller URL with room and server parameters
+                        const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
+                        const qrData = `${baseUrl}?room=${roomId}&server=${encodeURIComponent(serverUrlInput.value)}`;
+
+                        console.log('QR Code URL:', qrData);
+
+                        new QRCode(document.getElementById('qrcode'), {
+                            text: qrData,
+                            width: 256,
+                            height: 256,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+
+                        showScreen('waiting');
+
+                        // Join the room as display
+                        ws.send(JSON.stringify({
+                            type: 'join_display',
+                            roomId: roomId
+                        }));
+
+                    } else if (data.type === 'init') {
+                        gameState = data.gameState;
+                        updatePlayerCount();
+
+                    } else if (data.type === 'update') {
+                        gameState = data.gameState;
+                        updatePlayerCount();
+
+                        // Switch to game screen when first player joins
+                        if (gameState.players.length > 0 && !canvas.classList.contains('active')) {
+                            showScreen('game');
+                        }
+
+                        // Switch back to waiting screen if all players leave
+                        if (gameState.players.length === 0 && canvas.classList.contains('active')) {
+                            showScreen('waiting');
+                        }
+                    }
+                };
+            } catch (error) {
+                console.error('Connection error:', error);
+                alert('Ошибка подключения: ' + error.message);
+            }
+        });
+
+        function updatePlayerCount() {
+            if (gameState) {
+                playerCount.textContent = `Игроков: ${gameState.players.length}`;
+            }
+        }
+
+        function render() {
+            if (!gameState) return;
+
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw bottom boundary
+            ctx.strokeStyle = '#FFF';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 40);
+            ctx.lineTo(canvas.width, canvas.height - 40);
+            ctx.stroke();
+
+            // Draw pizzas
+            for (const pizza of gameState.pizzas) {
+                // Pizza base (red circle)
+                ctx.fillStyle = '#D32F2F';
+                ctx.beginPath();
+                ctx.arc(pizza.x, pizza.y, 9, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cheese triangles (yellow)
+                ctx.fillStyle = '#FDD835';
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const x1 = pizza.x + Math.cos(angle) * 6;
+                    const y1 = pizza.y + Math.sin(angle) * 6;
+                    const x2 = pizza.x + Math.cos(angle + Math.PI / 6) * 7.2;
+                    const y2 = pizza.y + Math.sin(angle + Math.PI / 6) * 7.2;
+
+                    ctx.beginPath();
+                    ctx.moveTo(pizza.x, pizza.y);
+                    ctx.lineTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+
+            // Draw all players
+            for (const player of gameState.players) {
+                if (!player.alive) continue;
+
+                // Draw body segments
+                ctx.fillStyle = player.color;
+                for (let i = 1; i < player.segments.length; i++) {
+                    const seg = player.segments[i];
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, 7.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Draw head
+                const head = player.segments[0];
+                ctx.save();
+                ctx.translate(head.x, head.y);
+                ctx.rotate(player.angle);
+
+                // Head circle (lighter color)
+                const headColor = lightenColor(player.color, 20);
+                ctx.fillStyle = headColor;
+                ctx.beginPath();
+                ctx.arc(0, 0, 7.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Eyes (white)
+                ctx.fillStyle = '#FFF';
+                ctx.beginPath();
+                ctx.arc(4, -3, 2, 0, Math.PI * 2);
+                ctx.arc(4, 3, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Pupils (black)
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(4.5, -3, 0.8, 0, Math.PI * 2);
+                ctx.arc(4.5, 3, 0.8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+
+                // Draw player name above head
+                ctx.fillStyle = player.color;
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.name, head.x, head.y - 15);
+            }
+
+            // Update scoreboard
+            updateScoreboard();
+        }
+
+        function updateScoreboard() {
+            if (!gameState) return;
+
+            playerList.innerHTML = '';
+
+            // Sort players by score
+            const sortedPlayers = [...gameState.players].sort((a, b) => b.score - a.score);
+
+            for (const player of sortedPlayers) {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-score';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'player-name';
+                nameSpan.style.color = player.color;
+                nameSpan.textContent = player.name;
+
+                const scoreSpan = document.createElement('span');
+                scoreSpan.textContent = player.score;
+
+                const statusSpan = document.createElement('div');
+                statusSpan.className = 'player-status' + (player.alive ? '' : ' dead');
+                statusSpan.textContent = player.alive ? '' : 'Мертв';
+
+                playerDiv.appendChild(nameSpan);
+                playerDiv.appendChild(scoreSpan);
+                if (!player.alive) {
+                    playerDiv.appendChild(statusSpan);
+                }
+
+                playerList.appendChild(playerDiv);
+            }
+        }
+
+        function lightenColor(color, percent) {
+            const num = parseInt(color.replace('#', ''), 16);
+            const r = Math.min(255, ((num >> 16) & 0xFF) + percent);
+            const g = Math.min(255, ((num >> 8) & 0xFF) + percent);
+            const b = Math.min(255, (num & 0xFF) + percent);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        // Animation loop
+        function animate() {
+            if (gameState && canvas.classList.contains('active')) {
+                render();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

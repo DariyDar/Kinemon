@@ -1,0 +1,25 @@
+{
+  "name": "kinemon-games",
+  "version": "3.0.0",
+  "description": "Motion-controlled games with offline and online multiplayer modes",
+  "main": "server.js",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "update-url": "node update-server-url.js"
+  },
+  "keywords": [
+    "game",
+    "motion-control",
+    "websocket",
+    "multiplayer"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.14.2"
+  }
+}

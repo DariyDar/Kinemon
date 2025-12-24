@@ -261,6 +261,14 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
         serverUrlInput.value = defaultServer;
 
+        // Wake up Render server on page load (free tier spins down after inactivity)
+        if (!isLocalhost) {
+            console.log('🔄 Waking up Render server...');
+            fetch('https://kinemon.onrender.com')
+                .then(() => console.log('✅ Server wake-up request sent'))
+                .catch((err) => console.log('⚠️ Server wake-up failed:', err));
+        }
+
         // Check URL parameters (from QR code scan)
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');

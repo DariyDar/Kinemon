@@ -206,6 +206,10 @@
             <input type="text" id="serverUrl" placeholder="ws://localhost:8080">
             <br>
             <button class="btn" id="connectBtn">Подключиться</button>
+            <p style="font-size: 14px; opacity: 0.6; margin-top: 20px;">
+                ⏱️ Первое подключение может занять 30-60 сек<br>
+                (бесплатный сервер просыпается)
+            </p>
         </div>
 
         <!-- Waiting for Players Screen -->
@@ -270,6 +274,14 @@
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
         serverUrlInput.value = defaultServer;
+
+        // Wake up Render server on page load (free tier spins down after inactivity)
+        if (!isLocalhost) {
+            console.log('🔄 Waking up Render server...');
+            fetch('https://kinemon.onrender.com')
+                .then(() => console.log('✅ Server wake-up request sent'))
+                .catch((err) => console.log('⚠️ Server wake-up failed:', err));
+        }
 
         function showScreen(screenName) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));

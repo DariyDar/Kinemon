@@ -174,7 +174,7 @@
         <!-- Room Input Screen -->
         <div id="roomInputScreen" class="screen active">
             <h1>📱 Контроллер</h1>
-            <p>Присоединяйтесь к игре</p>
+            <p id="joinPrompt">Присоединяйтесь к игре</p>
 
             <button class="btn" id="scanQrBtn">📷 Сканировать QR-код</button>
             <p style="font-size: 14px; opacity: 0.5;">или</p>
@@ -186,6 +186,10 @@
             <input type="text" id="serverUrl" placeholder="Адрес сервера" value="">
             <br>
             <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
+            <p id="qrHint" style="font-size: 14px; opacity: 0.6; margin-top: 20px; display: none;">
+                ✅ Данные из QR-кода загружены<br>
+                Нажмите "Подключиться" для продолжения
+            </p>
         </div>
 
         <!-- QR Scanner Screen removed - now using native camera app -->
@@ -280,10 +284,16 @@
             roomIdInput.value = roomFromUrl;
             serverUrlInput.value = serverFromUrl;
 
-            // Auto-connect after a short delay
-            setTimeout(() => {
-                connectToRoom(roomFromUrl, serverFromUrl);
-            }, 500);
+            // Change button text to indicate auto-filled data
+            manualJoinBtn.textContent = 'Подключиться к комнате ' + roomFromUrl;
+            manualJoinBtn.style.fontSize = '20px';
+
+            // Show hint
+            document.getElementById('qrHint').style.display = 'block';
+            document.getElementById('joinPrompt').textContent = '✅ QR-код отсканирован!';
+
+            // DO NOT auto-connect - iOS requires user interaction for sensor permission
+            // User must click the button to grant permission
         }
 
         function showScreen(screenName) {

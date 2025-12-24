@@ -381,8 +381,35 @@
                     manualJoinBtn.textContent = 'Подключиться';
 
                     // Motion controller already initialized with permission granted
-                    // Just initialize calibration
+                    // Initialize calibration
                     calibration = new Calibration(motionController);
+
+                    // Set calibration complete callback
+                    calibration.onComplete = (min, max) => {
+                        console.log('Calibration complete:', min, max);
+
+                        // Send join message
+                        ws.send(JSON.stringify({
+                            type: 'join',
+                            roomId: roomId,
+                            name: playerNameInput.value.trim() || 'Player'
+                        }));
+
+                        playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
+                        showScreen('controller');
+
+                        // Start sending tilt data
+                        motionController.onTiltChange = (normalized) => {
+                            tiltDisplay.textContent = normalized.toFixed(2);
+
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    type: 'input',
+                                    tilt: normalized
+                                }));
+                            }
+                        };
+                    };
 
                     // Start motion tracking and calibration
                     try {
@@ -441,32 +468,6 @@
         setMaxBtn.addEventListener('click', () => {
             calibration.setMaxPosition();
         });
-
-        calibration.onComplete = (min, max) => {
-            console.log('Calibration complete:', min, max);
-
-            // Send join message
-            ws.send(JSON.stringify({
-                type: 'join',
-                roomId: roomId,
-                name: playerNameInput.value.trim() || 'Player'
-            }));
-
-            playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
-            showScreen('controller');
-
-            // Start sending tilt data
-            motionController.onTiltChange = (normalized) => {
-                tiltDisplay.textContent = normalized.toFixed(2);
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'input',
-                        tilt: normalized
-                    }));
-                }
-            };
-        };
 
         disconnectBtn.addEventListener('click', () => {
             if (ws) {

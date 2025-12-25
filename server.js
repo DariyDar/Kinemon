@@ -54,10 +54,23 @@ const rooms = new Map();
 // Game constants
 const BASE_MOVE_SPEED = 1.8;
 const INITIAL_LENGTH = 7;
-const CANVAS = { width: 600, height: 800 };
+const DEFAULT_CANVAS = { width: 600, height: 800 };
 const BASE_SEGMENT_SIZE = 15;
 const BASE_PIZZA_SIZE = 18;
 const BOUNDARY_MARGIN_BOTTOM = 40;
+
+// Get canvas size based on field size setting
+function getCanvasSize(fieldSize) {
+    switch (fieldSize) {
+        case 'small':
+            return { width: 600, height: 800 };
+        case 'medium':
+            return { width: 960, height: 1280 }; // 80% of 1200x1600
+        case 'large':
+        default:
+            return { width: 1200, height: 1600 }; // Full screen
+    }
+}
 
 // Generate random room ID
 function generateRoomId() {
@@ -80,12 +93,19 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         gameLoopInterval: null
     };
 
+    // Set canvas size based on field size (for Snake) or use default (for Pong)
+    if (gameType === 'snake' && settings.fieldSize) {
+        room.canvas = getCanvasSize(settings.fieldSize);
+    } else {
+        room.canvas = { ...DEFAULT_CANVAS };
+    }
+
     // Initialize game-specific state
     if (gameType === 'pong') {
         // Pong: ball and scores
         room.ball = {
-            x: CANVAS.width / 2,
-            y: CANVAS.height / 2,
+            x: room.canvas.width / 2,
+            y: room.canvas.height / 2,
             radius: 8,
             speedX: (settings.ballSpeed || 3) * 0.8,
             speedY: (settings.ballSpeed || 3) * 0.6
@@ -121,9 +141,9 @@ function spawnPizza(room) {
     const pizzaSize = room ? room.pizzaSize : BASE_PIZZA_SIZE;
     const margin = pizzaSize;
     const minX = margin;
-    const maxX = CANVAS.width - margin;
+    const maxX = room.canvas.width - margin;
     const minY = margin;
-    const maxY = CANVAS.height - BOUNDARY_MARGIN_BOTTOM - margin;
+    const maxY = room.canvas.height - BOUNDARY_MARGIN_BOTTOM - margin;
 
     return {
         x: minX + Math.random() * (maxX - minX),
@@ -189,16 +209,16 @@ wss.on('connection', (ws) => {
                 if (room.gameType === 'pong') {
                     // Pong: paddle position (left or right)
                     const isPlayer1 = room.players.size === 0;
-                    player.paddleY = CANVAS.height / 2 - room.paddleSize / 2;
-                    player.paddleX = isPlayer1 ? 20 : CANVAS.width - 30;
+                    player.paddleY = room.canvas.height / 2 - room.paddleSize / 2;
+                    player.paddleX = isPlayer1 ? 20 : room.canvas.width - 30;
                     player.side = isPlayer1 ? 'left' : 'right';
                 } else {
                     // Snake: segments and position
                     player.alive = true;
                     player.segments = [];
                     player.angle = 0;
-                    player.headX = CANVAS.width / 2 + (Math.random() - 0.5) * 200;
-                    player.headY = CANVAS.height / 2 + (Math.random() - 0.5) * 200;
+                    player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
+                    player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
 
                     // Initialize snake segments using room's segment size
                     for (let i = 0; i < INITIAL_LENGTH; i++) {
@@ -291,7 +311,7 @@ function hasDisplayClient(roomId) {
 function serializeGameState(room) {
     const state = {
         gameType: room.gameType,
-        canvas: CANVAS
+        canvas: room.canvas
     };
 
     if (room.gameType === 'pong') {
@@ -395,9 +415,9 @@ function updateSnake(room) {
 
         // Wrap around screen
         const minX = 0;
-        const maxX = CANVAS.width;
+        const maxX = room.canvas.width;
         const minY = 0;
-        const maxY = CANVAS.height - BOUNDARY_MARGIN_BOTTOM;
+        const maxY = room.canvas.height - BOUNDARY_MARGIN_BOTTOM;
 
         if (player.headX < minX) player.headX = maxX;
         if (player.headX > maxX) player.headX = minX;
@@ -427,13 +447,13 @@ function updatePong(room) {
         // Map tilt (0-1) to paddle Y position
         // tilt 0 (bottom) -> paddle at bottom
         // tilt 1 (top) -> paddle at top
-        const targetY = (1 - player.tilt) * (CANVAS.height - room.paddleSize);
+        const targetY = (1 - player.tilt) * (room.canvas.height - room.paddleSize);
 
         // Smooth movement
         player.paddleY += (targetY - player.paddleY) * 0.3;
 
         // Clamp position
-        player.paddleY = Math.max(0, Math.min(CANVAS.height - room.paddleSize, player.paddleY));
+        player.paddleY = Math.max(0, Math.min(room.canvas.height - room.paddleSize, player.paddleY));
     }
 
     // Update ball position
@@ -441,7 +461,7 @@ function updatePong(room) {
     room.ball.y += room.ball.speedY;
 
     // Top and bottom wall collision
-    if (room.ball.y - room.ball.radius < 0 || room.ball.y + room.ball.radius > CANVAS.height) {
+    if (room.ball.y - room.ball.radius < 0 || room.ball.y + room.ball.radius > room.canvas.height) {
         room.ball.speedY = -room.ball.speedY;
     }
 
@@ -485,7 +505,7 @@ function updatePong(room) {
             console.log(`${rightPlayer.name} scored! Score: ${players[0]?.score || 0} - ${rightPlayer.score}`);
         }
         resetBall(room);
-    } else if (room.ball.x > CANVAS.width) {
+    } else if (room.ball.x > room.canvas.width) {
         // Left player scores
         const players = Array.from(room.players.values());
         const leftPlayer = players.find(p => p.side === 'left');
@@ -499,8 +519,8 @@ function updatePong(room) {
 
 // Reset ball to center (Pong)
 function resetBall(room) {
-    room.ball.x = CANVAS.width / 2;
-    room.ball.y = CANVAS.height / 2;
+    room.ball.x = room.canvas.width / 2;
+    room.ball.y = room.canvas.height / 2;
     room.ball.speedX = -room.ball.speedX;
     room.ball.speedY = (Math.random() - 0.5) * 8;
 }

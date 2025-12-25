@@ -591,10 +591,24 @@
 
                     } else if (data.type === 'init') {
                         gameState = data.gameState;
+
+                        // Update canvas size from server
+                        if (gameState.canvas) {
+                            canvas.width = gameState.canvas.width;
+                            canvas.height = gameState.canvas.height;
+                        }
+
                         updatePlayerCount();
 
                     } else if (data.type === 'update') {
                         gameState = data.gameState;
+
+                        // Update canvas size if it changed
+                        if (gameState.canvas && (canvas.width !== gameState.canvas.width || canvas.height !== gameState.canvas.height)) {
+                            canvas.width = gameState.canvas.width;
+                            canvas.height = gameState.canvas.height;
+                        }
+
                         updatePlayerCount();
 
                         // Switch to game screen when first player joins

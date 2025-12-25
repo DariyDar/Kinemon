@@ -77,7 +77,9 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         gameType: gameType, // 'pong' or 'snake'
         settings: settings,
         players: new Map(),
-        gameLoopInterval: null
+        gameLoopInterval: null,
+        winner: null,
+        gameOver: false
     };
 
     // Set canvas size based on client viewport dimensions (for Snake) or use default (for Pong)
@@ -113,7 +115,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.pizzaSize = BASE_PIZZA_SIZE * room.sizeMultiplier;
 
         room.pizzas = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 100; i++) {
             room.pizzas.push(spawnPizza(room));
         }
     }
@@ -141,6 +143,38 @@ function spawnPizza(room) {
         y: minY + Math.random() * (maxY - minY),
         id: Date.now() + Math.random()
     };
+}
+
+// Drop pizzas from dead snake body
+function dropPizzasFromSnake(room, player) {
+    const pizzasToDrop = player.score;
+
+    if (pizzasToDrop === 0 || player.segments.length === 0) return;
+
+    // Distribute pizzas along snake body
+    for (let i = 0; i < pizzasToDrop; i++) {
+        // Pick random segment from snake body
+        const segmentIndex = Math.floor(Math.random() * player.segments.length);
+        const segment = player.segments[segmentIndex];
+
+        // Add random scatter offset (-20 to +20 pixels)
+        const scatterX = (Math.random() - 0.5) * 40;
+        const scatterY = (Math.random() - 0.5) * 40;
+
+        const droppedPizza = {
+            x: segment.x + scatterX,
+            y: segment.y + scatterY,
+            id: Date.now() + Math.random()
+        };
+
+        // Keep pizza within bounds
+        droppedPizza.x = Math.max(room.pizzaSize, Math.min(room.canvas.width - room.pizzaSize, droppedPizza.x));
+        droppedPizza.y = Math.max(room.pizzaSize, Math.min(room.canvas.height - BOUNDARY_MARGIN_BOTTOM - room.pizzaSize, droppedPizza.y));
+
+        room.pizzas.push(droppedPizza);
+    }
+
+    console.log(`${player.name} dropped ${pizzasToDrop} pizzas`);
 }
 
 // Handle WebSocket connections
@@ -333,6 +367,12 @@ function serializeGameState(room) {
         state.pizzas = room.pizzas;
         state.segmentSize = room.segmentSize;
         state.pizzaSize = room.pizzaSize;
+        state.gameOver = room.gameOver;
+        state.winner = room.winner ? {
+            id: room.winner.id,
+            name: room.winner.name,
+            score: room.winner.score
+        } : null;
     }
 
     return state;
@@ -412,7 +452,7 @@ function updateSnake(room) {
 
         if (player.headX < minX) player.headX = maxX;
         if (player.headX >= maxX) player.headX = minX;
-        if (player.headY < minY) player.headY = maxY;
+        if (player.headY < minY) player.headY = maxY - 1;
         if (player.headY >= maxY) player.headY = minY;
 
         // Add new head segment
@@ -532,7 +572,13 @@ function checkCollisions(room) {
                 // Ate pizza
                 room.pizzas.splice(i, 1);
                 player.score++;
-                room.pizzas.push(spawnPizza(room));
+
+                // Check for win condition
+                if (player.score >= 50) {
+                    room.winner = player;
+                    room.gameOver = true;
+                    console.log(`${player.name} wins with 50 pizzas!`);
+                }
             }
         }
 
@@ -544,6 +590,7 @@ function checkCollisions(room) {
 
             if (dist < room.segmentSize * 0.8) {
                 player.alive = false;
+                dropPizzasFromSnake(room, player);
                 console.log(`Player ${player.id} died (self-collision) in room ${room.id}`);
             }
         }
@@ -560,6 +607,7 @@ function checkCollisions(room) {
                 if (dist < room.segmentSize * 0.8) {
                     // Player whose head collided dies
                     player.alive = false;
+                    dropPizzasFromSnake(room, player);
                     console.log(`Player ${player.id} died (hit ${otherPlayer.id}) in room ${room.id}`);
                     break;
                 }

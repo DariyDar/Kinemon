@@ -265,6 +265,14 @@
             <p id="playerCount" style="font-size: 20px; color: #4CAF50;">Игроков: 0</p>
         </div>
 
+        <!-- Win Screen -->
+        <div id="winScreen" class="screen">
+            <h1>🏆 Победа!</h1>
+            <p id="winnerName" style="font-size: 32px; margin: 20px 0;"></p>
+            <p>Собрал 50 пицц!</p>
+            <button class="btn" onclick="window.location.href='index.html'">Вернуться в меню</button>
+        </div>
+
         <!-- Game Display -->
         <canvas id="gameCanvas" width="600" height="800"></canvas>
 
@@ -479,6 +487,11 @@
                 canvas.classList.remove('active');
                 roomInfo.style.display = 'none';
                 scoreboard.style.display = 'none';
+            } else if (screenName === 'win') {
+                document.getElementById('winScreen').classList.add('active');
+                canvas.classList.remove('active');
+                roomInfo.style.display = 'none';
+                scoreboard.style.display = 'none';
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
                 roomInfo.style.display = 'block';
@@ -625,6 +638,12 @@
         function render() {
             if (!gameState) return;
 
+            // Check for game over
+            if (gameState.gameOver && gameState.winner) {
+                showWinScreen(gameState.winner);
+                return;
+            }
+
             if (gameState.gameType === 'pong') {
                 renderPong();
             } else {
@@ -633,6 +652,19 @@
 
             // Update scoreboard
             updateScoreboard();
+        }
+
+        function showWinScreen(winner) {
+            // Set winner name
+            document.getElementById('winnerName').textContent = winner.name;
+
+            // Show win screen
+            showScreen('win');
+
+            // Hide game elements
+            canvas.classList.remove('active');
+            roomInfo.style.display = 'none';
+            scoreboard.style.display = 'none';
         }
 
         function renderPong() {

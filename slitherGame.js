@@ -20,13 +20,14 @@ class SlitherGame {
 
         // Settings multipliers (can be set from settings)
         this.turnSpeedMultiplier = 1; // 1x-5x
-        this._moveSpeedMultiplier = 4; // 1-5 (default 4, which is current speed)
+        this.controlMapping = 'linear'; // 'linear', 'nonlinear_a', 'nonlinear_b'
+        this._moveSpeedMultiplier = 3; // 1-3 (default 3, which is current speed - fastest)
         this._sizeMultiplier = 1; // 1-5 (default 1, minimum)
 
         // Calculated values based on multipliers
         this.SEGMENT_SIZE = this.BASE_SEGMENT_SIZE * this._sizeMultiplier;
         this.PIZZA_SIZE = this.BASE_PIZZA_SIZE * this._sizeMultiplier;
-        this.MOVE_SPEED = this.BASE_MOVE_SPEED * (this._moveSpeedMultiplier / 4); // Normalize to current speed
+        this.MOVE_SPEED = this.BASE_MOVE_SPEED * (this._moveSpeedMultiplier / 3); // Normalize to current speed (3 = fastest)
 
         // Determine which axis to use (the one with greater range during calibration)
         const calibrationData = this.motionController.getCalibrationData();
@@ -164,17 +165,37 @@ class SlitherGame {
         // Get tilt and convert to rotation speed
         const tilt = this.motionController.getNormalizedTilt();
 
-        // Map tilt to rotation
-        // At edges (0 or 1), snake should make a circle with radius = 3 segments
-        // Circle circumference = 2πr = 2π * 3 * SEGMENT_SIZE
-        // At max speed, complete circle with 6-segment snake
+        // Map tilt to rotation with control mapping
         const circleRadius = 3 * this.SEGMENT_SIZE;
         const maxRotationSpeed = this.MOVE_SPEED / circleRadius; // radians per frame
 
         // Tilt 0.5 = center = no rotation
         // Tilt 0 or 1 = max rotation
         const tiltDeviation = (tilt - 0.5) * 2; // -1 to 1
-        const rotationSpeed = tiltDeviation * maxRotationSpeed * 2.4 * this.turnSpeedMultiplier; // 2x base (was 1.2), then multiplied by settings
+
+        // Apply control mapping curve
+        let mappedDeviation = tiltDeviation;
+        if (this.controlMapping === 'nonlinear_a') {
+            // Moderate curve: dead zone 0.3, quadratic ramp
+            const absVal = Math.abs(tiltDeviation);
+            if (absVal < 0.3) {
+                mappedDeviation = 0;
+            } else {
+                const normalized = (absVal - 0.3) / 0.7; // 0 to 1
+                mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized);
+            }
+        } else if (this.controlMapping === 'nonlinear_b') {
+            // Strong curve: dead zone 0.4, cubic ramp
+            const absVal = Math.abs(tiltDeviation);
+            if (absVal < 0.4) {
+                mappedDeviation = 0;
+            } else {
+                const normalized = (absVal - 0.4) / 0.6; // 0 to 1
+                mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * normalized);
+            }
+        }
+
+        const rotationSpeed = mappedDeviation * maxRotationSpeed * 2.4 * this.turnSpeedMultiplier; // 2x base, then multiplied by settings
 
         // Update angle
         this.snake.angle += rotationSpeed;
@@ -389,7 +410,7 @@ class SlitherGame {
      */
     set moveSpeedMultiplier(value) {
         this._moveSpeedMultiplier = value;
-        this.MOVE_SPEED = this.BASE_MOVE_SPEED * (value / 4);
+        this.MOVE_SPEED = this.BASE_MOVE_SPEED * (value / 3); // 3 = fastest
     }
 
     get moveSpeedMultiplier() {

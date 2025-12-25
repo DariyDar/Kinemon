@@ -385,13 +385,21 @@
             </div>
 
             <div class="setting-group">
+                <label for="snakeControlMapping">Режим управления</label>
+                <select id="snakeControlMapping">
+                    <option value="linear">Линейный</option>
+                    <option value="nonlinear_a">Нелинейный A (умеренный)</option>
+                    <option value="nonlinear_b">Нелинейный B (сильный)</option>
+                </select>
+                <div class="setting-info">Мёртвая зона и кривая поворота</div>
+            </div>
+
+            <div class="setting-group">
                 <label for="snakeMoveSpeed">Скорость движения</label>
                 <select id="snakeMoveSpeed">
-                    <option value="1">1 - Очень медленно</option>
-                    <option value="2">2 - Медленно</option>
-                    <option value="3">3 - Нормально</option>
-                    <option value="4">4 - Быстро</option>
-                    <option value="5">5 - Очень быстро</option>
+                    <option value="1">Медленная</option>
+                    <option value="2">Средняя</option>
+                    <option value="3">Быстрая</option>
                 </select>
                 <div class="setting-info">Влияет на скорость движения змейки</div>
             </div>
@@ -426,7 +434,8 @@
         // Game settings
         const gameSettings = {
             snakeTurnSpeed: 2, // Default 2x
-            snakeMoveSpeed: 4, // Default 4 (current speed)
+            snakeControlMapping: 'linear', // Default linear
+            snakeMoveSpeed: 3, // Default 3 (fastest)
             snakeSize: 1 // Default 1 (minimum)
         };
 
@@ -457,6 +466,7 @@
 
         // Settings
         const snakeTurnSpeedSelect = document.getElementById('snakeTurnSpeed');
+        const snakeControlMappingSelect = document.getElementById('snakeControlMapping');
         const snakeMoveSpeedSelect = document.getElementById('snakeMoveSpeed');
         const snakeSizeSelect = document.getElementById('snakeSize');
 
@@ -464,6 +474,10 @@
         if (localStorage.getItem('snakeTurnSpeed')) {
             gameSettings.snakeTurnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed'));
             snakeTurnSpeedSelect.value = gameSettings.snakeTurnSpeed;
+        }
+        if (localStorage.getItem('snakeControlMapping')) {
+            gameSettings.snakeControlMapping = localStorage.getItem('snakeControlMapping');
+            snakeControlMappingSelect.value = gameSettings.snakeControlMapping;
         }
         if (localStorage.getItem('snakeMoveSpeed')) {
             gameSettings.snakeMoveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed'));
@@ -495,6 +509,18 @@
             if (currentGame && currentGame.turnSpeedMultiplier !== undefined) {
                 currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
                 console.log('Turn speed updated to', gameSettings.snakeTurnSpeed);
+            }
+        });
+
+        // Save control mapping setting
+        snakeControlMappingSelect.addEventListener('change', () => {
+            gameSettings.snakeControlMapping = snakeControlMappingSelect.value;
+            localStorage.setItem('snakeControlMapping', gameSettings.snakeControlMapping);
+
+            // Apply to current game if it's a snake game
+            if (currentGame && currentGame.controlMapping !== undefined) {
+                currentGame.controlMapping = gameSettings.snakeControlMapping;
+                console.log('Control mapping updated to', gameSettings.snakeControlMapping);
             }
         });
 
@@ -671,9 +697,10 @@
                 currentGame = new SlitherGame('gameCanvas', motionController);
                 // Apply settings
                 currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
+                currentGame.controlMapping = gameSettings.snakeControlMapping;
                 currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
                 currentGame.sizeMultiplier = gameSettings.snakeSize;
-                console.log('Applied settings - Turn:', gameSettings.snakeTurnSpeed, 'Move:', gameSettings.snakeMoveSpeed, 'Size:', gameSettings.snakeSize);
+                console.log('Applied settings - Turn:', gameSettings.snakeTurnSpeed, 'Control:', gameSettings.snakeControlMapping, 'Move:', gameSettings.snakeMoveSpeed, 'Size:', gameSettings.snakeSize);
 
                 // Start game immediately
                 showScreen('game');

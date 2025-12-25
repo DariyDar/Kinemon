@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Kinemon Games</title>
+    <title>Kinemon Games - Выбор игры</title>
     <style>
         * {
             margin: 0;
@@ -19,44 +19,22 @@
             min-height: 100vh;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             color: white;
-            touch-action: none;
         }
 
-        #gameContainer {
-            width: 100%;
-            max-width: 100vw;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
-
-        .screen {
+        #container {
             text-align: center;
-            padding: 20px;
-            display: none;
-            max-width: 500px;
+            padding: 40px;
+            max-width: 600px;
         }
 
-        .screen.active {
-            display: block;
-        }
-
-        .screen h1 {
+        h1 {
             font-size: 48px;
             margin-bottom: 20px;
         }
 
-        .screen h2 {
-            font-size: 32px;
-            margin-bottom: 20px;
-        }
-
-        .screen p {
+        p {
             font-size: 18px;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
             opacity: 0.8;
             line-height: 1.6;
         }
@@ -65,747 +43,76 @@
             background: #4CAF50;
             color: white;
             border: none;
-            padding: 20px 40px;
-            font-size: 24px;
+            padding: 30px 50px;
+            font-size: 28px;
             border-radius: 10px;
             cursor: pointer;
             font-weight: bold;
-            margin: 10px;
+            margin: 15px;
             display: inline-block;
-            min-width: 200px;
+            min-width: 250px;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #45a049;
         }
 
         .btn:active {
-            background: #45a049;
+            background: #3d8b40;
         }
 
         .btn-secondary {
             background: #2196F3;
         }
 
-        .btn-secondary:active {
+        .btn-secondary:hover {
             background: #0b7dda;
         }
 
-        .btn-danger {
-            background: #F44336;
-        }
-
-        .btn-danger:active {
-            background: #da190b;
+        .btn-secondary:active {
+            background: #0a6bc2;
         }
 
         .game-list {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
             margin-top: 20px;
-        }
-
-        canvas {
-            border: 2px solid #333;
-            display: none;
-            max-width: 100vw;
-            max-height: 100vh;
-        }
-
-        canvas.active {
-            display: block;
-        }
-
-        #score {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 32px;
-            z-index: 10;
-            display: none;
-        }
-
-        #score.active {
-            display: block;
-        }
-
-        #exitBtn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(244, 67, 54, 0.8);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 18px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            z-index: 100;
-            display: none;
-        }
-
-        #exitBtn.active {
-            display: block;
-        }
-
-        #exitBtn:active {
-            background: rgba(244, 67, 54, 1);
         }
 
         #version {
             position: absolute;
             bottom: 10px;
-            left: 10px;
+            right: 10px;
             font-size: 14px;
             opacity: 0.7;
             background: rgba(0, 0, 0, 0.5);
             padding: 5px 10px;
             border-radius: 5px;
-            z-index: 100;
-        }
-
-        #settingsBtn {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(76, 175, 80, 0.8);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            font-size: 18px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            z-index: 100;
-            display: none;
-        }
-
-        #settingsBtn.active {
-            display: block;
-        }
-
-        #settingsBtn:active {
-            background: rgba(76, 175, 80, 1);
-        }
-
-        #settingsDropdown {
-            position: absolute;
-            top: 50px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.95);
-            border: 2px solid #4CAF50;
-            border-radius: 10px;
-            padding: 20px;
-            display: none;
-            z-index: 150;
-            min-width: 250px;
-        }
-
-        #settingsDropdown.active {
-            display: block;
-        }
-
-        .setting-group {
-            margin-bottom: 20px;
-        }
-
-        .setting-group label {
-            display: block;
-            font-size: 14px;
-            margin-bottom: 8px;
-            color: #4CAF50;
-            font-weight: bold;
-        }
-
-        .setting-group select {
-            width: 100%;
-            padding: 8px;
-            font-size: 14px;
-            background: #222;
-            color: white;
-            border: 1px solid #4CAF50;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        .setting-group select:focus {
-            outline: none;
-            border-color: #66BB6A;
-        }
-
-        .setting-info {
-            font-size: 12px;
-            color: #888;
-            margin-top: 5px;
-        }
-
-        #debugInfo {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            font-size: 12px;
-            opacity: 0.5;
-            z-index: 100;
-        }
-
-        .calibration-indicator {
-            font-size: 64px;
-            margin: 20px 0;
-        }
-
-        .instruction {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
-
-        .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 200;
-        }
-
-        .overlay.active {
-            display: flex;
-        }
-
-        .overlay-content {
-            text-align: center;
-            padding: 40px;
-            background: #222;
-            border-radius: 20px;
-            max-width: 400px;
-        }
-
-        .countdown {
-            font-size: 72px;
-            font-weight: bold;
-            color: #4CAF50;
-            margin: 20px 0;
         }
     </style>
 </head>
 <body>
-    <div id="gameContainer">
-        <!-- Mode Selection Screen -->
-        <div id="modeSelection" class="screen active">
-            <h1>🎮 Kinemon Games</h1>
-            <p>Выберите режим игры</p>
-            <div class="game-list">
-                <button class="btn" id="offlineBtn">📱 Оффлайн</button>
-                <button class="btn btn-secondary" id="onlineBtn">🌐 Онлайн</button>
-            </div>
+    <div id="container">
+        <h1>🎮 Kinemon Games</h1>
+        <p>Выберите игру для онлайн мультиплеера</p>
+        <div class="game-list">
+            <button class="btn" id="pongBtn">🏓 Pong</button>
+            <button class="btn btn-secondary" id="snakeBtn">🐍 Pizza Snake</button>
         </div>
-
-        <!-- Online Role Selection -->
-        <div id="onlineRoleSelection" class="screen">
-            <h1>🌐 Онлайн режим</h1>
-            <p>Выберите роль</p>
-            <div class="game-list">
-                <button class="btn" id="controllerRoleBtn">📱 Контроллер<br><small style="font-size: 14px;">Управление с телефона</small></button>
-                <button class="btn btn-secondary" id="displayRoleBtn">🖥️ Экран<br><small style="font-size: 14px;">Отображение на компьютере</small></button>
-            </div>
-            <button class="btn btn-danger" id="backFromOnlineBtn" style="margin-top: 20px; min-width: 150px;">← Назад</button>
-        </div>
-
-        <!-- Main Menu -->
-        <div id="mainMenu" class="screen">
-            <h1>🎮 Kinemon Games</h1>
-            <p>Управляйте играми наклоном телефона</p>
-            <div class="game-list">
-                <button class="btn" data-game="pong">🏓 Pong</button>
-                <button class="btn" data-game="snake">🐍 Pizza Snake</button>
-            </div>
-            <button class="btn btn-secondary" id="settingsBtnMenu" style="margin-top: 20px; min-width: 200px;">⚙️ Настройки</button>
-        </div>
-
-        <!-- Calibration Screen - Min Position -->
-        <div id="calibrationMinScreen" class="screen">
-            <h2>Калибровка</h2>
-            <div class="calibration-indicator">⬇️</div>
-            <div class="instruction">
-                <p><strong>Шаг 1 из 2</strong></p>
-                <p>Наклоните телефон в положение<br>для НИЖНЕЙ позиции</p>
-            </div>
-            <button id="setMinBtn" class="btn">Зафиксировать</button>
-        </div>
-
-        <!-- Calibration Screen - Max Position -->
-        <div id="calibrationMaxScreen" class="screen">
-            <h2>Калибровка</h2>
-            <div class="calibration-indicator">⬆️</div>
-            <div class="instruction">
-                <p><strong>Шаг 2 из 2</strong></p>
-                <p>Наклоните телефон в положение<br>для ВЕРХНЕЙ позиции</p>
-            </div>
-            <button id="setMaxBtn" class="btn">Зафиксировать</button>
-        </div>
-
-
-        <!-- Game Canvas -->
-        <div id="score">
-            <span id="playerScore">0</span> : <span id="aiScore">0</span>
-        </div>
-
-        <button id="exitBtn">Выход</button>
-
-        <canvas id="gameCanvas"></canvas>
-
-        <!-- Death Overlay -->
-        <div id="deathOverlay" class="overlay">
-            <div class="overlay-content">
-                <h2>Игра окончена!</h2>
-                <p style="font-size: 36px; margin: 20px 0;"><span id="finalScore">0</span></p>
-                <button id="restartBtn" class="btn">Заново</button>
-                <button id="menuBtn" class="btn btn-secondary">В меню</button>
-            </div>
-        </div>
-
-        <div id="version">v3.0</div>
-
-        <!-- Settings Screen -->
-        <div id="settingsScreen" class="screen">
-            <h1>⚙️ Настройки</h1>
-
-            <div class="setting-group">
-                <label for="snakeTurnSpeed">Скорость поворота</label>
-                <select id="snakeTurnSpeed">
-                    <option value="1">1x - Медленно</option>
-                    <option value="2">2x - Нормально</option>
-                    <option value="3">3x - Быстро</option>
-                    <option value="4">4x - Очень быстро</option>
-                    <option value="5">5x - Экстремально</option>
-                </select>
-                <div class="setting-info">Влияет на скорость поворота змейки</div>
-            </div>
-
-            <div class="setting-group">
-                <label for="snakeControlMapping">Режим управления</label>
-                <select id="snakeControlMapping">
-                    <option value="linear">Линейный</option>
-                    <option value="nonlinear_a">Нелинейный A (умеренный)</option>
-                    <option value="nonlinear_b">Нелинейный B (сильный)</option>
-                </select>
-                <div class="setting-info">Мёртвая зона и кривая поворота</div>
-            </div>
-
-            <div class="setting-group">
-                <label for="snakeMoveSpeed">Скорость движения</label>
-                <select id="snakeMoveSpeed">
-                    <option value="1">Медленная</option>
-                    <option value="2">Средняя</option>
-                    <option value="3">Быстрая</option>
-                </select>
-                <div class="setting-info">Влияет на скорость движения змейки</div>
-            </div>
-
-            <div class="setting-group">
-                <label for="fieldSize">Размер игрового поля</label>
-                <select id="fieldSize">
-                    <option value="small">Маленькое (600x800)</option>
-                    <option value="medium">Среднее (80%)</option>
-                    <option value="large">Большое (весь экран)</option>
-                </select>
-                <div class="setting-info">Влияет на размер игрового поля</div>
-            </div>
-
-            <div class="setting-group">
-                <label for="snakeSize">Размер змейки</label>
-                <select id="snakeSize">
-                    <option value="1">1 - Минимум</option>
-                    <option value="2">2 - Маленький</option>
-                    <option value="3">3 - Средний</option>
-                    <option value="4">4 - Большой</option>
-                    <option value="5">5 - Максимум</option>
-                </select>
-                <div class="setting-info">Влияет на размер змейки и пиццы</div>
-            </div>
-
-            <button class="btn" id="backFromSettingsBtn" style="margin-top: 20px; min-width: 150px;">← Назад</button>
-        </div>
-
-        <button id="settingsBtn">⚙️ Настройки</button>
-
-        <div id="settingsDropdown"></div>
-
-        <div id="debugInfo"></div>
     </div>
 
-    <!-- Import modules -->
-    <script src="motionController.js"></script>
-    <script src="calibration.js"></script>
-    <script src="pongGame.js"></script>
-    <script src="slitherGame.js"></script>
+    <div id="version">v3.1</div>
 
     <script>
-        // Game state
-        let currentGame = null;
-        let currentGameType = null;
-
-        // Game settings (expose globally for slitherGame.js)
-        window.gameSettings = {
-            snakeTurnSpeed: 2, // Default 2x
-            snakeControlMapping: 'linear', // Default linear
-            snakeMoveSpeed: 3, // Default 3 (fastest)
-            fieldSize: 'large', // Default large (fullscreen)
-            snakeSize: 1 // Default 1 (minimum)
-        };
-        const gameSettings = window.gameSettings;
-
-        // Initialize controllers
-        const motionController = new MotionController();
-        const calibration = new Calibration(motionController);
-
-        // UI elements
-        const modeSelection = document.getElementById('modeSelection');
-        const onlineRoleSelection = document.getElementById('onlineRoleSelection');
-        const mainMenu = document.getElementById('mainMenu');
-        const settingsScreen = document.getElementById('settingsScreen');
-        const calibrationMinScreen = document.getElementById('calibrationMinScreen');
-        const calibrationMaxScreen = document.getElementById('calibrationMaxScreen');
-        const centeringScreen = document.getElementById('centeringScreen');
-        const canvas = document.getElementById('gameCanvas');
-        const scoreDisplay = document.getElementById('score');
-        const exitBtn = document.getElementById('exitBtn');
-        const debugInfo = document.getElementById('debugInfo');
-        const deathOverlay = document.getElementById('deathOverlay');
-        const settingsBtn = document.getElementById('settingsBtn');
-        const settingsBtnMenu = document.getElementById('settingsBtnMenu');
-
-        // Buttons
-        const setMinBtn = document.getElementById('setMinBtn');
-        const setMaxBtn = document.getElementById('setMaxBtn');
-        const restartBtn = document.getElementById('restartBtn');
-        const menuBtn = document.getElementById('menuBtn');
-        const backFromSettingsBtn = document.getElementById('backFromSettingsBtn');
-
-        // Settings
-        const snakeTurnSpeedSelect = document.getElementById('snakeTurnSpeed');
-        const snakeControlMappingSelect = document.getElementById('snakeControlMapping');
-        const snakeMoveSpeedSelect = document.getElementById('snakeMoveSpeed');
-        const fieldSizeSelect = document.getElementById('fieldSize');
-        const snakeSizeSelect = document.getElementById('snakeSize');
-
-        // Load saved settings from localStorage
-        if (localStorage.getItem('snakeTurnSpeed')) {
-            gameSettings.snakeTurnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed'));
-            snakeTurnSpeedSelect.value = gameSettings.snakeTurnSpeed;
-        }
-        if (localStorage.getItem('snakeControlMapping')) {
-            gameSettings.snakeControlMapping = localStorage.getItem('snakeControlMapping');
-            snakeControlMappingSelect.value = gameSettings.snakeControlMapping;
-        }
-        if (localStorage.getItem('snakeMoveSpeed')) {
-            gameSettings.snakeMoveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed'));
-            snakeMoveSpeedSelect.value = gameSettings.snakeMoveSpeed;
-        }
-        if (localStorage.getItem('fieldSize')) {
-            gameSettings.fieldSize = localStorage.getItem('fieldSize');
-            fieldSizeSelect.value = gameSettings.fieldSize;
-        }
-        if (localStorage.getItem('snakeSize')) {
-            gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize'));
-            snakeSizeSelect.value = gameSettings.snakeSize;
-        }
-
-        // In-game settings button (during game)
-        settingsBtn.addEventListener('click', () => {
-            showScreen('settings');
+        // Redirect to display.html with game type parameter
+        document.getElementById('pongBtn').addEventListener('click', () => {
+            window.location.href = 'display.html?game=pong';
         });
 
-        // Save snake turn speed setting
-        snakeTurnSpeedSelect.addEventListener('change', () => {
-            gameSettings.snakeTurnSpeed = parseInt(snakeTurnSpeedSelect.value);
-            localStorage.setItem('snakeTurnSpeed', gameSettings.snakeTurnSpeed);
-
-            // Apply to current game if it's a snake game
-            if (currentGame && currentGame.turnSpeedMultiplier !== undefined) {
-                currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
-                console.log('Turn speed updated to', gameSettings.snakeTurnSpeed);
-            }
-        });
-
-        // Save control mapping setting
-        snakeControlMappingSelect.addEventListener('change', () => {
-            gameSettings.snakeControlMapping = snakeControlMappingSelect.value;
-            localStorage.setItem('snakeControlMapping', gameSettings.snakeControlMapping);
-
-            // Apply to current game if it's a snake game
-            if (currentGame && currentGame.controlMapping !== undefined) {
-                currentGame.controlMapping = gameSettings.snakeControlMapping;
-                console.log('Control mapping updated to', gameSettings.snakeControlMapping);
-            }
-        });
-
-        // Save snake move speed setting
-        snakeMoveSpeedSelect.addEventListener('change', () => {
-            gameSettings.snakeMoveSpeed = parseInt(snakeMoveSpeedSelect.value);
-            localStorage.setItem('snakeMoveSpeed', gameSettings.snakeMoveSpeed);
-
-            // Apply to current game if it's a snake game
-            if (currentGame && currentGame.moveSpeedMultiplier !== undefined) {
-                currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
-                console.log('Move speed updated to', gameSettings.snakeMoveSpeed);
-            }
-        });
-
-        // Save field size setting
-        fieldSizeSelect.addEventListener('change', () => {
-            gameSettings.fieldSize = fieldSizeSelect.value;
-            localStorage.setItem('fieldSize', gameSettings.fieldSize);
-            console.log('Field size updated to', gameSettings.fieldSize);
-        });
-
-        // Save snake size setting
-        snakeSizeSelect.addEventListener('change', () => {
-            gameSettings.snakeSize = parseInt(snakeSizeSelect.value);
-            localStorage.setItem('snakeSize', gameSettings.snakeSize);
-
-            // Apply to current game if it's a snake game
-            if (currentGame && currentGame.sizeMultiplier !== undefined) {
-                currentGame.sizeMultiplier = gameSettings.snakeSize;
-                console.log('Size updated to', gameSettings.snakeSize);
-            }
-        });
-
-        // Enter fullscreen mode
-        async function enterFullscreen() {
-            const elem = document.documentElement;
-            try {
-                if (elem.requestFullscreen) {
-                    await elem.requestFullscreen();
-                } else if (elem.webkitRequestFullscreen) { // Safari
-                    await elem.webkitRequestFullscreen();
-                } else if (elem.msRequestFullscreen) { // IE11
-                    await elem.msRequestFullscreen();
-                }
-                console.log('Entered fullscreen mode');
-            } catch (error) {
-                console.log('Could not enter fullscreen:', error);
-            }
-        }
-
-        // Exit fullscreen mode
-        function exitFullscreen() {
-            try {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) {
-                    document.msExitFullscreen();
-                }
-            } catch (error) {
-                console.log('Could not exit fullscreen:', error);
-            }
-        }
-
-        // Show specific screen
-        function showScreen(screenName) {
-            // Hide all screens
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            canvas.classList.remove('active');
-            scoreDisplay.classList.remove('active');
-            exitBtn.classList.remove('active');
-            deathOverlay.classList.remove('active');
-            settingsBtn.classList.remove('active');
-            settingsDropdown.classList.remove('active');
-
-            // Show requested screen
-            if (screenName === 'mode-selection') {
-                modeSelection.classList.add('active');
-                exitFullscreen();
-            } else if (screenName === 'online-role') {
-                onlineRoleSelection.classList.add('active');
-            } else if (screenName === 'menu') {
-                mainMenu.classList.add('active');
-                exitFullscreen();
-            } else if (screenName === 'settings') {
-                settingsScreen.classList.add('active');
-                exitFullscreen();
-            } else if (screenName === 'calibration-min') {
-                calibrationMinScreen.classList.add('active');
-            } else if (screenName === 'calibration-max') {
-                calibrationMaxScreen.classList.add('active');
-            } else if (screenName === 'game') {
-                canvas.classList.add('active');
-                exitBtn.classList.add('active');
-                settingsBtn.classList.add('active');
-                if (currentGameType === 'pong') {
-                    scoreDisplay.classList.add('active');
-                }
-                // Enter fullscreen when starting game
-                enterFullscreen();
-            } else if (screenName === 'death') {
-                deathOverlay.classList.add('active');
-            }
-        }
-
-        // Update score display
-        function updateScore() {
-            if (!currentGame) return;
-            const score = currentGame.getScore();
-            if (currentGameType === 'pong') {
-                document.getElementById('playerScore').textContent = score.player;
-                document.getElementById('aiScore').textContent = score.ai;
-            }
-        }
-
-        // Mode selection
-        document.getElementById('offlineBtn').addEventListener('click', () => {
-            showScreen('menu');
-        });
-
-        document.getElementById('onlineBtn').addEventListener('click', () => {
-            showScreen('online-role');
-        });
-
-        document.getElementById('backFromOnlineBtn').addEventListener('click', () => {
-            showScreen('mode-selection');
-        });
-
-        // Settings navigation
-        settingsBtnMenu.addEventListener('click', () => {
-            showScreen('settings');
-        });
-
-        backFromSettingsBtn.addEventListener('click', () => {
-            showScreen('menu');
-        });
-
-        document.getElementById('controllerRoleBtn').addEventListener('click', () => {
-            window.location.href = 'controller.html';
-        });
-
-        document.getElementById('displayRoleBtn').addEventListener('click', () => {
-            window.location.href = 'display.html';
-        });
-
-        // Game selection
-        document.querySelectorAll('[data-game]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                currentGameType = btn.dataset.game;
-                await startGameFlow();
-            });
-        });
-
-        // Start game flow (permission -> calibration -> game)
-        async function startGameFlow() {
-            try {
-                // Request permission
-                await motionController.requestPermission();
-                motionController.start();
-
-                // Start calibration
-                await calibration.start();
-                showScreen('calibration-min');
-            } catch (error) {
-                alert('Ошибка доступа к датчикам: ' + error.message);
-            }
-        }
-
-        // Set minimum position button
-        setMinBtn.addEventListener('click', () => {
-            calibration.setMinPosition();
-            showScreen('calibration-max');
-        });
-
-        // Set maximum position button
-        setMaxBtn.addEventListener('click', () => {
-            calibration.setMaxPosition();
-        });
-
-        // Calibration complete callback
-        calibration.onComplete = (min, max) => {
-            console.log('Calibration complete:', min, max);
-
-            // Create appropriate game
-            if (currentGameType === 'pong') {
-                currentGame = new PongGame('gameCanvas', motionController);
-                showScreen('game');
-                currentGame.start();
-                setInterval(updateScore, 100);
-            } else if (currentGameType === 'snake') {
-                currentGame = new SlitherGame('gameCanvas', motionController);
-                // Apply settings
-                currentGame.turnSpeedMultiplier = gameSettings.snakeTurnSpeed;
-                currentGame.controlMapping = gameSettings.snakeControlMapping;
-                currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
-                currentGame.sizeMultiplier = gameSettings.snakeSize;
-                console.log('Applied settings - Turn:', gameSettings.snakeTurnSpeed, 'Control:', gameSettings.snakeControlMapping, 'Move:', gameSettings.snakeMoveSpeed, 'Size:', gameSettings.snakeSize);
-
-                // Start game immediately
-                showScreen('game');
-                currentGame.start();
-
-                // Update score for snake
-                currentGame.onScoreChange = (score) => {
-                    scoreDisplay.innerHTML = `${score}`;
-                    scoreDisplay.classList.add('active');
-                };
-
-                // Death handler
-                currentGame.onDeath = (score) => {
-                    document.getElementById('finalScore').textContent = score;
-                    showScreen('death');
-                };
-            }
-
-            // Update debug info
-            motionController.onTiltChange = (normalized, raw) => {
-                if (currentGame && currentGame.paddle) {
-                    debugInfo.innerHTML = `Tilt: ${normalized.toFixed(3)}<br>Raw: ${raw.toFixed(1)}°<br>Paddle: ${currentGame.paddle.y.toFixed(0)}`;
-                } else if (currentGame && currentGame.snake) {
-                    debugInfo.innerHTML = `Tilt: ${normalized.toFixed(3)}<br>Raw: ${raw.toFixed(1)}°<br>Angle: ${(currentGame.snake.angle * 180 / Math.PI).toFixed(1)}°`;
-                }
-            };
-        };
-
-
-        // Exit button
-        exitBtn.addEventListener('click', () => {
-            if (currentGame) {
-                currentGame.stop();
-                currentGame = null;
-            }
-            motionController.stop();
-            calibration.reset();
-            showScreen('menu');
-        });
-
-        // Restart button (death screen)
-        restartBtn.addEventListener('click', async () => {
-            if (currentGame) {
-                currentGame.stop();
-                currentGame = null;
-            }
-            calibration.reset();
-            await startGameFlow();
-        });
-
-        // Menu button (death screen)
-        menuBtn.addEventListener('click', () => {
-            if (currentGame) {
-                currentGame.stop();
-                currentGame = null;
-            }
-            motionController.stop();
-            calibration.reset();
-            showScreen('menu');
-        });
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            if (currentGame && currentGame.resizeCanvas) {
-                currentGame.resizeCanvas();
-            }
+        document.getElementById('snakeBtn').addEventListener('click', () => {
+            window.location.href = 'display.html?game=snake';
         });
     </script>
 </body>

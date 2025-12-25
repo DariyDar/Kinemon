@@ -240,6 +240,7 @@
         let calibration = null;
         let playerId = null;
         let roomId = null;
+        let gameType = 'snake'; // Default game type
 
         const roomInputScreen = document.getElementById('roomInputScreen');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
@@ -259,8 +260,6 @@
         const playerNameDisplay = document.getElementById('playerNameDisplay');
 
         // Set default server URL based on current location
-        // For production, use your deployed server URL (e.g., wss://kinemon-games.onrender.com)
-        // For local testing, use ws://localhost:8080
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
         serverUrlInput.value = defaultServer;
@@ -277,9 +276,20 @@
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         const serverFromUrl = urlParams.get('server');
+        const gameFromUrl = urlParams.get('game');
+
+        // Set game type if provided
+        if (gameFromUrl) {
+            gameType = gameFromUrl;
+            console.log('Game type from URL:', gameType);
+        }
+
+        // Update header with game name
+        const gameName = gameType === 'pong' ? 'Pong' : 'Pizza Snake';
+        document.querySelector('#roomInputScreen h1').textContent = `🎮 ${gameName} Controller`;
 
         if (roomFromUrl && serverFromUrl) {
-            console.log('Detected QR code parameters:', {room: roomFromUrl, server: serverFromUrl});
+            console.log('Detected QR code parameters:', {room: roomFromUrl, server: serverFromUrl, game: gameType});
             // Auto-fill fields
             roomIdInput.value = roomFromUrl;
             serverUrlInput.value = serverFromUrl;
@@ -290,7 +300,7 @@
 
             // Show hint
             document.getElementById('qrHint').style.display = 'block';
-            document.getElementById('joinPrompt').textContent = '✅ QR-код отсканирован!';
+            document.getElementById('joinPrompt').textContent = `✅ QR-код отсканирован! Игра: ${gameName}`;
 
             // DO NOT auto-connect - iOS requires user interaction for sensor permission
             // User must click the button to grant permission
@@ -388,11 +398,12 @@
                     calibration.onComplete = (min, max) => {
                         console.log('Calibration complete:', min, max);
 
-                        // Send join message
+                        // Send join message with game type
                         ws.send(JSON.stringify({
                             type: 'join',
                             roomId: roomId,
-                            name: playerNameInput.value.trim() || 'Player'
+                            name: playerNameInput.value.trim() || 'Player',
+                            gameType: gameType
                         }));
 
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';

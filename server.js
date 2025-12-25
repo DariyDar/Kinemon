@@ -52,11 +52,11 @@ const wss = new WebSocket.Server({ server });
 const rooms = new Map();
 
 // Game constants
-const MOVE_SPEED = 1.8;
+const BASE_MOVE_SPEED = 1.8;
 const INITIAL_LENGTH = 7;
 const CANVAS = { width: 600, height: 800 };
-const SEGMENT_SIZE = 15;
-const PIZZA_SIZE = 18;
+const BASE_SEGMENT_SIZE = 15;
+const BASE_PIZZA_SIZE = 18;
 const BOUNDARY_MARGIN_BOTTOM = 40;
 
 // Generate random room ID
@@ -93,10 +93,17 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.paddleSize = (settings.paddleSize || 2) * 50; // 50, 100, 150
         room.winScore = settings.winScore || 11;
     } else {
-        // Snake: pizzas
+        // Snake: pizzas and calculated settings
+        room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
+        room.turnSpeedMultiplier = settings.turnSpeed || 2;
+        room.controlMapping = settings.controlMapping || 'linear';
+        room.sizeMultiplier = settings.snakeSize || 1;
+        room.segmentSize = BASE_SEGMENT_SIZE * room.sizeMultiplier;
+        room.pizzaSize = BASE_PIZZA_SIZE * room.sizeMultiplier;
+
         room.pizzas = [];
         for (let i = 0; i < 3; i++) {
-            room.pizzas.push(spawnPizza());
+            room.pizzas.push(spawnPizza(room));
         }
     }
 
@@ -110,8 +117,9 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
 }
 
 // Spawn pizza
-function spawnPizza() {
-    const margin = PIZZA_SIZE;
+function spawnPizza(room) {
+    const pizzaSize = room ? room.pizzaSize : BASE_PIZZA_SIZE;
+    const margin = pizzaSize;
     const minX = margin;
     const maxX = CANVAS.width - margin;
     const minY = margin;
@@ -192,10 +200,10 @@ wss.on('connection', (ws) => {
                     player.headX = CANVAS.width / 2 + (Math.random() - 0.5) * 200;
                     player.headY = CANVAS.height / 2 + (Math.random() - 0.5) * 200;
 
-                    // Initialize snake segments
+                    // Initialize snake segments using room's segment size
                     for (let i = 0; i < INITIAL_LENGTH; i++) {
                         player.segments.push({
-                            x: player.headX - i * SEGMENT_SIZE,
+                            x: player.headX - i * room.segmentSize,
                             y: player.headY
                         });
                     }
@@ -312,6 +320,8 @@ function serializeGameState(room) {
             angle: p.angle
         }));
         state.pizzas = room.pizzas;
+        state.segmentSize = room.segmentSize;
+        state.pizzaSize = room.pizzaSize;
     }
 
     return state;
@@ -347,18 +357,41 @@ function updateSnake(room) {
     for (const player of room.players.values()) {
         if (!player.alive) continue;
 
-        // Calculate rotation from tilt
-        const circleRadius = 3 * SEGMENT_SIZE;
-        const maxRotationSpeed = MOVE_SPEED / circleRadius;
+        // Calculate rotation from tilt with control mapping
+        const circleRadius = 3 * room.segmentSize;
+        const maxRotationSpeed = room.moveSpeed / circleRadius;
         const tiltDeviation = (player.tilt - 0.5) * 2; // -1 to 1
-        const rotationSpeed = tiltDeviation * maxRotationSpeed * 2.4;
+
+        // Apply control mapping curve
+        let mappedDeviation = tiltDeviation;
+        if (room.controlMapping === 'nonlinear_a') {
+            // Moderate curve: dead zone 0.3, quadratic ramp
+            const absVal = Math.abs(tiltDeviation);
+            if (absVal < 0.3) {
+                mappedDeviation = 0;
+            } else {
+                const normalized = (absVal - 0.3) / 0.7; // 0 to 1
+                mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized);
+            }
+        } else if (room.controlMapping === 'nonlinear_b') {
+            // Strong curve: dead zone 0.4, cubic ramp
+            const absVal = Math.abs(tiltDeviation);
+            if (absVal < 0.4) {
+                mappedDeviation = 0;
+            } else {
+                const normalized = (absVal - 0.4) / 0.6; // 0 to 1
+                mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * normalized);
+            }
+        }
+
+        const rotationSpeed = mappedDeviation * maxRotationSpeed * 2.4 * room.turnSpeedMultiplier;
 
         // Update angle
         player.angle += rotationSpeed;
 
         // Move head
-        player.headX += Math.cos(player.angle) * MOVE_SPEED;
-        player.headY += Math.sin(player.angle) * MOVE_SPEED;
+        player.headX += Math.cos(player.angle) * room.moveSpeed;
+        player.headY += Math.sin(player.angle) * room.moveSpeed;
 
         // Wrap around screen
         const minX = 0;
@@ -484,21 +517,21 @@ function checkCollisions(room) {
             const pizza = room.pizzas[i];
             const dist = Math.hypot(head.x - pizza.x, head.y - pizza.y);
 
-            if (dist < SEGMENT_SIZE / 2 + PIZZA_SIZE / 2) {
+            if (dist < room.segmentSize / 2 + room.pizzaSize / 2) {
                 // Ate pizza
                 room.pizzas.splice(i, 1);
                 player.score++;
-                room.pizzas.push(spawnPizza());
+                room.pizzas.push(spawnPizza(room));
             }
         }
 
         // Check self-collision
-        const minSegmentsForCollision = Math.ceil((2 * Math.PI * 3 * SEGMENT_SIZE) / SEGMENT_SIZE);
+        const minSegmentsForCollision = Math.ceil((2 * Math.PI * 3 * room.segmentSize) / room.segmentSize);
         for (let i = minSegmentsForCollision; i < player.segments.length; i++) {
             const seg = player.segments[i];
             const dist = Math.hypot(head.x - seg.x, head.y - seg.y);
 
-            if (dist < SEGMENT_SIZE * 0.8) {
+            if (dist < room.segmentSize * 0.8) {
                 player.alive = false;
                 console.log(`Player ${player.id} died (self-collision) in room ${room.id}`);
             }
@@ -513,7 +546,7 @@ function checkCollisions(room) {
                 const seg = otherPlayer.segments[i];
                 const dist = Math.hypot(head.x - seg.x, head.y - seg.y);
 
-                if (dist < SEGMENT_SIZE * 0.8) {
+                if (dist < room.segmentSize * 0.8) {
                     // Player whose head collided dies
                     player.alive = false;
                     console.log(`Player ${player.id} died (hit ${otherPlayer.id}) in room ${room.id}`);

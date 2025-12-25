@@ -59,19 +59,6 @@ const BASE_SEGMENT_SIZE = 15;
 const BASE_PIZZA_SIZE = 18;
 const BOUNDARY_MARGIN_BOTTOM = 40;
 
-// Get canvas size based on field size setting
-function getCanvasSize(fieldSize) {
-    switch (fieldSize) {
-        case 'small':
-            return { width: 600, height: 800 };
-        case 'medium':
-            return { width: 960, height: 1280 }; // 80% of 1200x1600
-        case 'large':
-        default:
-            return { width: 1200, height: 1600 }; // Full screen
-    }
-}
-
 // Generate random room ID
 function generateRoomId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -93,9 +80,13 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         gameLoopInterval: null
     };
 
-    // Set canvas size based on field size (for Snake) or use default (for Pong)
-    if (gameType === 'snake' && settings.fieldSize) {
-        room.canvas = getCanvasSize(settings.fieldSize);
+    // Set canvas size based on client viewport dimensions (for Snake) or use default (for Pong)
+    if (gameType === 'snake' && settings.canvasWidth && settings.canvasHeight) {
+        // Use client-reported dimensions with validation
+        const width = Math.max(400, Math.min(2560, settings.canvasWidth));
+        const height = Math.max(600, Math.min(3840, settings.canvasHeight));
+        room.canvas = { width, height };
+        console.log(`Snake canvas: ${width}x${height}`);
     } else {
         room.canvas = { ...DEFAULT_CANVAS };
     }
@@ -420,9 +411,9 @@ function updateSnake(room) {
         const maxY = room.canvas.height - BOUNDARY_MARGIN_BOTTOM;
 
         if (player.headX < minX) player.headX = maxX;
-        if (player.headX > maxX) player.headX = minX;
+        if (player.headX >= maxX) player.headX = minX;
         if (player.headY < minY) player.headY = maxY;
-        if (player.headY > maxY) player.headY = minY;
+        if (player.headY >= maxY) player.headY = minY;
 
         // Add new head segment
         player.segments.unshift({

@@ -89,6 +89,12 @@
         #gameCanvas {
             border: 2px solid #333;
             display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: contain;
         }
 
         #gameCanvas.active {
@@ -99,10 +105,11 @@
             position: absolute;
             top: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.3);
             padding: 20px;
             border-radius: 10px;
             min-width: 200px;
+            pointer-events: none;
         }
 
         .player-score {
@@ -125,25 +132,6 @@
 
         .player-status.dead {
             color: #F44336;
-        }
-
-        .status {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 15px;
-            border-radius: 10px;
-            font-size: 16px;
-        }
-
-        .status.connected {
-            background: rgba(76, 175, 80, 0.2);
-            border: 2px solid #4CAF50;
-        }
-
-        .status.disconnected {
-            background: rgba(244, 67, 54, 0.2);
-            border: 2px solid #F44336;
         }
 
         /* Waiting for players screen styles */
@@ -179,9 +167,10 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.3);
             padding: 15px;
             border-radius: 10px;
+            pointer-events: none;
         }
 
         .room-label {
@@ -279,8 +268,6 @@
         <!-- Game Display -->
         <canvas id="gameCanvas" width="600" height="800"></canvas>
 
-        <div id="status" class="status disconnected">Отключено</div>
-
         <div id="roomInfo" class="room-info" style="display: none;">
             <div class="room-label">Комната</div>
             <div class="room-id-display" id="roomIdInfo">------</div>
@@ -302,12 +289,22 @@
         let gameType = null; // 'pong' or 'snake'
         let gameSettings = {}; // Store game settings
 
+        // Detect available viewport dimensions
+        function getAvailableCanvasDimensions() {
+            const availableWidth = window.innerWidth;
+            const availableHeight = window.innerHeight;
+            console.log(`Viewport: ${availableWidth}x${availableHeight}`);
+            return {
+                width: Math.floor(availableWidth),
+                height: Math.floor(availableHeight)
+            };
+        }
+
         const settingsScreen = document.getElementById('settingsScreen');
         const connectionScreen = document.getElementById('connectionScreen');
         const waitingScreen = document.getElementById('waitingScreen');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const statusDisplay = document.getElementById('status');
         const playerList = document.getElementById('playerList');
         const roomCodeDisplay = document.getElementById('roomCodeDisplay');
         const roomIdInfo = document.getElementById('roomIdInfo');
@@ -401,15 +398,6 @@
                         <div class="setting-info">Влияет на скорость движения змейки</div>
                     </div>
                     <div class="setting-group">
-                        <label for="fieldSize">Размер игрового поля</label>
-                        <select id="fieldSize">
-                            <option value="small">Маленькое (600x800)</option>
-                            <option value="medium">Среднее (80%)</option>
-                            <option value="large" selected>Большое (весь экран)</option>
-                        </select>
-                        <div class="setting-info">Влияет на размер игрового поля</div>
-                    </div>
-                    <div class="setting-group">
                         <label for="snakeSize">Размер змейки</label>
                         <select id="snakeSize">
                             <option value="1" selected>1 - Минимум</option>
@@ -425,13 +413,11 @@
                 gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
                 gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'linear';
                 gameSettings.moveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed')) || 3;
-                gameSettings.fieldSize = localStorage.getItem('fieldSize') || 'large';
                 gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
 
                 document.getElementById('snakeTurnSpeed').value = gameSettings.turnSpeed;
                 document.getElementById('snakeControlMapping').value = gameSettings.controlMapping;
                 document.getElementById('snakeMoveSpeed').value = gameSettings.moveSpeed;
-                document.getElementById('fieldSize').value = gameSettings.fieldSize;
                 document.getElementById('snakeSize').value = gameSettings.snakeSize;
             }
         }
@@ -453,12 +439,10 @@
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
                 gameSettings.moveSpeed = parseInt(document.getElementById('snakeMoveSpeed').value);
-                gameSettings.fieldSize = document.getElementById('fieldSize').value;
                 gameSettings.snakeSize = parseInt(document.getElementById('snakeSize').value);
                 localStorage.setItem('snakeTurnSpeed', gameSettings.turnSpeed);
                 localStorage.setItem('snakeControlMapping', gameSettings.controlMapping);
                 localStorage.setItem('snakeMoveSpeed', gameSettings.moveSpeed);
-                localStorage.setItem('fieldSize', gameSettings.fieldSize);
                 localStorage.setItem('snakeSize', gameSettings.snakeSize);
             }
 
@@ -522,8 +506,13 @@
                 ws.onopen = () => {
                     clearTimeout(connectionTimeout);
                     console.log('✅ Connected to server');
-                    statusDisplay.textContent = 'Подключено';
-                    statusDisplay.className = 'status connected';
+
+                    // Get viewport dimensions for Snake
+                    const dimensions = getAvailableCanvasDimensions();
+                    if (gameType === 'snake') {
+                        gameSettings.canvasWidth = dimensions.width;
+                        gameSettings.canvasHeight = dimensions.height;
+                    }
 
                     // Request room creation with game type and settings
                     ws.send(JSON.stringify({
@@ -543,8 +532,6 @@
                 ws.onclose = (event) => {
                     clearTimeout(connectionTimeout);
                     console.log('Disconnected from server. Code:', event.code, 'Reason:', event.reason);
-                    statusDisplay.textContent = 'Отключено';
-                    statusDisplay.className = 'status disconnected';
                     showScreen('settings');
 
                     if (event.code !== 1000 && event.code !== 1001) {

@@ -71,21 +71,37 @@ function getRandomColor() {
 }
 
 // Create new room
-function createRoom(roomId) {
+function createRoom(roomId, gameType = 'snake', settings = {}) {
     const room = {
         id: roomId,
+        gameType: gameType, // 'pong' or 'snake'
+        settings: settings,
         players: new Map(),
-        pizzas: [],
         gameLoopInterval: null
     };
 
-    // Initialize pizzas
-    for (let i = 0; i < 3; i++) {
-        room.pizzas.push(spawnPizza());
+    // Initialize game-specific state
+    if (gameType === 'pong') {
+        // Pong: ball and scores
+        room.ball = {
+            x: CANVAS.width / 2,
+            y: CANVAS.height / 2,
+            radius: 8,
+            speedX: (settings.ballSpeed || 3) * 0.8,
+            speedY: (settings.ballSpeed || 3) * 0.6
+        };
+        room.paddleSize = (settings.paddleSize || 2) * 50; // 50, 100, 150
+        room.winScore = settings.winScore || 11;
+    } else {
+        // Snake: pizzas
+        room.pizzas = [];
+        for (let i = 0; i < 3; i++) {
+            room.pizzas.push(spawnPizza());
+        }
     }
 
     rooms.set(roomId, room);
-    console.log(`Room created: ${roomId}`);
+    console.log(`Room created: ${roomId} (${gameType})`);
 
     // Start game loop for this room
     room.gameLoopInterval = setInterval(() => gameLoop(roomId), 1000 / 60);
@@ -117,49 +133,72 @@ wss.on('connection', (ws) => {
             const data = JSON.parse(message);
 
             if (data.type === 'create_room') {
-                // Create new room
+                // Create new room with game type and settings
                 const roomId = generateRoomId();
-                createRoom(roomId);
+                const gameType = data.gameType || 'snake';
+                const settings = data.settings || {};
+                createRoom(roomId, gameType, settings);
 
                 ws.send(JSON.stringify({
                     type: 'room_created',
                     roomId: roomId
                 }));
 
-                console.log(`Room ${roomId} created by display`);
+                console.log(`Room ${roomId} created by display (${gameType})`);
 
             } else if (data.type === 'join') {
                 const roomId = data.roomId;
+                const gameType = data.gameType || 'snake';
 
                 // Create room if it doesn't exist
                 if (!rooms.has(roomId)) {
-                    createRoom(roomId);
+                    createRoom(roomId, gameType);
                 }
 
                 const room = rooms.get(roomId);
+
+                // For Pong: limit to 2 players
+                if (room.gameType === 'pong' && room.players.size >= 2) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: 'Room is full (max 2 players for Pong)'
+                    }));
+                    return;
+                }
+
                 const playerId = Date.now() + '-' + Math.random();
 
-                // Initialize player
+                // Initialize player based on game type
                 const player = {
                     id: playerId,
                     name: data.name || `Player ${room.players.size + 1}`,
                     color: getRandomColor(),
                     score: 0,
-                    alive: true,
-                    segments: [],
-                    angle: 0,
-                    headX: CANVAS.width / 2 + (Math.random() - 0.5) * 200,
-                    headY: CANVAS.height / 2 + (Math.random() - 0.5) * 200,
                     tilt: 0.5,
                     ws: ws
                 };
 
-                // Initialize snake segments
-                for (let i = 0; i < INITIAL_LENGTH; i++) {
-                    player.segments.push({
-                        x: player.headX - i * SEGMENT_SIZE,
-                        y: player.headY
-                    });
+                if (room.gameType === 'pong') {
+                    // Pong: paddle position (left or right)
+                    const isPlayer1 = room.players.size === 0;
+                    player.paddleY = CANVAS.height / 2 - room.paddleSize / 2;
+                    player.paddleX = isPlayer1 ? 20 : CANVAS.width - 30;
+                    player.side = isPlayer1 ? 'left' : 'right';
+                } else {
+                    // Snake: segments and position
+                    player.alive = true;
+                    player.segments = [];
+                    player.angle = 0;
+                    player.headX = CANVAS.width / 2 + (Math.random() - 0.5) * 200;
+                    player.headY = CANVAS.height / 2 + (Math.random() - 0.5) * 200;
+
+                    // Initialize snake segments
+                    for (let i = 0; i < INITIAL_LENGTH; i++) {
+                        player.segments.push({
+                            x: player.headX - i * SEGMENT_SIZE,
+                            y: player.headY
+                        });
+                    }
                 }
 
                 room.players.set(playerId, player);
@@ -174,7 +213,7 @@ wss.on('connection', (ws) => {
                     gameState: serializeGameState(room)
                 }));
 
-                console.log(`Player ${playerId} joined room ${roomId} as ${player.name}`);
+                console.log(`Player ${playerId} joined room ${roomId} as ${player.name} (${room.gameType})`);
 
             } else if (data.type === 'join_display') {
                 const roomId = data.roomId;
@@ -242,8 +281,28 @@ function hasDisplayClient(roomId) {
 
 // Serialize game state for sending to clients
 function serializeGameState(room) {
-    return {
-        players: Array.from(room.players.values()).map(p => ({
+    const state = {
+        gameType: room.gameType,
+        canvas: CANVAS
+    };
+
+    if (room.gameType === 'pong') {
+        // Pong state
+        state.players = Array.from(room.players.values()).map(p => ({
+            id: p.id,
+            name: p.name,
+            color: p.color,
+            score: p.score,
+            paddleY: p.paddleY,
+            paddleX: p.paddleX,
+            side: p.side
+        }));
+        state.ball = room.ball;
+        state.paddleSize = room.paddleSize;
+        state.winScore = room.winScore;
+    } else {
+        // Snake state
+        state.players = Array.from(room.players.values()).map(p => ({
             id: p.id,
             name: p.name,
             color: p.color,
@@ -251,10 +310,11 @@ function serializeGameState(room) {
             alive: p.alive,
             segments: p.segments,
             angle: p.angle
-        })),
-        pizzas: room.pizzas,
-        canvas: CANVAS
-    };
+        }));
+        state.pizzas = room.pizzas;
+    }
+
+    return state;
 }
 
 // Update game state (60 FPS per room)
@@ -262,6 +322,27 @@ function gameLoop(roomId) {
     const room = rooms.get(roomId);
     if (!room) return;
 
+    if (room.gameType === 'pong') {
+        updatePong(room);
+    } else {
+        updateSnake(room);
+    }
+
+    // Broadcast game state to all clients in this room
+    const state = JSON.stringify({
+        type: 'update',
+        gameState: serializeGameState(room)
+    });
+
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
+            client.send(state);
+        }
+    });
+}
+
+// Update Snake game
+function updateSnake(room) {
     // Update each player
     for (const player of room.players.values()) {
         if (!player.alive) continue;
@@ -304,18 +385,91 @@ function gameLoop(roomId) {
 
     // Check collisions
     checkCollisions(room);
+}
 
-    // Broadcast game state to all clients in this room
-    const state = JSON.stringify({
-        type: 'update',
-        gameState: serializeGameState(room)
-    });
+// Update Pong game
+function updatePong(room) {
+    // Update paddle positions based on tilt
+    for (const player of room.players.values()) {
+        // Map tilt (0-1) to paddle Y position
+        // tilt 0 (bottom) -> paddle at bottom
+        // tilt 1 (top) -> paddle at top
+        const targetY = (1 - player.tilt) * (CANVAS.height - room.paddleSize);
 
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
-            client.send(state);
+        // Smooth movement
+        player.paddleY += (targetY - player.paddleY) * 0.3;
+
+        // Clamp position
+        player.paddleY = Math.max(0, Math.min(CANVAS.height - room.paddleSize, player.paddleY));
+    }
+
+    // Update ball position
+    room.ball.x += room.ball.speedX;
+    room.ball.y += room.ball.speedY;
+
+    // Top and bottom wall collision
+    if (room.ball.y - room.ball.radius < 0 || room.ball.y + room.ball.radius > CANVAS.height) {
+        room.ball.speedY = -room.ball.speedY;
+    }
+
+    // Paddle collisions
+    for (const player of room.players.values()) {
+        const paddleWidth = 10;
+
+        if (player.side === 'left') {
+            // Left paddle collision
+            if (room.ball.x - room.ball.radius < player.paddleX + paddleWidth &&
+                room.ball.y > player.paddleY &&
+                room.ball.y < player.paddleY + room.paddleSize &&
+                room.ball.speedX < 0) {
+                room.ball.speedX = Math.abs(room.ball.speedX);
+
+                // Add angle based on hit position
+                const hitPos = (room.ball.y - player.paddleY) / room.paddleSize;
+                room.ball.speedY = (hitPos - 0.5) * 10;
+            }
+        } else {
+            // Right paddle collision
+            if (room.ball.x + room.ball.radius > player.paddleX &&
+                room.ball.y > player.paddleY &&
+                room.ball.y < player.paddleY + room.paddleSize &&
+                room.ball.speedX > 0) {
+                room.ball.speedX = -Math.abs(room.ball.speedX);
+
+                const hitPos = (room.ball.y - player.paddleY) / room.paddleSize;
+                room.ball.speedY = (hitPos - 0.5) * 10;
+            }
         }
-    });
+    }
+
+    // Score points
+    if (room.ball.x < 0) {
+        // Right player scores
+        const players = Array.from(room.players.values());
+        const rightPlayer = players.find(p => p.side === 'right');
+        if (rightPlayer) {
+            rightPlayer.score++;
+            console.log(`${rightPlayer.name} scored! Score: ${players[0]?.score || 0} - ${rightPlayer.score}`);
+        }
+        resetBall(room);
+    } else if (room.ball.x > CANVAS.width) {
+        // Left player scores
+        const players = Array.from(room.players.values());
+        const leftPlayer = players.find(p => p.side === 'left');
+        if (leftPlayer) {
+            leftPlayer.score++;
+            console.log(`${leftPlayer.name} scored! Score: ${leftPlayer.score} - ${players[1]?.score || 0}`);
+        }
+        resetBall(room);
+    }
+}
+
+// Reset ball to center (Pong)
+function resetBall(room) {
+    room.ball.x = CANVAS.width / 2;
+    room.ball.y = CANVAS.height / 2;
+    room.ball.speedX = -room.ball.speedX;
+    room.ball.speedY = (Math.random() - 0.5) * 8;
 }
 
 // Check collisions

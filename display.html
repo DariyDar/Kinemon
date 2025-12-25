@@ -624,6 +624,53 @@
         function render() {
             if (!gameState) return;
 
+            if (gameState.gameType === 'pong') {
+                renderPong();
+            } else {
+                renderSnake();
+            }
+
+            // Update scoreboard
+            updateScoreboard();
+        }
+
+        function renderPong() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw center line
+            ctx.strokeStyle = '#333';
+            ctx.setLineDash([5, 15]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw ball
+            if (gameState.ball) {
+                ctx.fillStyle = '#FFF';
+                ctx.beginPath();
+                ctx.arc(gameState.ball.x, gameState.ball.y, gameState.ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw paddles
+            const paddleWidth = 10;
+            for (const player of gameState.players) {
+                ctx.fillStyle = player.color;
+                ctx.fillRect(player.paddleX, player.paddleY, paddleWidth, gameState.paddleSize);
+
+                // Draw player name above paddle
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                const nameX = player.side === 'left' ? player.paddleX + paddleWidth / 2 + 30 : player.paddleX + paddleWidth / 2 - 30;
+                ctx.fillText(player.name, nameX, 30);
+            }
+        }
+
+        function renderSnake() {
             // Clear canvas
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -710,9 +757,6 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(player.name, head.x, head.y - 15);
             }
-
-            // Update scoreboard
-            updateScoreboard();
         }
 
         function updateScoreboard() {

@@ -71,8 +71,28 @@ class SlitherGame {
      * Resize canvas to fit screen
      */
     resizeCanvas() {
-        this.canvas.width = Math.min(window.innerWidth, 600);
-        this.canvas.height = Math.min(window.innerHeight, 800);
+        // Default to large (fullscreen)
+        let maxWidth = window.innerWidth;
+        let maxHeight = window.innerHeight;
+
+        // Apply field size setting if exists
+        if (window.gameSettings && window.gameSettings.fieldSize) {
+            if (window.gameSettings.fieldSize === 'small') {
+                maxWidth = 600;
+                maxHeight = 800;
+            } else if (window.gameSettings.fieldSize === 'medium') {
+                maxWidth = window.innerWidth * 0.8;
+                maxHeight = window.innerHeight * 0.8;
+            }
+            // 'large' uses full window dimensions (default)
+        } else {
+            // Fallback: use full dimensions
+            maxWidth = window.innerWidth;
+            maxHeight = window.innerHeight;
+        }
+
+        this.canvas.width = Math.min(window.innerWidth, maxWidth);
+        this.canvas.height = Math.min(window.innerHeight, maxHeight);
     }
 
     /**

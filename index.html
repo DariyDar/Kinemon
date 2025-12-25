@@ -323,6 +323,7 @@
                 <button class="btn" data-game="pong">🏓 Pong</button>
                 <button class="btn" data-game="snake">🐍 Pizza Snake</button>
             </div>
+            <button class="btn btn-secondary" id="settingsBtnMenu" style="margin-top: 20px; min-width: 200px;">⚙️ Настройки</button>
         </div>
 
         <!-- Calibration Screen - Min Position -->
@@ -369,9 +370,10 @@
 
         <div id="version">v3.0</div>
 
-        <button id="settingsBtn">⚙️ Настройки</button>
+        <!-- Settings Screen -->
+        <div id="settingsScreen" class="screen">
+            <h1>⚙️ Настройки</h1>
 
-        <div id="settingsDropdown">
             <div class="setting-group">
                 <label for="snakeTurnSpeed">Скорость поворота</label>
                 <select id="snakeTurnSpeed">
@@ -405,6 +407,16 @@
             </div>
 
             <div class="setting-group">
+                <label for="fieldSize">Размер игрового поля</label>
+                <select id="fieldSize">
+                    <option value="small">Маленькое (600x800)</option>
+                    <option value="medium">Среднее (80%)</option>
+                    <option value="large">Большое (весь экран)</option>
+                </select>
+                <div class="setting-info">Влияет на размер игрового поля</div>
+            </div>
+
+            <div class="setting-group">
                 <label for="snakeSize">Размер змейки</label>
                 <select id="snakeSize">
                     <option value="1">1 - Минимум</option>
@@ -415,7 +427,13 @@
                 </select>
                 <div class="setting-info">Влияет на размер змейки и пиццы</div>
             </div>
+
+            <button class="btn" id="backFromSettingsBtn" style="margin-top: 20px; min-width: 150px;">← Назад</button>
         </div>
+
+        <button id="settingsBtn">⚙️ Настройки</button>
+
+        <div id="settingsDropdown"></div>
 
         <div id="debugInfo"></div>
     </div>
@@ -431,13 +449,15 @@
         let currentGame = null;
         let currentGameType = null;
 
-        // Game settings
-        const gameSettings = {
+        // Game settings (expose globally for slitherGame.js)
+        window.gameSettings = {
             snakeTurnSpeed: 2, // Default 2x
             snakeControlMapping: 'linear', // Default linear
             snakeMoveSpeed: 3, // Default 3 (fastest)
+            fieldSize: 'large', // Default large (fullscreen)
             snakeSize: 1 // Default 1 (minimum)
         };
+        const gameSettings = window.gameSettings;
 
         // Initialize controllers
         const motionController = new MotionController();
@@ -447,6 +467,7 @@
         const modeSelection = document.getElementById('modeSelection');
         const onlineRoleSelection = document.getElementById('onlineRoleSelection');
         const mainMenu = document.getElementById('mainMenu');
+        const settingsScreen = document.getElementById('settingsScreen');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
         const calibrationMaxScreen = document.getElementById('calibrationMaxScreen');
         const centeringScreen = document.getElementById('centeringScreen');
@@ -456,18 +477,20 @@
         const debugInfo = document.getElementById('debugInfo');
         const deathOverlay = document.getElementById('deathOverlay');
         const settingsBtn = document.getElementById('settingsBtn');
-        const settingsDropdown = document.getElementById('settingsDropdown');
+        const settingsBtnMenu = document.getElementById('settingsBtnMenu');
 
         // Buttons
         const setMinBtn = document.getElementById('setMinBtn');
         const setMaxBtn = document.getElementById('setMaxBtn');
         const restartBtn = document.getElementById('restartBtn');
         const menuBtn = document.getElementById('menuBtn');
+        const backFromSettingsBtn = document.getElementById('backFromSettingsBtn');
 
         // Settings
         const snakeTurnSpeedSelect = document.getElementById('snakeTurnSpeed');
         const snakeControlMappingSelect = document.getElementById('snakeControlMapping');
         const snakeMoveSpeedSelect = document.getElementById('snakeMoveSpeed');
+        const fieldSizeSelect = document.getElementById('fieldSize');
         const snakeSizeSelect = document.getElementById('snakeSize');
 
         // Load saved settings from localStorage
@@ -483,21 +506,18 @@
             gameSettings.snakeMoveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed'));
             snakeMoveSpeedSelect.value = gameSettings.snakeMoveSpeed;
         }
+        if (localStorage.getItem('fieldSize')) {
+            gameSettings.fieldSize = localStorage.getItem('fieldSize');
+            fieldSizeSelect.value = gameSettings.fieldSize;
+        }
         if (localStorage.getItem('snakeSize')) {
             gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize'));
             snakeSizeSelect.value = gameSettings.snakeSize;
         }
 
-        // Settings button toggle
+        // In-game settings button (during game)
         settingsBtn.addEventListener('click', () => {
-            settingsDropdown.classList.toggle('active');
-        });
-
-        // Close settings when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
-                settingsDropdown.classList.remove('active');
-            }
+            showScreen('settings');
         });
 
         // Save snake turn speed setting
@@ -534,6 +554,13 @@
                 currentGame.moveSpeedMultiplier = gameSettings.snakeMoveSpeed;
                 console.log('Move speed updated to', gameSettings.snakeMoveSpeed);
             }
+        });
+
+        // Save field size setting
+        fieldSizeSelect.addEventListener('change', () => {
+            gameSettings.fieldSize = fieldSizeSelect.value;
+            localStorage.setItem('fieldSize', gameSettings.fieldSize);
+            console.log('Field size updated to', gameSettings.fieldSize);
         });
 
         // Save snake size setting
@@ -600,6 +627,9 @@
             } else if (screenName === 'menu') {
                 mainMenu.classList.add('active');
                 exitFullscreen();
+            } else if (screenName === 'settings') {
+                settingsScreen.classList.add('active');
+                exitFullscreen();
             } else if (screenName === 'calibration-min') {
                 calibrationMinScreen.classList.add('active');
             } else if (screenName === 'calibration-max') {
@@ -639,6 +669,15 @@
 
         document.getElementById('backFromOnlineBtn').addEventListener('click', () => {
             showScreen('mode-selection');
+        });
+
+        // Settings navigation
+        settingsBtnMenu.addEventListener('click', () => {
+            showScreen('settings');
+        });
+
+        backFromSettingsBtn.addEventListener('click', () => {
+            showScreen('menu');
         });
 
         document.getElementById('controllerRoleBtn').addEventListener('click', () => {

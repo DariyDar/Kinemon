@@ -286,11 +286,22 @@
         const tiltDisplay = document.getElementById('tiltDisplay');
         const playerNameDisplay = document.getElementById('playerNameDisplay');
 
+        // Debug: Log all URL info
+        console.log('=== QR Code Auto-fill Debug ===');
+        console.log('Full URL:', window.location.href);
+        console.log('Search params:', window.location.search);
+
         // Check URL parameters FIRST (from QR code scan)
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         const serverFromUrl = urlParams.get('server');
         const gameFromUrl = urlParams.get('game');
+
+        console.log('Parsed URL params:', {
+            room: roomFromUrl,
+            server: serverFromUrl,
+            game: gameFromUrl
+        });
 
         // Set game type if provided
         if (gameFromUrl) {
@@ -302,14 +313,20 @@
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
+        console.log('Default server:', defaultServer);
+        console.log('Server input element exists?', serverUrlInput !== null);
+        console.log('Room input element exists?', roomIdInput !== null);
+
         // Use server from URL if available, otherwise use default
         if (serverFromUrl) {
             serverUrlInput.value = serverFromUrl;
-            console.log('Using server from URL:', serverFromUrl);
+            console.log('✅ Set server from URL:', serverFromUrl);
         } else {
             serverUrlInput.value = defaultServer;
-            console.log('Using default server:', defaultServer);
+            console.log('✅ Set default server:', defaultServer);
         }
+
+        console.log('Server input current value:', serverUrlInput.value);
 
         // Wake up Render server on page load (free tier spins down after inactivity)
         if (!isLocalhost) {
@@ -325,9 +342,12 @@
 
         // Auto-fill room code if available from QR scan
         if (roomFromUrl) {
-            console.log('Detected QR code parameters:', {room: roomFromUrl, server: serverFromUrl || defaultServer, game: gameType});
+            console.log('🎯 Auto-filling from QR code...');
+            console.log('Room code:', roomFromUrl);
+
             // Auto-fill room field
             roomIdInput.value = roomFromUrl;
+            console.log('✅ Set room code:', roomIdInput.value);
 
             // Change button text to indicate auto-filled data
             manualJoinBtn.textContent = 'Подключиться к комнате ' + roomFromUrl;
@@ -337,9 +357,15 @@
             document.getElementById('qrHint').style.display = 'block';
             document.getElementById('joinPrompt').textContent = `✅ QR-код отсканирован! Игра: ${gameName}`;
 
+            console.log('✅ QR auto-fill complete!');
+
             // DO NOT auto-connect - iOS requires user interaction for sensor permission
             // User must click the button to grant permission
+        } else {
+            console.log('ℹ️ No room code in URL - manual entry required');
         }
+
+        console.log('=== End Debug ===');
 
         function showScreen(screenName) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));

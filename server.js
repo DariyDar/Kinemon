@@ -246,6 +246,7 @@ wss.on('connection', (ws) => {
                     player.angle = 0;
                     player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
                     player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
+                    player.controlScheme = data.controlScheme || 'rotation_smooth';  // Store per-player control
 
                     // Initialize snake segments using room's segment size
                     for (let i = 0; i < INITIAL_LENGTH; i++) {
@@ -325,6 +326,11 @@ wss.on('connection', (ws) => {
                         player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
                         player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
 
+                        // Restore control scheme if provided
+                        if (data.controlScheme) {
+                            player.controlScheme = data.controlScheme;
+                        }
+
                         // Reset segments
                         player.segments = [];
                         for (let i = 0; i < INITIAL_LENGTH; i++) {
@@ -334,7 +340,17 @@ wss.on('connection', (ws) => {
                             });
                         }
 
-                        console.log(`Player ${player.id} respawned in room ${room.id}`);
+                        console.log(`Player ${player.id} respawned with control: ${player.controlScheme}`);
+                    }
+                }
+            } else if (data.type === 'change_control' && ws.playerId && ws.roomId) {
+                // Handle control scheme change during gameplay
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'snake') {
+                    const player = room.players.get(ws.playerId);
+                    if (player) {
+                        player.controlScheme = data.controlScheme || 'rotation_smooth';
+                        console.log(`Player ${player.id} changed control to ${player.controlScheme}`);
                     }
                 }
             }
@@ -453,10 +469,10 @@ function updateSnake(room) {
         const maxRotationSpeed = room.moveSpeed / circleRadius;
         const tiltDeviation = (player.tilt - 0.5) * 2; // -1 to 1
 
-        // Apply control mapping curve
+        // Apply control mapping curve (per-player)
         let mappedDeviation = tiltDeviation;
 
-        switch (room.controlMapping) {
+        switch (player.controlScheme || room.controlMapping || 'rotation_smooth') {
             case 'rotation_smooth':
                 // Improved rotation mode: smoothing + reduced sensitivity
                 const absSmooth = Math.abs(tiltDeviation);
@@ -511,6 +527,35 @@ function updateSnake(room) {
                     mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * normalized);
                 }
                 break;
+
+            case 'fixed_updown': {
+                // Fixed up-down control: absolute vertical intent
+                // Up tilt = move toward top of screen, down tilt = toward bottom
+                if (Math.abs(tiltDeviation) < 0.15) {
+                    mappedDeviation = 0;
+                    break;
+                }
+
+                // Determine if snake is facing right (0-180°) or left (180-360°)
+                const angle = ((player.angle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+                const facingRight = angle < Math.PI;
+
+                // When facing right: up-tilt = turn CCW (negative), down-tilt = turn CW (positive)
+                // When facing left: REVERSE - up-tilt = turn CW (positive), down-tilt = turn CCW (negative)
+
+                const tiltMagnitude = Math.abs(tiltDeviation);
+                const normalizedTilt = (tiltMagnitude - 0.15) / 0.85;
+
+                if (facingRight) {
+                    // Moving right: normal behavior
+                    mappedDeviation = tiltDeviation * normalizedTilt;
+                } else {
+                    // Moving left: FLIP the tilt direction for instant flip
+                    mappedDeviation = -tiltDeviation * normalizedTilt;
+                }
+
+                break;
+            }
 
             default:
                 // Default to rotation_smooth

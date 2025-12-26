@@ -124,6 +124,20 @@
             border: 2px solid #F44336;
         }
 
+        #controlSchemeSelect {
+            cursor: pointer;
+        }
+
+        #controlSchemeSelect:focus {
+            outline: 2px solid #4CAF50;
+            outline-offset: 2px;
+        }
+
+        #controlSelector {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
         .calibration-indicator {
             font-size: 64px;
             margin: 20px 0;
@@ -255,6 +269,19 @@
                 🔄 Вернуться в бой!
             </button>
         </div>
+
+        <!-- Control Scheme Selector (shown during gameplay) -->
+        <div id="controlSelector" style="position: fixed; top: 20px; right: 20px; z-index: 1000; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; display: none;">
+            <div style="font-size: 14px; margin-bottom: 10px; opacity: 0.8;">Управление:</div>
+            <select id="controlSchemeSelect" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px; border-radius: 5px; font-size: 14px; width: 200px;">
+                <option value="rotation_smooth">Поворот (плавный)</option>
+                <option value="center_straight">Центр = прямо</option>
+                <option value="rotation_linear">Поворот (быстрый)</option>
+                <option value="fixed_updown">Фиксированные ↑↓</option>
+                <option value="nonlinear_a">Нелинейный A</option>
+                <option value="nonlinear_b">Нелинейный B</option>
+            </select>
+        </div>
     </div>
 
     <script src="motionController.js"></script>
@@ -268,6 +295,9 @@
         let gameType = 'snake'; // Default game type
         let wakeLock = null;
         let pingInterval = null;
+
+        // Load saved control preference from localStorage
+        let currentControlScheme = localStorage.getItem('playerControlScheme') || 'rotation_smooth';
 
         const roomInputScreen = document.getElementById('roomInputScreen');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
@@ -469,16 +499,21 @@
                     calibration.onComplete = async (min, max) => {
                         console.log('Calibration complete:', min, max);
 
-                        // Send join message with game type
+                        // Send join message with game type and control scheme
                         ws.send(JSON.stringify({
                             type: 'join',
                             roomId: roomId,
                             name: playerNameInput.value.trim() || 'Player',
-                            gameType: gameType
+                            gameType: gameType,
+                            controlScheme: currentControlScheme
                         }));
 
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
+
+                        // Show control selector and set current value
+                        document.getElementById('controlSelector').style.display = 'block';
+                        document.getElementById('controlSchemeSelect').value = currentControlScheme;
 
                         // Request wake lock to prevent phone sleep
                         if ('wakeLock' in navigator) {
@@ -571,6 +606,9 @@
                             document.getElementById('deathScore').textContent = myPlayer.score;
                             showScreen('death');
 
+                            // Hide control selector
+                            document.getElementById('controlSelector').style.display = 'none';
+
                             // Stop sending motion data while dead
                             motionController.onTiltChange = null;
                         }
@@ -606,11 +644,15 @@
             // Request respawn from server
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
-                    type: 'respawn'
+                    type: 'respawn',
+                    controlScheme: currentControlScheme
                 }));
 
                 // Return to controller screen
                 showScreen('controller');
+
+                // Show control selector again
+                document.getElementById('controlSelector').style.display = 'block';
 
                 // Resume sending motion data
                 motionController.onTiltChange = (normalized) => {
@@ -623,6 +665,25 @@
                     }
                 };
             }
+        });
+
+        // Control scheme selector change handler
+        document.getElementById('controlSchemeSelect').addEventListener('change', (e) => {
+            const newScheme = e.target.value;
+            currentControlScheme = newScheme;
+
+            // Save to localStorage
+            localStorage.setItem('playerControlScheme', newScheme);
+
+            // Send to server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'change_control',
+                    controlScheme: newScheme
+                }));
+            }
+
+            console.log('Control scheme changed to:', newScheme);
         });
     </script>
 </body>

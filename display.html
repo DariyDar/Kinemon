@@ -269,7 +269,7 @@
         <div id="winScreen" class="screen">
             <h1>🏆 Победа!</h1>
             <p id="winnerName" style="font-size: 32px; margin: 20px 0;"></p>
-            <p>Собрал 50 пицц!</p>
+            <p id="winMessage">Собрал 50 пицц!</p>
             <button class="btn" onclick="window.location.href='index.html'">Вернуться в меню</button>
         </div>
 
@@ -416,17 +416,30 @@
                         </select>
                         <div class="setting-info">Влияет на размер змейки и пиццы</div>
                     </div>
+                    <div class="setting-group">
+                        <label for="snakeWinScore">Пицц для победы</label>
+                        <select id="snakeWinScore">
+                            <option value="20">20 пицц</option>
+                            <option value="30">30 пицц</option>
+                            <option value="50" selected>50 пицц</option>
+                            <option value="75">75 пицц</option>
+                            <option value="100">100 пицц</option>
+                        </select>
+                        <div class="setting-info">Количество пицц для победы</div>
+                    </div>
                 `;
                 // Load saved settings
                 gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
                 gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'linear';
                 gameSettings.moveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed')) || 3;
                 gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
+                gameSettings.winScore = parseInt(localStorage.getItem('snakeWinScore')) || 50;
 
                 document.getElementById('snakeTurnSpeed').value = gameSettings.turnSpeed;
                 document.getElementById('snakeControlMapping').value = gameSettings.controlMapping;
                 document.getElementById('snakeMoveSpeed').value = gameSettings.moveSpeed;
                 document.getElementById('snakeSize').value = gameSettings.snakeSize;
+                document.getElementById('snakeWinScore').value = gameSettings.winScore;
             }
         }
 
@@ -448,10 +461,12 @@
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
                 gameSettings.moveSpeed = parseInt(document.getElementById('snakeMoveSpeed').value);
                 gameSettings.snakeSize = parseInt(document.getElementById('snakeSize').value);
+                gameSettings.winScore = parseInt(document.getElementById('snakeWinScore').value);
                 localStorage.setItem('snakeTurnSpeed', gameSettings.turnSpeed);
                 localStorage.setItem('snakeControlMapping', gameSettings.controlMapping);
                 localStorage.setItem('snakeMoveSpeed', gameSettings.moveSpeed);
                 localStorage.setItem('snakeSize', gameSettings.snakeSize);
+                localStorage.setItem('snakeWinScore', gameSettings.winScore);
             }
 
             console.log('Game settings:', gameSettings);
@@ -655,8 +670,9 @@
         }
 
         function showWinScreen(winner) {
-            // Set winner name
+            // Set winner name and message
             document.getElementById('winnerName').textContent = winner.name;
+            document.getElementById('winMessage').textContent = `Собрал ${winner.score} пицц!`;
 
             // Show win screen
             showScreen('win');
@@ -680,6 +696,18 @@
             ctx.lineTo(canvas.width / 2, canvas.height);
             ctx.stroke();
             ctx.setLineDash([]);
+
+            // Show waiting message if game hasn't started
+            if (!gameState.gameStarted) {
+                ctx.fillStyle = '#FFF';
+                ctx.font = 'bold 36px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('Ожидание второго игрока...', canvas.width / 2, canvas.height / 2);
+
+                ctx.font = '20px sans-serif';
+                ctx.fillStyle = '#888';
+                ctx.fillText(`Подключено: ${gameState.players.length}/2`, canvas.width / 2, canvas.height / 2 + 50);
+            }
 
             // Draw ball
             if (gameState.ball) {

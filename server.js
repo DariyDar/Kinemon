@@ -105,6 +105,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         };
         room.paddleSize = (settings.paddleSize || 2) * 50; // 50, 100, 150
         room.winScore = settings.winScore || 11;
+        room.gameStarted = false; // Game starts when 2 players join
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -258,6 +259,12 @@ wss.on('connection', (ws) => {
                 ws.playerId = playerId;
                 ws.roomId = roomId;
 
+                // For Pong: start game when 2 players join
+                if (room.gameType === 'pong' && room.players.size === 2) {
+                    room.gameStarted = true;
+                    console.log(`Pong game starting in room ${roomId} with 2 players`);
+                }
+
                 // Send initial state to new player
                 ws.send(JSON.stringify({
                     type: 'init',
@@ -294,8 +301,11 @@ wss.on('connection', (ws) => {
                 const room = rooms.get(ws.roomId);
                 if (room) {
                     const player = room.players.get(ws.playerId);
-                    if (player && player.alive) {
-                        player.tilt = data.tilt;
+                    if (player) {
+                        // For Pong, always update. For Snake, only if alive.
+                        if (room.gameType === 'pong' || player.alive) {
+                            player.tilt = data.tilt;
+                        }
                     }
                 }
             }
@@ -353,6 +363,7 @@ function serializeGameState(room) {
         state.ball = room.ball;
         state.paddleSize = room.paddleSize;
         state.winScore = room.winScore;
+        state.gameStarted = room.gameStarted;
     } else {
         // Snake state
         state.players = Array.from(room.players.values()).map(p => ({
@@ -487,6 +498,11 @@ function updatePong(room) {
         player.paddleY = Math.max(0, Math.min(room.canvas.height - room.paddleSize, player.paddleY));
     }
 
+    // Don't update ball until game starts (need 2 players)
+    if (!room.gameStarted) {
+        return;
+    }
+
     // Update ball position
     room.ball.x += room.ball.speedX;
     room.ball.y += room.ball.speedY;
@@ -574,10 +590,11 @@ function checkCollisions(room) {
                 player.score++;
 
                 // Check for win condition
-                if (player.score >= 50) {
+                const winScore = room.settings.winScore || 50;
+                if (player.score >= winScore) {
                     room.winner = player;
                     room.gameOver = true;
-                    console.log(`${player.name} wins with 50 pizzas!`);
+                    console.log(`${player.name} wins with ${winScore} pizzas!`);
                 }
             }
         }

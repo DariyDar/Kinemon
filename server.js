@@ -239,6 +239,7 @@ wss.on('connection', (ws) => {
                     player.paddleY = room.canvas.height / 2 - room.paddleSize / 2;
                     player.paddleX = isPlayer1 ? 20 : room.canvas.width - 30;
                     player.side = isPlayer1 ? 'left' : 'right';
+                    player.alive = true; // Pong players are always alive (no death mechanic)
                 } else {
                     // Snake: segments and position
                     player.alive = true;
@@ -666,6 +667,14 @@ function updatePong(room) {
         if (rightPlayer) {
             rightPlayer.score++;
             console.log(`${rightPlayer.name} scored! Score: ${players[0]?.score || 0} - ${rightPlayer.score}`);
+
+            // Check for win condition
+            if (rightPlayer.score >= room.winScore) {
+                room.winner = rightPlayer;
+                room.gameOver = true;
+                console.log(`${rightPlayer.name} wins the game!`);
+                return; // Don't reset ball, game is over
+            }
         }
         resetBall(room);
     } else if (room.ball.x > room.canvas.width) {
@@ -675,6 +684,14 @@ function updatePong(room) {
         if (leftPlayer) {
             leftPlayer.score++;
             console.log(`${leftPlayer.name} scored! Score: ${leftPlayer.score} - ${players[1]?.score || 0}`);
+
+            // Check for win condition
+            if (leftPlayer.score >= room.winScore) {
+                room.winner = leftPlayer;
+                room.gameOver = true;
+                console.log(`${leftPlayer.name} wins the game!`);
+                return; // Don't reset ball, game is over
+            }
         }
         resetBall(room);
     }

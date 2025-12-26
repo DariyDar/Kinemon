@@ -463,7 +463,7 @@
                     calibration = new Calibration(motionController);
 
                     // Set calibration complete callback
-                    calibration.onComplete = (min, max) => {
+                    calibration.onComplete = async (min, max) => {
                         console.log('Calibration complete:', min, max);
 
                         // Send join message with game type

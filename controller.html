@@ -529,9 +529,36 @@
                             }
                         }
 
+                        // Vibration feedback tracking
+                        let previousZone = null; // Track which zone we were in
+
                         // Start sending tilt data
                         motionController.onTiltChange = (normalized) => {
                             tiltDisplay.textContent = normalized.toFixed(2);
+
+                            // Haptic feedback for zone transitions
+                            // Zones: 'bottom' (0-0.15), 'center' (0.45-0.55), 'top' (0.85-1.0)
+                            let currentZone = null;
+
+                            if (normalized <= 0.15) {
+                                currentZone = 'bottom';
+                            } else if (normalized >= 0.85) {
+                                currentZone = 'top';
+                            } else if (normalized >= 0.45 && normalized <= 0.55) {
+                                currentZone = 'center';
+                            }
+
+                            // Vibrate when entering a new zone
+                            if (currentZone !== null && currentZone !== previousZone) {
+                                if ('vibrate' in navigator) {
+                                    // Strong, short vibration (50ms)
+                                    navigator.vibrate(50);
+                                }
+                                previousZone = currentZone;
+                            } else if (currentZone === null && previousZone !== null) {
+                                // Exited a zone
+                                previousZone = null;
+                            }
 
                             if (ws && ws.readyState === WebSocket.OPEN) {
                                 ws.send(JSON.stringify({

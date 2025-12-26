@@ -249,6 +249,10 @@
             <div class="room-display">Комната: <span id="roomDisplay3"></span></div>
             <div id="statusDisplay" class="status connected">Подключено</div>
             <div class="tilt-display" id="tiltDisplay">0.50</div>
+            <div id="vibrationStatus" style="padding: 15px; margin: 15px 0; border-radius: 10px; background: rgba(255,255,255,0.1); font-size: 16px; cursor: pointer; user-select: none;">
+                🔔 Вибрация: <span id="vibrationStatusText">проверка...</span><br>
+                <small style="opacity: 0.7; font-size: 12px;">Нажмите для теста</small>
+            </div>
             <p>Наклоняйте телефон для управления</p>
             <div class="info">
                 <p id="playerInfo">Игрок: <span id="playerNameDisplay"></span></p>
@@ -531,28 +535,80 @@
 
                         // Vibration feedback tracking
                         let previousZone = null; // Track which zone we were in
+                        let vibrationEnabled = 'vibrate' in navigator;
+                        let vibrationWorking = false;
+
+                        console.log('🔔 Vibration setup:', {
+                            api_available: vibrationEnabled,
+                            user_agent: navigator.userAgent
+                        });
+
+                        // Test vibration function
+                        const statusText = document.getElementById('vibrationStatusText');
+                        const statusBox = document.getElementById('vibrationStatus');
+
+                        function testVibration() {
+                            if (vibrationEnabled) {
+                                try {
+                                    vibrationWorking = navigator.vibrate([200]);
+                                    if (vibrationWorking) {
+                                        statusText.textContent = 'работает ✅';
+                                        statusBox.style.background = 'rgba(76, 175, 80, 0.3)';
+                                        statusBox.style.border = '2px solid rgba(76, 175, 80, 0.6)';
+                                    } else {
+                                        statusText.textContent = 'не поддерживается ⚠️';
+                                        statusBox.style.background = 'rgba(255, 152, 0, 0.3)';
+                                        statusBox.style.border = '2px solid rgba(255, 152, 0, 0.6)';
+                                    }
+                                } catch (err) {
+                                    statusText.textContent = 'ошибка ❌';
+                                    statusBox.style.background = 'rgba(244, 67, 54, 0.3)';
+                                    statusBox.style.border = '2px solid rgba(244, 67, 54, 0.6)';
+                                    console.error('Vibration test failed:', err);
+                                }
+                            } else {
+                                statusText.textContent = 'не поддерживается браузером ❌';
+                                statusBox.style.background = 'rgba(244, 67, 54, 0.3)';
+                                statusBox.style.border = '2px solid rgba(244, 67, 54, 0.6)';
+                            }
+                        }
+
+                        // Test immediately
+                        testVibration();
+
+                        // Allow manual retest by clicking
+                        statusBox.addEventListener('click', () => {
+                            testVibration();
+                        });
 
                         // Start sending tilt data
                         motionController.onTiltChange = (normalized) => {
                             tiltDisplay.textContent = normalized.toFixed(2);
 
                             // Haptic feedback for zone transitions
-                            // Zones: 'bottom' (0-0.15), 'center' (0.45-0.55), 'top' (0.85-1.0)
+                            // Zones: 'bottom' (0-0.2), 'center' (0.4-0.6), 'top' (0.8-1.0)
                             let currentZone = null;
 
-                            if (normalized <= 0.15) {
+                            if (normalized <= 0.2) {
                                 currentZone = 'bottom';
-                            } else if (normalized >= 0.85) {
+                            } else if (normalized >= 0.8) {
                                 currentZone = 'top';
-                            } else if (normalized >= 0.45 && normalized <= 0.55) {
+                            } else if (normalized >= 0.4 && normalized <= 0.6) {
                                 currentZone = 'center';
                             }
 
                             // Vibrate when entering a new zone
                             if (currentZone !== null && currentZone !== previousZone) {
-                                if ('vibrate' in navigator) {
-                                    // Strong, short vibration (50ms)
-                                    navigator.vibrate(50);
+                                if (vibrationEnabled) {
+                                    try {
+                                        // Strong vibration pattern: vibrate 100ms, pause 50ms, vibrate 100ms
+                                        const vibrated = navigator.vibrate([100, 50, 100]);
+                                        console.log('🔔 Zone vibration:', currentZone, 'at', normalized.toFixed(2), 'result:', vibrated);
+                                    } catch (err) {
+                                        console.error('❌ Vibration failed:', err);
+                                    }
+                                } else {
+                                    console.log('⚠️ Vibration not available (zone:', currentZone + ')');
                                 }
                                 previousZone = currentZone;
                             } else if (currentZone === null && previousZone !== null) {

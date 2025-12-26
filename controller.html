@@ -286,20 +286,7 @@
         const tiltDisplay = document.getElementById('tiltDisplay');
         const playerNameDisplay = document.getElementById('playerNameDisplay');
 
-        // Set default server URL based on current location
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
-        const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
-        serverUrlInput.value = defaultServer;
-
-        // Wake up Render server on page load (free tier spins down after inactivity)
-        if (!isLocalhost) {
-            console.log('🔄 Waking up Render server...');
-            fetch('https://kinemon.onrender.com')
-                .then(() => console.log('✅ Server wake-up request sent'))
-                .catch((err) => console.log('⚠️ Server wake-up failed:', err));
-        }
-
-        // Check URL parameters (from QR code scan)
+        // Check URL parameters FIRST (from QR code scan)
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         const serverFromUrl = urlParams.get('server');
@@ -311,15 +298,36 @@
             console.log('Game type from URL:', gameType);
         }
 
+        // Set default server URL based on current location
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+        const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
+
+        // Use server from URL if available, otherwise use default
+        if (serverFromUrl) {
+            serverUrlInput.value = serverFromUrl;
+            console.log('Using server from URL:', serverFromUrl);
+        } else {
+            serverUrlInput.value = defaultServer;
+            console.log('Using default server:', defaultServer);
+        }
+
+        // Wake up Render server on page load (free tier spins down after inactivity)
+        if (!isLocalhost) {
+            console.log('🔄 Waking up Render server...');
+            fetch('https://kinemon.onrender.com')
+                .then(() => console.log('✅ Server wake-up request sent'))
+                .catch((err) => console.log('⚠️ Server wake-up failed:', err));
+        }
+
         // Update header with game name
         const gameName = gameType === 'pong' ? 'Pong' : 'Pizza Snake';
         document.querySelector('#roomInputScreen h1').textContent = `🎮 ${gameName} Controller`;
 
-        if (roomFromUrl && serverFromUrl) {
-            console.log('Detected QR code parameters:', {room: roomFromUrl, server: serverFromUrl, game: gameType});
-            // Auto-fill fields
+        // Auto-fill room code if available from QR scan
+        if (roomFromUrl) {
+            console.log('Detected QR code parameters:', {room: roomFromUrl, server: serverFromUrl || defaultServer, game: gameType});
+            // Auto-fill room field
             roomIdInput.value = roomFromUrl;
-            serverUrlInput.value = serverFromUrl;
 
             // Change button text to indicate auto-filled data
             manualJoinBtn.textContent = 'Подключиться к комнате ' + roomFromUrl;

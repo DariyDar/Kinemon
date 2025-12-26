@@ -116,7 +116,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.pizzaSize = BASE_PIZZA_SIZE * room.sizeMultiplier;
 
         room.pizzas = [];
-        for (let i = 0; i < 100; i++) {
+        const initialCount = room.settings.initialPizzas || 100;
+        for (let i = 0; i < initialCount; i++) {
             room.pizzas.push(spawnPizza(room));
         }
     }
@@ -454,24 +455,66 @@ function updateSnake(room) {
 
         // Apply control mapping curve
         let mappedDeviation = tiltDeviation;
-        if (room.controlMapping === 'nonlinear_a') {
-            // Moderate curve: dead zone 0.3, quadratic ramp
-            const absVal = Math.abs(tiltDeviation);
-            if (absVal < 0.3) {
-                mappedDeviation = 0;
-            } else {
-                const normalized = (absVal - 0.3) / 0.7; // 0 to 1
-                mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized);
-            }
-        } else if (room.controlMapping === 'nonlinear_b') {
-            // Strong curve: dead zone 0.4, cubic ramp
-            const absVal = Math.abs(tiltDeviation);
-            if (absVal < 0.4) {
-                mappedDeviation = 0;
-            } else {
-                const normalized = (absVal - 0.4) / 0.6; // 0 to 1
-                mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * normalized);
-            }
+
+        switch (room.controlMapping) {
+            case 'rotation_smooth':
+                // Improved rotation mode: smoothing + reduced sensitivity
+                const absSmooth = Math.abs(tiltDeviation);
+                if (absSmooth < 0.15) {
+                    // Small dead zone to filter sensor noise
+                    mappedDeviation = 0;
+                } else {
+                    // Smooth ramp from dead zone
+                    const normalized = (absSmooth - 0.15) / 0.85;
+                    // Quadratic curve for smooth control
+                    mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * 0.7);
+                }
+                break;
+
+            case 'rotation_linear':
+                // Original linear mode (kept for advanced players)
+                mappedDeviation = tiltDeviation;
+                break;
+
+            case 'center_straight':
+                // Center position = straight ahead, edges = turning
+                // Large dead zone in center (0.4-0.6 = straight)
+                if (Math.abs(tiltDeviation) < 0.4) {
+                    mappedDeviation = 0;
+                } else {
+                    // Remap edges to full range
+                    const sign = Math.sign(tiltDeviation);
+                    const absEdge = Math.abs(tiltDeviation);
+                    const normalized = (absEdge - 0.4) / 0.6; // 0 to 1
+                    mappedDeviation = sign * normalized;
+                }
+                break;
+
+            case 'nonlinear_a':
+                // Keep existing nonlinear_a (moderate curve)
+                const absA = Math.abs(tiltDeviation);
+                if (absA < 0.3) {
+                    mappedDeviation = 0;
+                } else {
+                    const normalized = (absA - 0.3) / 0.7;
+                    mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized);
+                }
+                break;
+
+            case 'nonlinear_b':
+                // Keep existing nonlinear_b (strong curve)
+                const absB = Math.abs(tiltDeviation);
+                if (absB < 0.4) {
+                    mappedDeviation = 0;
+                } else {
+                    const normalized = (absB - 0.4) / 0.6;
+                    mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * normalized);
+                }
+                break;
+
+            default:
+                // Default to rotation_smooth
+                mappedDeviation = tiltDeviation * 0.7;
         }
 
         const rotationSpeed = mappedDeviation * maxRotationSpeed * 2.4 * room.turnSpeedMultiplier;

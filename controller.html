@@ -266,6 +266,8 @@
         let playerId = null;
         let roomId = null;
         let gameType = 'snake'; // Default game type
+        let wakeLock = null;
+        let pingInterval = null;
 
         const roomInputScreen = document.getElementById('roomInputScreen');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
@@ -415,6 +417,13 @@
                     manualJoinBtn.disabled = false;
                     manualJoinBtn.textContent = 'Подключиться';
 
+                    // Send ping every 30 seconds to keep connection alive
+                    pingInterval = setInterval(() => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 30000);
+
                     // Motion controller already initialized with permission granted
                     // Initialize calibration
                     calibration = new Calibration(motionController);
@@ -433,6 +442,20 @@
 
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
+
+                        // Request wake lock to prevent phone sleep
+                        if ('wakeLock' in navigator) {
+                            try {
+                                wakeLock = await navigator.wakeLock.request('screen');
+                                console.log('Wake Lock acquired');
+
+                                wakeLock.addEventListener('release', () => {
+                                    console.log('Wake Lock released');
+                                });
+                            } catch (err) {
+                                console.error('Wake Lock failed:', err);
+                            }
+                        }
 
                         // Start sending tilt data
                         motionController.onTiltChange = (normalized) => {
@@ -475,6 +498,19 @@
                     manualJoinBtn.disabled = false;
                     manualJoinBtn.textContent = 'Подключиться';
 
+                    // Clear ping interval
+                    if (pingInterval) {
+                        clearInterval(pingInterval);
+                        pingInterval = null;
+                    }
+
+                    // Release wake lock
+                    if (wakeLock !== null) {
+                        wakeLock.release().then(() => {
+                            wakeLock = null;
+                        });
+                    }
+
                     if (event.code !== 1000 && event.code !== 1001) {
                         // Abnormal closure
                         alert('⚠️ Соединение потеряно.\n\nCode: ' + event.code);
@@ -487,6 +523,20 @@
                     if (data.type === 'init') {
                         playerId = data.playerId;
                         console.log('Received player ID:', playerId);
+                    }
+
+                    if (data.type === 'update' && data.gameState) {
+                        // Check if this player died
+                        const myPlayer = data.gameState.players.find(p => p.id === playerId);
+
+                        if (myPlayer && !myPlayer.alive) {
+                            // Show death screen
+                            document.getElementById('deathScore').textContent = myPlayer.score;
+                            showScreen('death');
+
+                            // Stop sending motion data while dead
+                            motionController.onTiltChange = null;
+                        }
                     }
                 };
             } catch (error) {
@@ -513,6 +563,29 @@
                 motionController.stop();
             }
             showScreen('room-input');
+        });
+
+        document.getElementById('respawnBtn').addEventListener('click', () => {
+            // Request respawn from server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'respawn'
+                }));
+
+                // Return to controller screen
+                showScreen('controller');
+
+                // Resume sending motion data
+                motionController.onTiltChange = (normalized) => {
+                    tiltDisplay.textContent = normalized.toFixed(2);
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'input',
+                            tilt: normalized
+                        }));
+                    }
+                };
+            }
         });
     </script>
 </body>

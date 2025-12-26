@@ -390,11 +390,13 @@
                     <div class="setting-group">
                         <label for="snakeControlMapping">Режим управления</label>
                         <select id="snakeControlMapping">
-                            <option value="linear" selected>Линейный</option>
-                            <option value="nonlinear_a">Нелинейный A (умеренный)</option>
-                            <option value="nonlinear_b">Нелинейный B (сильный)</option>
+                            <option value="center_straight" selected>Центр = прямо</option>
+                            <option value="rotation_smooth">Поворот (плавный)</option>
+                            <option value="rotation_linear">Поворот (чувствительный)</option>
+                            <option value="nonlinear_a">Нелинейный A (старый)</option>
+                            <option value="nonlinear_b">Нелинейный B (старый)</option>
                         </select>
-                        <div class="setting-info">Мёртвая зона и кривая поворота</div>
+                        <div class="setting-info">Как наклон влияет на поворот змейки</div>
                     </div>
                     <div class="setting-group">
                         <label for="snakeMoveSpeed">Скорость движения</label>
@@ -427,19 +429,30 @@
                         </select>
                         <div class="setting-info">Количество пицц для победы</div>
                     </div>
+                    <div class="setting-group">
+                        <label for="snakeInitialPizzas">Начальное количество пыли</label>
+                        <select id="snakeInitialPizzas">
+                            <option value="100" selected>100 частиц</option>
+                            <option value="150">150 частиц</option>
+                            <option value="200">200 частиц</option>
+                        </select>
+                        <div class="setting-info">Количество звёздной пыли на старте</div>
+                    </div>
                 `;
                 // Load saved settings
                 gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
-                gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'linear';
+                gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'center_straight';
                 gameSettings.moveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed')) || 3;
                 gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
                 gameSettings.winScore = parseInt(localStorage.getItem('snakeWinScore')) || 50;
+                gameSettings.initialPizzas = parseInt(localStorage.getItem('snakeInitialPizzas')) || 100;
 
                 document.getElementById('snakeTurnSpeed').value = gameSettings.turnSpeed;
                 document.getElementById('snakeControlMapping').value = gameSettings.controlMapping;
                 document.getElementById('snakeMoveSpeed').value = gameSettings.moveSpeed;
                 document.getElementById('snakeSize').value = gameSettings.snakeSize;
                 document.getElementById('snakeWinScore').value = gameSettings.winScore;
+                document.getElementById('snakeInitialPizzas').value = gameSettings.initialPizzas;
             }
         }
 
@@ -462,11 +475,13 @@
                 gameSettings.moveSpeed = parseInt(document.getElementById('snakeMoveSpeed').value);
                 gameSettings.snakeSize = parseInt(document.getElementById('snakeSize').value);
                 gameSettings.winScore = parseInt(document.getElementById('snakeWinScore').value);
+                gameSettings.initialPizzas = parseInt(document.getElementById('snakeInitialPizzas').value);
                 localStorage.setItem('snakeTurnSpeed', gameSettings.turnSpeed);
                 localStorage.setItem('snakeControlMapping', gameSettings.controlMapping);
                 localStorage.setItem('snakeMoveSpeed', gameSettings.moveSpeed);
                 localStorage.setItem('snakeSize', gameSettings.snakeSize);
                 localStorage.setItem('snakeWinScore', gameSettings.winScore);
+                localStorage.setItem('snakeInitialPizzas', gameSettings.initialPizzas);
             }
 
             console.log('Game settings:', gameSettings);

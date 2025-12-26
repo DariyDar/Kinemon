@@ -390,8 +390,8 @@
                     <div class="setting-group">
                         <label for="snakeControlMapping">Режим управления</label>
                         <select id="snakeControlMapping">
-                            <option value="center_straight" selected>Центр = прямо</option>
-                            <option value="rotation_smooth">Поворот (плавный)</option>
+                            <option value="rotation_smooth" selected>Поворот (плавный)</option>
+                            <option value="center_straight">Центр = прямо</option>
                             <option value="rotation_linear">Поворот (чувствительный)</option>
                             <option value="nonlinear_a">Нелинейный A (старый)</option>
                             <option value="nonlinear_b">Нелинейный B (старый)</option>
@@ -441,7 +441,7 @@
                 `;
                 // Load saved settings
                 gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
-                gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'center_straight';
+                gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'rotation_smooth';
                 gameSettings.moveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed')) || 3;
                 gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
                 gameSettings.winScore = parseInt(localStorage.getItem('snakeWinScore')) || 50;

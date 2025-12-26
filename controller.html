@@ -273,6 +273,7 @@
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
         const calibrationMaxScreen = document.getElementById('calibrationMaxScreen');
         const controllerScreen = document.getElementById('controllerScreen');
+        const deathScreen = document.getElementById('deathScreen');
 
         const playerNameInput = document.getElementById('playerName');
         const roomIdInput = document.getElementById('roomIdInput');
@@ -378,6 +379,8 @@
                 calibrationMaxScreen.classList.add('active');
             } else if (screenName === 'controller') {
                 controllerScreen.classList.add('active');
+            } else if (screenName === 'death') {
+                deathScreen.classList.add('active');
             }
         }
 

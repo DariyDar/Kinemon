@@ -543,8 +543,8 @@ function updateSnake(room) {
             y: player.headY
         });
 
-        // Remove tail segment
-        if (player.segments.length > INITIAL_LENGTH + player.score) {
+        // Remove tail segment (3x growth per pizza)
+        if (player.segments.length > INITIAL_LENGTH + player.score * 3) {
             player.segments.pop();
         }
     }

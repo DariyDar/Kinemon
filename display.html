@@ -750,30 +750,38 @@
             const pizzaRadius = pizzaSize / 2;
             const segmentRadius = segmentSize / 2;
 
-            // Draw pizzas
+            // Draw stardust particles (was pizzas)
+            // Neon color palette
+            const neonColors = [
+                '#FF006E', // Hot pink
+                '#8338EC', // Purple
+                '#3A86FF', // Blue
+                '#FFBE0B', // Yellow
+                '#FB5607', // Orange
+                '#06FFA5', // Cyan
+                '#FF006E', // Magenta
+                '#00F5FF', // Bright cyan
+                '#CCFF00', // Lime
+                '#FF1744'  // Red
+            ];
+
             for (const pizza of gameState.pizzas) {
-                // Pizza base (red circle)
-                ctx.fillStyle = '#D32F2F';
+                // Assign consistent color based on pizza ID
+                const colorIndex = (pizza.id ? String(pizza.id).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) : Math.floor(Math.random() * neonColors.length)) % neonColors.length;
+                const color = neonColors[colorIndex];
+
+                // Draw glow effect
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = color;
+
+                // Draw stardust particle
+                ctx.fillStyle = color;
                 ctx.beginPath();
                 ctx.arc(pizza.x, pizza.y, pizzaRadius, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Cheese triangles (yellow) - scaled proportionally
-                ctx.fillStyle = '#FDD835';
-                for (let i = 0; i < 6; i++) {
-                    const angle = (i / 6) * Math.PI * 2;
-                    const x1 = pizza.x + Math.cos(angle) * (pizzaRadius * 0.67);
-                    const y1 = pizza.y + Math.sin(angle) * (pizzaRadius * 0.67);
-                    const x2 = pizza.x + Math.cos(angle + Math.PI / 6) * (pizzaRadius * 0.8);
-                    const y2 = pizza.y + Math.sin(angle + Math.PI / 6) * (pizzaRadius * 0.8);
-
-                    ctx.beginPath();
-                    ctx.moveTo(pizza.x, pizza.y);
-                    ctx.lineTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.closePath();
-                    ctx.fill();
-                }
+                // Reset shadow for next draw
+                ctx.shadowBlur = 0;
             }
 
             // Draw all players

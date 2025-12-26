@@ -56,7 +56,7 @@ const BASE_MOVE_SPEED = 1.8;
 const INITIAL_LENGTH = 7;
 const DEFAULT_CANVAS = { width: 600, height: 800 };
 const BASE_SEGMENT_SIZE = 15;
-const BASE_PIZZA_SIZE = 18;
+const BASE_PIZZA_SIZE = 8;  // Reduced from 18 for stardust effect
 const BOUNDARY_MARGIN_BOTTOM = 40;
 
 // Generate random room ID
@@ -308,6 +308,34 @@ wss.on('connection', (ws) => {
                         }
                     }
                 }
+            } else if (data.type === 'ping') {
+                // Keepalive ping - respond with pong
+                ws.send(JSON.stringify({ type: 'pong' }));
+            } else if (data.type === 'respawn' && ws.playerId && ws.roomId) {
+                // Respawn dead player
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'snake') {
+                    const player = room.players.get(ws.playerId);
+                    if (player && !player.alive) {
+                        // Reset player state
+                        player.alive = true;
+                        player.score = 0;
+                        player.angle = 0;
+                        player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
+                        player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
+
+                        // Reset segments
+                        player.segments = [];
+                        for (let i = 0; i < INITIAL_LENGTH; i++) {
+                            player.segments.push({
+                                x: player.headX - i * room.segmentSize,
+                                y: player.headY
+                            });
+                        }
+
+                        console.log(`Player ${player.id} respawned in room ${room.id}`);
+                    }
+                }
             }
         } catch (error) {
             console.error('Error processing message:', error);
@@ -461,7 +489,7 @@ function updateSnake(room) {
         const minY = 0;
         const maxY = room.canvas.height - BOUNDARY_MARGIN_BOTTOM;
 
-        if (player.headX < minX) player.headX = maxX;
+        if (player.headX < minX) player.headX = maxX - 1;
         if (player.headX >= maxX) player.headX = minX;
         if (player.headY < minY) player.headY = maxY - 1;
         if (player.headY >= maxY) player.headY = minY;
@@ -599,7 +627,8 @@ function checkCollisions(room) {
             }
         }
 
-        // Check self-collision
+        // REMOVED: Self-collision no longer kills snake - players can coil infinitely
+        /*
         const minSegmentsForCollision = Math.ceil((2 * Math.PI * 3 * room.segmentSize) / room.segmentSize);
         for (let i = minSegmentsForCollision; i < player.segments.length; i++) {
             const seg = player.segments[i];
@@ -608,9 +637,11 @@ function checkCollisions(room) {
             if (dist < room.segmentSize * 0.8) {
                 player.alive = false;
                 dropPizzasFromSnake(room, player);
+                player.segments = [];  // Clear segments to prevent invisible collision
                 console.log(`Player ${player.id} died (self-collision) in room ${room.id}`);
             }
         }
+        */
 
         // Check collision with other players
         for (const otherPlayer of room.players.values()) {
@@ -625,6 +656,7 @@ function checkCollisions(room) {
                     // Player whose head collided dies
                     player.alive = false;
                     dropPizzasFromSnake(room, player);
+                    player.segments = [];  // Clear segments to prevent invisible collision
                     console.log(`Player ${player.id} died (hit ${otherPlayer.id}) in room ${room.id}`);
                     break;
                 }

@@ -143,6 +143,17 @@
             margin: 20px 0;
         }
 
+        #deathScreen {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d1a1a 100%);
+        }
+
+        #deathScore {
+            display: inline-block;
+            padding: 5px 15px;
+            background: rgba(255, 215, 0, 0.2);
+            border-radius: 8px;
+        }
+
         .info {
             font-size: 14px;
             opacity: 0.6;
@@ -229,6 +240,20 @@
                 <p id="playerInfo">Игрок: <span id="playerNameDisplay"></span></p>
             </div>
             <button class="btn btn-danger" id="disconnectBtn">Отключиться</button>
+        </div>
+
+        <!-- Death Screen -->
+        <div id="deathScreen" class="screen">
+            <h1 style="font-size: 36px; margin-bottom: 30px;">💀 Поражение</h1>
+            <p id="deathMessage" style="font-size: 20px; line-height: 1.6; margin-bottom: 40px;">
+                У тебя было <span id="deathScore" style="color: #FFD700; font-size: 28px; font-weight: bold;">0</span> пицц на момент смерти
+            </p>
+            <p style="font-size: 18px; opacity: 0.8; margin-bottom: 40px;">
+                Возвращайся в бой, чтобы вернуть их обратно!
+            </p>
+            <button class="btn" id="respawnBtn" style="font-size: 24px; padding: 20px 40px;">
+                🔄 Вернуться в бой!
+            </button>
         </div>
     </div>
 

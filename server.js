@@ -856,45 +856,116 @@ function updatePushers(room) {
     }
 
     // Check square-to-square collisions (push physics)
+    // Using AABB (Axis-Aligned Bounding Box) collision detection
     const players = Array.from(room.players.values());
+    const halfSize = room.squareSize / 2;
+
     for (let i = 0; i < players.length; i++) {
         for (let j = i + 1; j < players.length; j++) {
             const p1 = players[i];
             const p2 = players[j];
 
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const distance = Math.hypot(dx, dy);
-            const minDist = room.squareSize;
+            // Calculate bounding boxes
+            const p1Left = p1.x - halfSize;
+            const p1Right = p1.x + halfSize;
+            const p1Top = p1.y - halfSize;
+            const p1Bottom = p1.y + halfSize;
 
-            if (distance < minDist) {
-                // Squares are touching - push logic
-                // Determine who is pushing whom based on movement axis
+            const p2Left = p2.x - halfSize;
+            const p2Right = p2.x + halfSize;
+            const p2Top = p2.y - halfSize;
+            const p2Bottom = p2.y + halfSize;
 
+            // AABB collision check
+            const isColliding = p1Right > p2Left &&
+                               p1Left < p2Right &&
+                               p1Bottom > p2Top &&
+                               p1Top < p2Bottom;
+
+            if (isColliding) {
+                // Determine push direction based on player axes and who is active pusher
                 if (p1.axis === 'X' && p2.axis === 'Y') {
-                    // p1 moves on X, p2 moves on Y
-                    // p1 pushes p2 along X axis
-                    p2.x = p1.x;
+                    // p1 moves horizontally, p2 moves vertically
+                    // p1 pushes p2 horizontally, p2 pushes p1 vertically
+
+                    // p1 pushes p2 on X axis
+                    if (p1.x < p2.x) {
+                        p2.x = p1Right + halfSize;
+                    } else {
+                        p2.x = p1Left - halfSize;
+                    }
+
+                    // p2 pushes p1 on Y axis
+                    if (p2.y < p1.y) {
+                        p1.y = p2Bottom + halfSize;
+                    } else {
+                        p1.y = p2Top - halfSize;
+                    }
+
                 } else if (p1.axis === 'Y' && p2.axis === 'X') {
-                    // p1 moves on Y, p2 moves on X
-                    // p1 pushes p2 along Y axis
-                    p2.y = p1.y;
+                    // p1 moves vertically, p2 moves horizontally
+                    // p1 pushes p2 vertically, p2 pushes p1 horizontally
+
+                    // p1 pushes p2 on Y axis
+                    if (p1.y < p2.y) {
+                        p2.y = p1Bottom + halfSize;
+                    } else {
+                        p2.y = p1Top - halfSize;
+                    }
+
+                    // p2 pushes p1 on X axis
+                    if (p2.x < p1.x) {
+                        p1.x = p2Right + halfSize;
+                    } else {
+                        p1.x = p2Left - halfSize;
+                    }
+
                 } else if (p1.axis === p2.axis) {
-                    // Same axis - the one with higher tilt value pushes
+                    // Same axis - the one with higher tilt pushes the other
                     if (p1.axis === 'X') {
+                        // Both move on X axis
                         if (p1.tilt > p2.tilt) {
-                            p2.x = p1.x;
+                            // p1 has priority, pushes p2
+                            if (p1.x < p2.x) {
+                                p2.x = p1Right + halfSize;
+                            } else {
+                                p2.x = p1Left - halfSize;
+                            }
                         } else {
-                            p1.x = p2.x;
+                            // p2 has priority, pushes p1
+                            if (p2.x < p1.x) {
+                                p1.x = p2Right + halfSize;
+                            } else {
+                                p1.x = p2Left - halfSize;
+                            }
                         }
                     } else {
+                        // Both move on Y axis
                         if (p1.tilt > p2.tilt) {
-                            p2.y = p1.y;
+                            // p1 has priority, pushes p2
+                            if (p1.y < p2.y) {
+                                p2.y = p1Bottom + halfSize;
+                            } else {
+                                p2.y = p1Top - halfSize;
+                            }
                         } else {
-                            p1.y = p2.y;
+                            // p2 has priority, pushes p1
+                            if (p2.y < p1.y) {
+                                p1.y = p2Bottom + halfSize;
+                            } else {
+                                p1.y = p2Top - halfSize;
+                            }
                         }
                     }
                 }
+
+                // Ensure players stay within field bounds
+                const margin = room.squareSize / 2;
+                const fieldSize = room.canvas.width;
+                p1.x = Math.max(margin, Math.min(fieldSize - margin, p1.x));
+                p1.y = Math.max(margin, Math.min(fieldSize - margin, p1.y));
+                p2.x = Math.max(margin, Math.min(fieldSize - margin, p2.x));
+                p2.y = Math.max(margin, Math.min(fieldSize - margin, p2.y));
             }
         }
     }

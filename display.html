@@ -385,6 +385,26 @@
                 document.getElementById('pongPaddleSize').value = gameSettings.paddleSize;
                 document.getElementById('pongWinScore').value = gameSettings.winScore;
 
+            } else if (gameType === 'pushers') {
+                gameTitle.textContent = '🔲 Настройки Толкатели';
+                settingsForm.innerHTML = `
+                    <div class="setting-group">
+                        <label for="pushersWinScore">Очков для победы</label>
+                        <select id="pushersWinScore">
+                            <option value="10">10 очков</option>
+                            <option value="15" selected>15 очков</option>
+                            <option value="20">20 очков</option>
+                            <option value="25">25 очков</option>
+                            <option value="30">30 очков</option>
+                        </select>
+                        <div class="setting-info">Количество смайликов для победы команды</div>
+                    </div>
+                `;
+                // Load saved settings
+                gameSettings.winScore = parseInt(localStorage.getItem('pushersWinScore')) || 15;
+
+                document.getElementById('pushersWinScore').value = gameSettings.winScore;
+
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Pizza Snake';
                 settingsForm.innerHTML = `
@@ -481,6 +501,9 @@
                 localStorage.setItem('pongBallSpeed', gameSettings.ballSpeed);
                 localStorage.setItem('pongPaddleSize', gameSettings.paddleSize);
                 localStorage.setItem('pongWinScore', gameSettings.winScore);
+            } else if (gameType === 'pushers') {
+                gameSettings.winScore = parseInt(document.getElementById('pushersWinScore').value);
+                localStorage.setItem('pushersWinScore', gameSettings.winScore);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
@@ -688,6 +711,8 @@
 
             if (gameState.gameType === 'pong') {
                 renderPong();
+            } else if (gameState.gameType === 'pushers') {
+                renderPushers();
             } else {
                 renderSnake();
             }
@@ -698,12 +723,16 @@
 
         function showWinScreen(winner, gameType) {
             // Set winner name and message
-            document.getElementById('winnerName').textContent = winner.name;
-
-            if (gameType === 'pong') {
-                document.getElementById('winMessage').textContent = `Победа со счётом ${winner.score}!`;
+            if (gameType === 'pushers') {
+                document.getElementById('winnerName').textContent = `Команда ${winner.team}`;
+                document.getElementById('winMessage').textContent = `Победила с ${winner.score} смайликами!`;
             } else {
-                document.getElementById('winMessage').textContent = `Собрал ${winner.score} пицц!`;
+                document.getElementById('winnerName').textContent = winner.name;
+                if (gameType === 'pong') {
+                    document.getElementById('winMessage').textContent = `Победа со счётом ${winner.score}!`;
+                } else {
+                    document.getElementById('winMessage').textContent = `Собрал ${winner.score} пицц!`;
+                }
             }
 
             // Show win screen
@@ -868,6 +897,109 @@
                 ctx.font = 'bold 14px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText(player.name, head.x, head.y - segmentRadius - 5);
+            }
+        }
+
+        function renderPushers() {
+            // Dark background
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Field border
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+            // Center grid (dashed lines for orientation)
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw skulls at corners
+            if (gameState.skulls) {
+                for (const skull of gameState.skulls) {
+                    // Red glow for skull
+                    ctx.fillStyle = '#F44336';
+                    ctx.font = `${gameState.skullSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('💀', skull.x, skull.y);
+                }
+            }
+
+            // Draw smiley
+            if (gameState.smiley) {
+                ctx.fillStyle = '#FFF';
+                ctx.font = `${gameState.smileySize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('😊', gameState.smiley.x, gameState.smiley.y);
+            }
+
+            // Draw player squares
+            if (gameState.players) {
+                for (const player of gameState.players) {
+                    const halfSize = gameState.squareSize / 2;
+
+                    // Draw square
+                    ctx.fillStyle = player.color;
+                    ctx.fillRect(
+                        player.x - halfSize,
+                        player.y - halfSize,
+                        gameState.squareSize,
+                        gameState.squareSize
+                    );
+
+                    // Draw player name above square
+                    ctx.fillStyle = player.color;
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(player.name, player.x, player.y - halfSize - 5);
+
+                    // Draw axis indicator below square
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(player.axis, player.x, player.y + halfSize + 3);
+                }
+            }
+
+            // Draw team scoreboard in top left corner
+            if (gameState.teamScores) {
+                const teams = [
+                    { name: 'Blue', color: '#2196F3' },
+                    { name: 'Red', color: '#F44336' },
+                    { name: 'Yellow', color: '#FFEB3B' },
+                    { name: 'Green', color: '#4CAF50' },
+                    { name: 'White', color: '#FFFFFF' }
+                ];
+
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+
+                let y = 15;
+                for (const team of teams) {
+                    const score = gameState.teamScores[team.name] || 0;
+
+                    // Only show teams with score > 0 or with active players
+                    const hasPlayers = gameState.players && gameState.players.some(p => p.team === team.name);
+
+                    if (score > 0 || hasPlayers) {
+                        ctx.fillStyle = team.color;
+                        ctx.fillText(`${team.name}: ${score}/${gameState.winScore}`, 15, y);
+                        y += 20;
+                    }
+                }
             }
         }
 

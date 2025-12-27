@@ -74,6 +74,18 @@
             background: #0a6bc2;
         }
 
+        .btn-tertiary {
+            background: #FF5722;
+        }
+
+        .btn-tertiary:hover {
+            background: #E64A19;
+        }
+
+        .btn-tertiary:active {
+            background: #D84315;
+        }
+
         .game-list {
             display: flex;
             flex-direction: column;
@@ -100,10 +112,11 @@
         <div class="game-list">
             <button class="btn" id="pongBtn">🏓 Pong</button>
             <button class="btn btn-secondary" id="snakeBtn">🐍 Pizza Snake</button>
+            <button class="btn btn-tertiary" id="pushersBtn">🔲 Толкатели</button>
         </div>
     </div>
 
-    <div id="version">v3.1</div>
+    <div id="version">v3.5</div>
 
     <script>
         // Redirect to display.html with game type parameter
@@ -113,6 +126,10 @@
 
         document.getElementById('snakeBtn').addEventListener('click', () => {
             window.location.href = 'display.html?game=snake';
+        });
+
+        document.getElementById('pushersBtn').addEventListener('click', () => {
+            window.location.href = 'display.html?game=pushers';
         });
     </script>
 </body>

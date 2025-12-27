@@ -208,6 +208,15 @@
             <br>
             <input type="text" id="playerName" placeholder="Ваше имя" maxlength="20" value="Player">
             <br>
+            <div id="teamSelector" style="display: none; margin: 10px 0;">
+                <select id="teamSelect" style="width: 100%; padding: 15px; font-size: 16px; border-radius: 10px; background: #222; color: white; border: 2px solid #444;">
+                    <option value="Blue">🔵 Синяя команда</option>
+                    <option value="Red">🔴 Красная команда</option>
+                    <option value="Yellow">🟡 Жёлтая команда</option>
+                    <option value="Green">🟢 Зелёная команда</option>
+                    <option value="White">⚪ Белая команда</option>
+                </select>
+            </div>
             <input type="text" id="serverUrl" placeholder="Адрес сервера" value="">
             <br>
             <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
@@ -256,6 +265,7 @@
             <p>Наклоняйте телефон для управления</p>
             <div class="info">
                 <p id="playerInfo">Игрок: <span id="playerNameDisplay"></span></p>
+                <p id="axisInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold;">Ваша ось: <span id="axisDisplay"></span></p>
             </div>
             <button class="btn btn-danger" id="disconnectBtn">Отключиться</button>
         </div>
@@ -372,8 +382,13 @@
         }
 
         // Update header with game name
-        const gameName = gameType === 'pong' ? 'Pong' : 'Pizza Snake';
+        const gameName = gameType === 'pong' ? 'Pong' : (gameType === 'pushers' ? 'Толкатели' : 'Pizza Snake');
         document.querySelector('#roomInputScreen h1').textContent = `🎮 ${gameName} Controller`;
+
+        // Show team selector for pushers game
+        if (gameType === 'pushers') {
+            document.getElementById('teamSelector').style.display = 'block';
+        }
 
         // Auto-fill room code if available from QR scan
         if (roomFromUrl) {
@@ -504,13 +519,20 @@
                         console.log('Calibration complete:', min, max);
 
                         // Send join message with game type and control scheme
-                        ws.send(JSON.stringify({
+                        const joinMessage = {
                             type: 'join',
                             roomId: roomId,
                             name: playerNameInput.value.trim() || 'Player',
                             gameType: gameType,
                             controlScheme: currentControlScheme
-                        }));
+                        };
+
+                        // Add team for pushers game
+                        if (gameType === 'pushers') {
+                            joinMessage.team = document.getElementById('teamSelect').value;
+                        }
+
+                        ws.send(JSON.stringify(joinMessage));
 
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
@@ -678,6 +700,16 @@
                     if (data.type === 'init') {
                         playerId = data.playerId;
                         console.log('Received player ID:', playerId);
+
+                        // For pushers game, show the assigned axis
+                        if (gameType === 'pushers' && data.gameState && data.gameState.players) {
+                            const myPlayer = data.gameState.players.find(p => p.id === playerId);
+                            if (myPlayer && myPlayer.axis) {
+                                document.getElementById('axisDisplay').textContent = myPlayer.axis;
+                                document.getElementById('axisInfo').style.display = 'block';
+                                console.log('Assigned axis:', myPlayer.axis);
+                            }
+                        }
                     }
 
                     if (data.type === 'update' && data.gameState) {

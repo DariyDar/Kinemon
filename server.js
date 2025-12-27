@@ -59,6 +59,12 @@ const BASE_SEGMENT_SIZE = 15;
 const BASE_PIZZA_SIZE = 8;  // Reduced from 18 for stardust effect
 const BOUNDARY_MARGIN_BOTTOM = 40;
 
+// Pushers constants
+const PUSHERS_SQUARE_SIZE = 30;
+const PUSHERS_SMILEY_SIZE = 20;
+const PUSHERS_SKULL_SIZE = 30;
+const PUSHERS_FIELD_SIZE = 800;
+
 // Generate random room ID
 function generateRoomId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -106,6 +112,35 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.paddleSize = (settings.paddleSize || 2) * 50; // 50, 100, 150
         room.winScore = settings.winScore || 11;
         room.gameStarted = false; // Game starts when 2 players join
+    } else if (gameType === 'pushers') {
+        // Pushers: team-based square pushing game
+        room.canvas = { width: PUSHERS_FIELD_SIZE, height: PUSHERS_FIELD_SIZE };
+        room.squareSize = PUSHERS_SQUARE_SIZE;
+        room.smileySize = PUSHERS_SMILEY_SIZE;
+        room.skullSize = PUSHERS_SKULL_SIZE;
+        room.winScore = settings.winScore || 15;
+        room.nextPlayerId = 0; // For axis assignment
+
+        // Team scores
+        room.teamScores = {
+            Blue: 0,
+            Red: 0,
+            Yellow: 0,
+            Green: 0,
+            White: 0
+        };
+
+        // Spawn skulls at corners
+        const margin = PUSHERS_SKULL_SIZE / 2;
+        room.skulls = [
+            { x: margin, y: margin },
+            { x: room.canvas.width - margin, y: margin },
+            { x: margin, y: room.canvas.height - margin },
+            { x: room.canvas.width - margin, y: room.canvas.height - margin }
+        ];
+
+        // Spawn first smiley
+        room.smiley = spawnSmiley(room);
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -145,6 +180,48 @@ function spawnPizza(room) {
         y: minY + Math.random() * (maxY - minY),
         id: Date.now() + Math.random()
     };
+}
+
+// Pushers helper functions
+function spawnSmiley(room) {
+    const margin = room.smileySize;
+    const minX = margin + 50;
+    const maxX = room.canvas.width - margin - 50;
+    const minY = margin + 50;
+    const maxY = room.canvas.height - margin - 50;
+
+    return {
+        x: minX + Math.random() * (maxX - minX),
+        y: minY + Math.random() * (maxY - minY)
+    };
+}
+
+function getTeamColor(team) {
+    const colors = {
+        Blue: '#2196F3',
+        Red: '#F44336',
+        Yellow: '#FFEB3B',
+        Green: '#4CAF50',
+        White: '#FFFFFF'
+    };
+    return colors[team] || '#FFFFFF';
+}
+
+function spawnPlayerSquare(room, axis) {
+    const margin = room.squareSize / 2 + 10;
+    let x, y;
+
+    if (axis === 'X') {
+        // Spawn on left or right edge
+        x = Math.random() > 0.5 ? margin : room.canvas.width - margin;
+        y = margin + Math.random() * (room.canvas.height - 2 * margin);
+    } else { // Y axis
+        // Spawn on top or bottom edge
+        x = margin + Math.random() * (room.canvas.width - 2 * margin);
+        y = Math.random() > 0.5 ? margin : room.canvas.height - margin;
+    }
+
+    return { x, y };
 }
 
 // Drop pizzas from dead snake body
@@ -240,6 +317,20 @@ wss.on('connection', (ws) => {
                     player.paddleX = isPlayer1 ? 20 : room.canvas.width - 30;
                     player.side = isPlayer1 ? 'left' : 'right';
                     player.alive = true; // Pong players are always alive (no death mechanic)
+                } else if (room.gameType === 'pushers') {
+                    // Pushers: axis-locked movement
+                    const team = data.team || 'White';
+                    const axis = room.nextPlayerId % 2 === 0 ? 'X' : 'Y'; // Alternate X, Y, X, Y...
+                    room.nextPlayerId++;
+
+                    const spawnPos = spawnPlayerSquare(room, axis);
+
+                    player.team = team;
+                    player.color = getTeamColor(team);
+                    player.axis = axis;
+                    player.x = spawnPos.x;
+                    player.y = spawnPos.y;
+                    player.alive = true;
                 } else {
                     // Snake: segments and position
                     player.alive = true;
@@ -416,6 +507,29 @@ function serializeGameState(room) {
             name: room.winner.name,
             score: room.winner.score
         } : null;
+    } else if (room.gameType === 'pushers') {
+        // Pushers state
+        state.players = Array.from(room.players.values()).map(p => ({
+            id: p.id,
+            name: p.name,
+            team: p.team,
+            color: p.color,
+            axis: p.axis,
+            x: p.x,
+            y: p.y
+        }));
+        state.teamScores = room.teamScores;
+        state.smiley = room.smiley;
+        state.skulls = room.skulls;
+        state.squareSize = room.squareSize;
+        state.smileySize = room.smileySize;
+        state.skullSize = room.skullSize;
+        state.winScore = room.winScore;
+        state.gameOver = room.gameOver;
+        state.winner = room.winner ? {
+            team: room.winner.team,
+            score: room.winner.score
+        } : null;
     } else {
         // Snake state
         state.players = Array.from(room.players.values()).map(p => ({
@@ -448,6 +562,8 @@ function gameLoop(roomId) {
 
     if (room.gameType === 'pong') {
         updatePong(room);
+    } else if (room.gameType === 'pushers') {
+        updatePushers(room);
     } else {
         updateSnake(room);
     }
@@ -709,6 +825,128 @@ function resetBall(room) {
     room.ball.y = room.canvas.height / 2;
     room.ball.speedX = -room.ball.speedX;
     room.ball.speedY = (Math.random() - 0.5) * 8;
+}
+
+// Update Pushers game
+function updatePushers(room) {
+    // Update player positions based on tilt and axis
+    for (const player of room.players.values()) {
+        const fieldSize = room.canvas.width; // Square field
+        const margin = room.squareSize / 2;
+
+        if (player.axis === 'X') {
+            // Move only on X axis
+            // tilt 0 (left) -> x = margin
+            // tilt 1 (right) -> x = fieldSize - margin
+            const targetX = margin + player.tilt * (fieldSize - 2 * margin);
+            player.x = targetX;
+
+            // Y position stays fixed (within bounds)
+            player.y = Math.max(margin, Math.min(fieldSize - margin, player.y));
+        } else {
+            // Move only on Y axis
+            // tilt 0 (top) -> y = margin
+            // tilt 1 (bottom) -> y = fieldSize - margin
+            const targetY = margin + player.tilt * (fieldSize - 2 * margin);
+            player.y = targetY;
+
+            // X position stays fixed (within bounds)
+            player.x = Math.max(margin, Math.min(fieldSize - margin, player.x));
+        }
+    }
+
+    // Check square-to-square collisions (push physics)
+    const players = Array.from(room.players.values());
+    for (let i = 0; i < players.length; i++) {
+        for (let j = i + 1; j < players.length; j++) {
+            const p1 = players[i];
+            const p2 = players[j];
+
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const distance = Math.hypot(dx, dy);
+            const minDist = room.squareSize;
+
+            if (distance < minDist) {
+                // Squares are touching - push logic
+                // Determine who is pushing whom based on movement axis
+
+                if (p1.axis === 'X' && p2.axis === 'Y') {
+                    // p1 moves on X, p2 moves on Y
+                    // p1 pushes p2 along X axis
+                    p2.x = p1.x;
+                } else if (p1.axis === 'Y' && p2.axis === 'X') {
+                    // p1 moves on Y, p2 moves on X
+                    // p1 pushes p2 along Y axis
+                    p2.y = p1.y;
+                } else if (p1.axis === p2.axis) {
+                    // Same axis - the one with higher tilt value pushes
+                    if (p1.axis === 'X') {
+                        if (p1.tilt > p2.tilt) {
+                            p2.x = p1.x;
+                        } else {
+                            p1.x = p2.x;
+                        }
+                    } else {
+                        if (p1.tilt > p2.tilt) {
+                            p2.y = p1.y;
+                        } else {
+                            p1.y = p2.y;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Check smiley collection
+    if (room.smiley) {
+        for (const player of room.players.values()) {
+            const dx = player.x - room.smiley.x;
+            const dy = player.y - room.smiley.y;
+            const distance = Math.hypot(dx, dy);
+
+            if (distance < (room.squareSize / 2 + room.smileySize / 2)) {
+                // Player collected smiley
+                room.teamScores[player.team]++;
+                console.log(`${player.name} (${player.team}) collected smiley! Score: ${room.teamScores[player.team]}`);
+
+                // Check win condition
+                if (room.teamScores[player.team] >= room.winScore) {
+                    room.winner = {
+                        team: player.team,
+                        score: room.teamScores[player.team]
+                    };
+                    room.gameOver = true;
+                    console.log(`${player.team} team wins with ${room.teamScores[player.team]} smileys!`);
+                    return;
+                }
+
+                // Spawn new smiley
+                room.smiley = spawnSmiley(room);
+            }
+        }
+    }
+
+    // Check skull collision
+    for (const player of room.players.values()) {
+        for (const skull of room.skulls) {
+            const dx = player.x - skull.x;
+            const dy = player.y - skull.y;
+            const distance = Math.hypot(dx, dy);
+
+            if (distance < (room.squareSize / 2 + room.skullSize / 2)) {
+                // Player hit skull
+                room.teamScores[player.team] = Math.max(0, room.teamScores[player.team] - 1);
+                console.log(`${player.name} (${player.team}) hit skull! Score: ${room.teamScores[player.team]}`);
+
+                // Respawn player at new position
+                const newPos = spawnPlayerSquare(room, player.axis);
+                player.x = newPos.x;
+                player.y = newPos.y;
+            }
+        }
+    }
 }
 
 // Check collisions

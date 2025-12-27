@@ -410,6 +410,12 @@ function serializeGameState(room) {
         state.paddleSize = room.paddleSize;
         state.winScore = room.winScore;
         state.gameStarted = room.gameStarted;
+        state.gameOver = room.gameOver;
+        state.winner = room.winner ? {
+            id: room.winner.id,
+            name: room.winner.name,
+            score: room.winner.score
+        } : null;
     } else {
         // Snake state
         state.players = Array.from(room.players.values()).map(p => ({

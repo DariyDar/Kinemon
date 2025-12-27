@@ -681,19 +681,21 @@
                     }
 
                     if (data.type === 'update' && data.gameState) {
-                        // Check if this player died
-                        const myPlayer = data.gameState.players.find(p => p.id === playerId);
+                        // Check if this player died (only for Snake, not Pong)
+                        if (data.gameState.gameType === 'snake') {
+                            const myPlayer = data.gameState.players.find(p => p.id === playerId);
 
-                        if (myPlayer && !myPlayer.alive) {
-                            // Show death screen
-                            document.getElementById('deathScore').textContent = myPlayer.score;
-                            showScreen('death');
+                            if (myPlayer && !myPlayer.alive) {
+                                // Show death screen
+                                document.getElementById('deathScore').textContent = myPlayer.score;
+                                showScreen('death');
 
-                            // Hide control selector
-                            document.getElementById('controlSelector').style.display = 'none';
+                                // Hide control selector
+                                document.getElementById('controlSelector').style.display = 'none';
 
-                            // Stop sending motion data while dead
-                            motionController.onTiltChange = null;
+                                // Stop sending motion data while dead
+                                motionController.onTiltChange = null;
+                            }
                         }
                     }
                 };

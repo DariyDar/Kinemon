@@ -682,7 +682,7 @@
 
             // Check for game over
             if (gameState.gameOver && gameState.winner) {
-                showWinScreen(gameState.winner);
+                showWinScreen(gameState.winner, gameState.gameType);
                 return;
             }
 
@@ -696,10 +696,15 @@
             updateScoreboard();
         }
 
-        function showWinScreen(winner) {
+        function showWinScreen(winner, gameType) {
             // Set winner name and message
             document.getElementById('winnerName').textContent = winner.name;
-            document.getElementById('winMessage').textContent = `Собрал ${winner.score} пицц!`;
+
+            if (gameType === 'pong') {
+                document.getElementById('winMessage').textContent = `Победа со счётом ${winner.score}!`;
+            } else {
+                document.getElementById('winMessage').textContent = `Собрал ${winner.score} пицц!`;
+            }
 
             // Show win screen
             showScreen('win');

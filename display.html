@@ -1569,7 +1569,8 @@
                             const hue = 30 + Math.random() * 30; // Orange to yellow
                             ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
                             ctx.beginPath();
-                            ctx.arc(x, y, 8 - i * 1.5, 0, Math.PI * 2);
+                            const radius = Math.max(1, 8 - i * 1.5); // Prevent negative radius
+                            ctx.arc(x, y, radius, 0, Math.PI * 2);
                             ctx.fill();
                         }
                     }

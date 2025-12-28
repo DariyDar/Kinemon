@@ -356,7 +356,7 @@ function detectPump(player, currentTilt) {
     if (lastTilt < 0.5 && currentTilt >= 0.5) {
         // Pump detected! Add energy based on how high they lifted
         const pumpStrength = Math.min(currentTilt - 0.5, 0.5) * 2; // 0-1
-        const energyBoost = pumpStrength * 3; // Energy boost from pump
+        const energyBoost = pumpStrength * 5; // Energy boost from pump (increased from 3 to 5)
         console.log(`Pump detected! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)}, Energy: +${energyBoost.toFixed(2)}`);
         return energyBoost;
     }
@@ -394,6 +394,8 @@ function applyEngineThrust(room) {
         room.ship.vx += -Math.cos(angle) * thrust;
         room.ship.vy += -Math.sin(angle) * thrust;
 
+        console.log(`Thrust applied: ${thrust.toFixed(3)}, Energy: ${room.systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(room.ship.vx, room.ship.vy).toFixed(2)}`);
+
         // Clamp velocity
         const MAX_SPEED = 9;
         const speed = Math.hypot(room.ship.vx, room.ship.vy);
@@ -403,8 +405,8 @@ function applyEngineThrust(room) {
         }
     }
 
-    // Energy decay - energy dissipates quickly
-    room.systems.engine.energy = Math.max(0, room.systems.engine.energy - 0.15);
+    // Energy decay - energy dissipates over time (reduced from 0.15 to 0.05 for better playability)
+    room.systems.engine.energy = Math.max(0, room.systems.engine.energy - 0.05);
 }
 
 // Update ship position with physics
@@ -1880,7 +1882,7 @@ function updateShip(room) {
 
         // Pump every 800ms to demonstrate pump mechanics
         if (timeSinceLastPump > 800) {
-            room.systems.engine.energy = Math.min(room.systems.engine.energy + 2.5, 10); // Add pump energy
+            room.systems.engine.energy = Math.min(room.systems.engine.energy + 4, 10); // Add pump energy (increased from 2.5 to 4)
             room.lastAutoPump = Date.now();
         }
 

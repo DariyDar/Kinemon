@@ -215,7 +215,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         // Initialize coins - only 1 coin at a time
         room.coins.push(spawnCoin(room));
 
-        room.gameStarted = false;
+        room.gameStarted = true; // Ship starts immediately (cooperative game, works with any number of players)
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest

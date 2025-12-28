@@ -404,16 +404,20 @@
             <h3>⚡ Энергия и тяга</h3>
             <div class="physics-grid">
                 <div class="physics-control">
-                    <label>Энергия от накачки <span class="value-display" id="pumpEnergyValue">10.0</span></label>
-                    <input type="range" id="pumpEnergy" min="1" max="20" step="0.5" value="10">
+                    <label>Энергия от накачки <span class="value-display" id="pumpEnergyValue">16.0</span></label>
+                    <input type="range" id="pumpEnergy" min="1" max="20" step="0.5" value="16">
                 </div>
                 <div class="physics-control">
-                    <label>Затухание энергии <span class="value-display" id="energyDecayValue">0.02</span></label>
-                    <input type="range" id="energyDecay" min="0.01" max="0.2" step="0.01" value="0.02">
+                    <label>Затухание энергии <span class="value-display" id="energyDecayValue">0.05</span></label>
+                    <input type="range" id="energyDecay" min="0.01" max="0.2" step="0.01" value="0.05">
                 </div>
                 <div class="physics-control">
-                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">0.8</span></label>
-                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="0.8">
+                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">1.4</span></label>
+                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="1.4">
+                </div>
+                <div class="physics-control">
+                    <label>Мин. дельта pump <span class="value-display" id="pumpMinDeltaValue">0.00</span></label>
+                    <input type="range" id="pumpMinDelta" min="0" max="0.2" step="0.01" value="0">
                 </div>
             </div>
         </div>
@@ -422,16 +426,16 @@
             <h3>🚀 Движение корабля</h3>
             <div class="physics-grid">
                 <div class="physics-control">
-                    <label>Трение (friction) <span class="value-display" id="frictionValue">0.99</span></label>
-                    <input type="range" id="friction" min="0.90" max="0.999" step="0.001" value="0.99">
+                    <label>Трение (friction) <span class="value-display" id="frictionValue">0.928</span></label>
+                    <input type="range" id="friction" min="0.90" max="0.999" step="0.001" value="0.928">
                 </div>
                 <div class="physics-control">
-                    <label>Макс. скорость <span class="value-display" id="maxSpeedValue">9.0</span></label>
-                    <input type="range" id="maxSpeed" min="3" max="15" step="0.5" value="9">
+                    <label>Макс. скорость <span class="value-display" id="maxSpeedValue">3.0</span></label>
+                    <input type="range" id="maxSpeed" min="3" max="15" step="0.5" value="3">
                 </div>
                 <div class="physics-control">
-                    <label>Порог остановки <span class="value-display" id="stopThresholdValue">0.05</span></label>
-                    <input type="range" id="stopThreshold" min="0.01" max="0.5" step="0.01" value="0.05">
+                    <label>Порог остановки <span class="value-display" id="stopThresholdValue">0.13</span></label>
+                    <input type="range" id="stopThreshold" min="0.01" max="0.5" step="0.01" value="0.13">
                 </div>
             </div>
         </div>
@@ -440,16 +444,16 @@
             <h3>🔥 Визуализация огня</h3>
             <div class="physics-grid">
                 <div class="physics-control">
-                    <label>Порог видимости <span class="value-display" id="fireThresholdValue">0.01</span></label>
-                    <input type="range" id="fireThreshold" min="0.001" max="0.2" step="0.001" value="0.01">
+                    <label>Порог видимости <span class="value-display" id="fireThresholdValue">0.089</span></label>
+                    <input type="range" id="fireThreshold" min="0.001" max="0.2" step="0.001" value="0.089">
                 </div>
                 <div class="physics-control">
-                    <label>Интенсивность огня <span class="value-display" id="fireIntensityValue">1.0</span></label>
-                    <input type="range" id="fireIntensity" min="0.5" max="3.0" step="0.1" value="1.0">
+                    <label>Интенсивность огня <span class="value-display" id="fireIntensityValue">1.4</span></label>
+                    <input type="range" id="fireIntensity" min="0.5" max="3.0" step="0.1" value="1.4">
                 </div>
                 <div class="physics-control">
-                    <label>Макс. частиц <span class="value-display" id="maxParticlesValue">8</span></label>
-                    <input type="range" id="maxParticles" min="3" max="20" step="1" value="8">
+                    <label>Макс. частиц <span class="value-display" id="maxParticlesValue">15</span></label>
+                    <input type="range" id="maxParticles" min="3" max="20" step="1" value="15">
                 </div>
             </div>
         </div>
@@ -467,15 +471,16 @@
 
         // Live physics settings (Ship game only)
         let physicsSettings = {
-            pumpEnergy: 10.0,
-            energyDecay: 0.02,
-            thrustMult: 0.8,
-            friction: 0.99,
-            maxSpeed: 9.0,
-            stopThreshold: 0.05,
-            fireThreshold: 0.01,
-            fireIntensity: 1.0,
-            maxParticles: 8
+            pumpEnergy: 16.0,
+            energyDecay: 0.05,
+            thrustMult: 1.4,
+            friction: 0.928,
+            maxSpeed: 3.0,
+            stopThreshold: 0.13,
+            fireThreshold: 0.089,
+            fireIntensity: 1.4,
+            maxParticles: 15,
+            pumpMinDelta: 0
         };
 
         // Visual effects system
@@ -837,6 +842,7 @@
                 { id: 'pumpEnergy', setting: 'pumpEnergy', display: 'pumpEnergyValue', decimals: 1 },
                 { id: 'energyDecay', setting: 'energyDecay', display: 'energyDecayValue', decimals: 2 },
                 { id: 'thrustMult', setting: 'thrustMult', display: 'thrustMultValue', decimals: 1 },
+                { id: 'pumpMinDelta', setting: 'pumpMinDelta', display: 'pumpMinDeltaValue', decimals: 2 },
                 { id: 'friction', setting: 'friction', display: 'frictionValue', decimals: 3 },
                 { id: 'maxSpeed', setting: 'maxSpeed', display: 'maxSpeedValue', decimals: 1 },
                 { id: 'stopThreshold', setting: 'stopThreshold', display: 'stopThresholdValue', decimals: 2 },

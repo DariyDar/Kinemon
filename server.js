@@ -176,8 +176,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.systems = {
             engine: {
                 amplitude: 0,
-                energy: 0,         // Accumulated energy from pumps
-                rotation: 0
+                energy: 0         // Accumulated energy from pumps
             },
             rudder: {
                 rotation: 0,
@@ -185,7 +184,6 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
             },
             weapon: {
                 amplitude: 0,
-                accumulation: 0,
                 lastFireTime: 0,
                 fireInterval: 1000
             },
@@ -351,6 +349,11 @@ function detectPump(player, currentTilt, room) {
 
     const lastTilt = player.lastTilt;
     player.lastTilt = currentTilt;
+
+    // Apply debouncing filter to reduce sensor noise
+    const delta = currentTilt - lastTilt;
+    const minDelta = (room.physics && room.physics.pumpMinDelta) || 0;
+    if (Math.abs(delta) < minDelta) return 0;
 
     // Detect upward crossing of 0.5 threshold (pump motion)
     if (lastTilt < 0.5 && currentTilt >= 0.5) {
@@ -877,8 +880,7 @@ wss.on('connection', (ws) => {
 
                     player.systemRole = systemIndex < 5 ? systems[systemIndex] : null;
                     player.systemIndex = systemIndex < 5 ? systemIndex + 1 : null; // 1-5
-                    player.accumulation = 0;      // Combo counter
-                    player.lastTilt = 0.5;        // Previous tilt value
+                    player.lastTilt = undefined;  // Previous tilt value (undefined allows proper first pump detection)
                     player.alive = true;          // All players share ship health
 
                     console.log(`Player ${player.name} assigned to system: ${player.systemRole || 'observer'}`);
@@ -1843,7 +1845,6 @@ function updateShip(room) {
                 // Detect pump motion and add energy
                 const energyAdded = detectPump(player, tilt, room);
                 room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 10); // Cap at 10
-                room.systems.engine.amplitude = tilt;
                 room.systems.engine.hasPlayer = true;
                 break;
             case 'rudder':

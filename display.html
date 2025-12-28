@@ -309,6 +309,14 @@
         let gameType = null; // 'pong' or 'snake'
         let gameSettings = {}; // Store game settings
 
+        // Visual effects system
+        const effects = {
+            particles: [],
+            screenShake: { active: false, offsetX: 0, offsetY: 0, intensity: 0, startTime: 0, duration: 0 },
+            flash: { active: false, color: '#FFF', alpha: 0, startTime: 0, duration: 0 },
+            scoreAnims: []
+        };
+
         // Detect available viewport dimensions
         function getAvailableCanvasDimensions() {
             const availableWidth = window.innerWidth;
@@ -685,6 +693,8 @@
                         if (gameState.players.length === 0 && canvas.classList.contains('active')) {
                             showScreen('waiting');
                         }
+                    } else if (data.type === 'effect') {
+                        handleEffect(data.effectType, data.data);
                     }
                 };
             } catch (error) {
@@ -697,6 +707,127 @@
         function updatePlayerCount() {
             if (gameState) {
                 playerCount.textContent = `Игроков: ${gameState.players.length}`;
+            }
+        }
+
+        // Visual effects handlers
+        function handleEffect(effectType, data) {
+            switch (effectType) {
+                case 'particle':
+                    spawnParticles(data.x, data.y, data.color, data.count || 15);
+                    break;
+                case 'flash':
+                    triggerFlash(data.color, data.intensity || 0.3);
+                    break;
+                case 'shake':
+                    triggerShake(data.intensity || 3);
+                    break;
+                case 'scoreAnim':
+                    spawnScoreAnimation(data.x, data.y, data.text, data.color);
+                    break;
+                case 'sound':
+                    console.log('Sound:', data.sound);
+                    break;
+            }
+        }
+
+        function spawnParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+                const speed = 2 + Math.random() * 3;
+                effects.particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    size: 2 + Math.random() * 3,
+                    color: color,
+                    alpha: 1.0,
+                    lifetime: 0.4 + Math.random() * 0.3,
+                    age: 0
+                });
+            }
+        }
+
+        function triggerFlash(color, intensity) {
+            effects.flash = {
+                active: true,
+                color: color,
+                alpha: intensity,
+                startTime: Date.now(),
+                duration: 200
+            };
+        }
+
+        function triggerShake(intensity) {
+            effects.screenShake = {
+                active: true,
+                intensity: intensity,
+                duration: 200,
+                startTime: Date.now(),
+                offsetX: 0,
+                offsetY: 0
+            };
+        }
+
+        function spawnScoreAnimation(x, y, text, color) {
+            effects.scoreAnims.push({
+                x: x, y: y,
+                text: text,
+                color: color,
+                alpha: 1.0,
+                lifetime: 1.0,
+                age: 0
+            });
+        }
+
+        function updateEffects() {
+            const deltaTime = 1/60;
+
+            // Update particles
+            for (let i = effects.particles.length - 1; i >= 0; i--) {
+                const p = effects.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.age += deltaTime;
+                p.alpha = 1.0 - (p.age / p.lifetime);
+                if (p.age >= p.lifetime) {
+                    effects.particles.splice(i, 1);
+                }
+            }
+
+            // Update screen shake
+            if (effects.screenShake.active) {
+                const elapsed = Date.now() - effects.screenShake.startTime;
+                if (elapsed >= effects.screenShake.duration) {
+                    effects.screenShake.active = false;
+                    effects.screenShake.offsetX = 0;
+                    effects.screenShake.offsetY = 0;
+                } else {
+                    const int = effects.screenShake.intensity;
+                    effects.screenShake.offsetX = (Math.random() - 0.5) * int * 2;
+                    effects.screenShake.offsetY = (Math.random() - 0.5) * int * 2;
+                }
+            }
+
+            // Update flash
+            if (effects.flash.active) {
+                const elapsed = Date.now() - effects.flash.startTime;
+                const progress = elapsed / effects.flash.duration;
+                effects.flash.alpha = effects.flash.alpha * (1 - progress);
+                if (elapsed >= effects.flash.duration) {
+                    effects.flash.active = false;
+                }
+            }
+
+            // Update score animations
+            for (let i = effects.scoreAnims.length - 1; i >= 0; i--) {
+                const anim = effects.scoreAnims[i];
+                anim.y -= 1.5;
+                anim.age += deltaTime;
+                anim.alpha = 1.0 - (anim.age / anim.lifetime);
+                if (anim.age >= anim.lifetime) {
+                    effects.scoreAnims.splice(i, 1);
+                }
             }
         }
 
@@ -745,6 +876,12 @@
         }
 
         function renderPong() {
+            // Apply screen shake
+            ctx.save();
+            if (effects.screenShake.active) {
+                ctx.translate(effects.screenShake.offsetX, effects.screenShake.offsetY);
+            }
+
             // Clear canvas
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -790,6 +927,37 @@
                 const nameX = player.side === 'left' ? player.paddleX + paddleWidth / 2 + 30 : player.paddleX + paddleWidth / 2 - 30;
                 ctx.fillText(player.name, nameX, 30);
             }
+
+            ctx.restore();
+
+            // Render visual effects
+            // Particles
+            for (const p of effects.particles) {
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Flash
+            if (effects.flash.active) {
+                ctx.fillStyle = effects.flash.color;
+                ctx.globalAlpha = effects.flash.alpha;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Score animations
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            for (const anim of effects.scoreAnims) {
+                ctx.globalAlpha = anim.alpha;
+                ctx.fillStyle = anim.color;
+                ctx.fillText(anim.text, anim.x, anim.y);
+            }
+            ctx.globalAlpha = 1.0;
         }
 
         function renderSnake() {
@@ -901,6 +1069,12 @@
         }
 
         function renderPushers() {
+            // Apply screen shake
+            ctx.save();
+            if (effects.screenShake.active) {
+                ctx.translate(effects.screenShake.offsetX, effects.screenShake.offsetY);
+            }
+
             // Dark background
             ctx.fillStyle = '#111';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -931,6 +1105,17 @@
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillText('💀', skull.x, skull.y);
+                }
+            }
+
+            // Draw ghosts
+            if (gameState.ghosts) {
+                for (const ghost of gameState.ghosts) {
+                    ctx.fillStyle = '#FFF';
+                    ctx.font = `${gameState.ghostSize || 30}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('👻', ghost.x, ghost.y);
                 }
             }
 
@@ -1001,6 +1186,37 @@
                     }
                 }
             }
+
+            ctx.restore();
+
+            // Render visual effects
+            // Particles
+            for (const p of effects.particles) {
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Flash
+            if (effects.flash.active) {
+                ctx.fillStyle = effects.flash.color;
+                ctx.globalAlpha = effects.flash.alpha;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Score animations
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            for (const anim of effects.scoreAnims) {
+                ctx.globalAlpha = anim.alpha;
+                ctx.fillStyle = anim.color;
+                ctx.fillText(anim.text, anim.x, anim.y);
+            }
+            ctx.globalAlpha = 1.0;
         }
 
         function updateScoreboard() {
@@ -1048,6 +1264,7 @@
         // Animation loop
         function animate() {
             if (gameState && canvas.classList.contains('active')) {
+                updateEffects();
                 render();
             }
             requestAnimationFrame(animate);

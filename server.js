@@ -102,12 +102,15 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
     // Initialize game-specific state
     if (gameType === 'pong') {
         // Pong: ball and scores
+        const baseSpeed = (settings.ballSpeed || 3) * 0.8;
         room.ball = {
             x: room.canvas.width / 2,
             y: room.canvas.height / 2,
             radius: 8,
-            speedX: (settings.ballSpeed || 3) * 0.8,
-            speedY: (settings.ballSpeed || 3) * 0.6
+            speedX: baseSpeed,
+            speedY: (settings.ballSpeed || 3) * 0.6,
+            baseSpeedX: baseSpeed,  // Store original speed for reset
+            maxSpeedX: baseSpeed * 3 // Cap at 3x base speed
         };
         room.paddleSize = (settings.paddleSize || 2) * 50; // 50, 100, 150
         room.winScore = settings.winScore || 11;
@@ -141,6 +144,11 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
 
         // Spawn first smiley
         room.smiley = spawnSmiley(room);
+
+        // Initialize ghost system
+        room.ghosts = [];
+        room.smileysCollected = 0;
+        room.ghostSize = PUSHERS_SKULL_SIZE; // 30px
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -222,6 +230,40 @@ function spawnPlayerSquare(room, axis) {
     }
 
     return { x, y };
+}
+
+// Spawn ghost enemy for Pushers
+function spawnGhost(room) {
+    const margin = room.ghostSize / 2 + 50;
+    const x = margin + Math.random() * (room.canvas.width - 2 * margin);
+    const y = margin + Math.random() * (room.canvas.height - 2 * margin);
+
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.5;
+
+    return {
+        x: x,
+        y: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: room.ghostSize,
+        id: Date.now() + Math.random()
+    };
+}
+
+// Broadcast visual effect to all clients in a room
+function broadcastEffect(roomId, effectType, data) {
+    const message = JSON.stringify({
+        type: 'effect',
+        effectType: effectType,
+        data: data
+    });
+
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
+            client.send(message);
+        }
+    });
 }
 
 // Drop pizzas from dead snake body
@@ -521,9 +563,11 @@ function serializeGameState(room) {
         state.teamScores = room.teamScores;
         state.smiley = room.smiley;
         state.skulls = room.skulls;
+        state.ghosts = room.ghosts;
         state.squareSize = room.squareSize;
         state.smileySize = room.smileySize;
         state.skullSize = room.skullSize;
+        state.ghostSize = room.ghostSize;
         state.winScore = room.winScore;
         state.gameOver = room.gameOver;
         state.winner = room.winner ? {
@@ -761,11 +805,18 @@ function updatePong(room) {
                 room.ball.y > player.paddleY &&
                 room.ball.y < player.paddleY + room.paddleSize &&
                 room.ball.speedX < 0) {
-                room.ball.speedX = Math.abs(room.ball.speedX);
+                // Accelerate ball by 5% on each paddle hit
+                const accelerated = Math.abs(room.ball.speedX) * 1.05;
+                room.ball.speedX = Math.min(accelerated, room.ball.maxSpeedX);
 
                 // Add angle based on hit position
                 const hitPos = (room.ball.y - player.paddleY) / room.paddleSize;
                 room.ball.speedY = (hitPos - 0.5) * 10;
+
+                // Visual effects
+                broadcastEffect(room.id, 'particle', { x: room.ball.x, y: room.ball.y, color: player.color, count: 12 });
+                broadcastEffect(room.id, 'flash', { color: player.color, intensity: 0.2 });
+                broadcastEffect(room.id, 'shake', { intensity: 2 });
             }
         } else {
             // Right paddle collision
@@ -773,10 +824,17 @@ function updatePong(room) {
                 room.ball.y > player.paddleY &&
                 room.ball.y < player.paddleY + room.paddleSize &&
                 room.ball.speedX > 0) {
-                room.ball.speedX = -Math.abs(room.ball.speedX);
+                // Accelerate ball by 5% on each paddle hit
+                const accelerated = Math.abs(room.ball.speedX) * 1.05;
+                room.ball.speedX = -Math.min(accelerated, room.ball.maxSpeedX);
 
                 const hitPos = (room.ball.y - player.paddleY) / room.paddleSize;
                 room.ball.speedY = (hitPos - 0.5) * 10;
+
+                // Visual effects
+                broadcastEffect(room.id, 'particle', { x: room.ball.x, y: room.ball.y, color: player.color, count: 12 });
+                broadcastEffect(room.id, 'flash', { color: player.color, intensity: 0.2 });
+                broadcastEffect(room.id, 'shake', { intensity: 2 });
             }
         }
     }
@@ -789,6 +847,17 @@ function updatePong(room) {
         if (rightPlayer) {
             rightPlayer.score++;
             console.log(`${rightPlayer.name} scored! Score: ${players[0]?.score || 0} - ${rightPlayer.score}`);
+
+            // Visual effects for scoring
+            broadcastEffect(room.id, 'particle', { x: room.ball.x, y: room.ball.y, color: rightPlayer.color, count: 20 });
+            broadcastEffect(room.id, 'flash', { color: rightPlayer.color, intensity: 0.3 });
+            broadcastEffect(room.id, 'shake', { intensity: 4 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: room.canvas.width - 100,
+                y: 30,
+                text: '+1',
+                color: rightPlayer.color
+            });
 
             // Check for win condition
             if (rightPlayer.score >= room.winScore) {
@@ -807,6 +876,17 @@ function updatePong(room) {
             leftPlayer.score++;
             console.log(`${leftPlayer.name} scored! Score: ${leftPlayer.score} - ${players[1]?.score || 0}`);
 
+            // Visual effects for scoring
+            broadcastEffect(room.id, 'particle', { x: room.ball.x, y: room.ball.y, color: leftPlayer.color, count: 20 });
+            broadcastEffect(room.id, 'flash', { color: leftPlayer.color, intensity: 0.3 });
+            broadcastEffect(room.id, 'shake', { intensity: 4 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: 100,
+                y: 30,
+                text: '+1',
+                color: leftPlayer.color
+            });
+
             // Check for win condition
             if (leftPlayer.score >= room.winScore) {
                 room.winner = leftPlayer;
@@ -823,7 +903,9 @@ function updatePong(room) {
 function resetBall(room) {
     room.ball.x = room.canvas.width / 2;
     room.ball.y = room.canvas.height / 2;
-    room.ball.speedX = -room.ball.speedX;
+    // Reset to base speed with random direction
+    const direction = Math.random() > 0.5 ? 1 : -1;
+    room.ball.speedX = room.ball.baseSpeedX * direction;
     room.ball.speedY = (Math.random() - 0.5) * 8;
 }
 
@@ -980,7 +1062,25 @@ function updatePushers(room) {
             if (distance < (room.squareSize / 2 + room.smileySize / 2)) {
                 // Player collected smiley
                 room.teamScores[player.team]++;
+                room.smileysCollected++;
                 console.log(`${player.name} (${player.team}) collected smiley! Score: ${room.teamScores[player.team]}`);
+
+                // Visual effects for smiley collection
+                broadcastEffect(room.id, 'particle', { x: room.smiley.x, y: room.smiley.y, color: '#FFEB3B', count: 15 });
+                broadcastEffect(room.id, 'flash', { color: player.color, intensity: 0.2 });
+                const teamIndex = ['Blue', 'Red', 'Yellow', 'Green', 'White'].indexOf(player.team);
+                broadcastEffect(room.id, 'scoreAnim', {
+                    x: 80,
+                    y: 15 + teamIndex * 20,
+                    text: '+1',
+                    color: player.color
+                });
+
+                // Spawn ghost every 3 smileys
+                if (room.smileysCollected % 3 === 0) {
+                    room.ghosts.push(spawnGhost(room));
+                    console.log(`👻 Ghost spawned! Total ghosts: ${room.ghosts.length}`);
+                }
 
                 // Check win condition
                 if (room.teamScores[player.team] >= room.winScore) {
@@ -999,6 +1099,61 @@ function updatePushers(room) {
         }
     }
 
+    // Update ghost positions and check wall bouncing
+    for (const ghost of room.ghosts) {
+        ghost.x += ghost.vx;
+        ghost.y += ghost.vy;
+
+        // Bounce off walls
+        const margin = ghost.size / 2;
+        if (ghost.x <= margin || ghost.x >= room.canvas.width - margin) {
+            ghost.vx = -ghost.vx;
+            ghost.x = Math.max(margin, Math.min(room.canvas.width - margin, ghost.x));
+        }
+        if (ghost.y <= margin || ghost.y >= room.canvas.height - margin) {
+            ghost.vy = -ghost.vy;
+            ghost.y = Math.max(margin, Math.min(room.canvas.height - margin, ghost.y));
+        }
+    }
+
+    // Check ghost collision with players
+    for (let i = room.ghosts.length - 1; i >= 0; i--) {
+        const ghost = room.ghosts[i];
+        for (const player of room.players.values()) {
+            const dx = player.x - ghost.x;
+            const dy = player.y - ghost.y;
+            const distance = Math.hypot(dx, dy);
+
+            if (distance < (room.squareSize / 2 + ghost.size / 2)) {
+                // Ghost hit player - same effect as skull
+                room.teamScores[player.team] = Math.max(0, room.teamScores[player.team] - 1);
+                console.log(`${player.name} (${player.team}) hit ghost! Score: ${room.teamScores[player.team]}`);
+
+                // Visual effects for ghost collision
+                broadcastEffect(room.id, 'particle', { x: player.x, y: player.y, color: '#9C27B0', count: 20 });
+                broadcastEffect(room.id, 'flash', { color: '#9C27B0', intensity: 0.4 });
+                broadcastEffect(room.id, 'shake', { intensity: 5 });
+                const teamIndex = ['Blue', 'Red', 'Yellow', 'Green', 'White'].indexOf(player.team);
+                broadcastEffect(room.id, 'scoreAnim', {
+                    x: 80,
+                    y: 15 + teamIndex * 20,
+                    text: '-1',
+                    color: '#F44336'
+                });
+
+                // Respawn player at new position
+                const newPos = spawnPlayerSquare(room, player.axis);
+                player.x = newPos.x;
+                player.y = newPos.y;
+
+                // Remove the ghost
+                room.ghosts.splice(i, 1);
+                console.log(`👻 Ghost removed! Remaining ghosts: ${room.ghosts.length}`);
+                break;
+            }
+        }
+    }
+
     // Check skull collision
     for (const player of room.players.values()) {
         for (const skull of room.skulls) {
@@ -1010,6 +1165,18 @@ function updatePushers(room) {
                 // Player hit skull
                 room.teamScores[player.team] = Math.max(0, room.teamScores[player.team] - 1);
                 console.log(`${player.name} (${player.team}) hit skull! Score: ${room.teamScores[player.team]}`);
+
+                // Visual effects for skull collision
+                broadcastEffect(room.id, 'particle', { x: player.x, y: player.y, color: '#F44336', count: 20 });
+                broadcastEffect(room.id, 'flash', { color: '#F44336', intensity: 0.4 });
+                broadcastEffect(room.id, 'shake', { intensity: 5 });
+                const teamIndex = ['Blue', 'Red', 'Yellow', 'Green', 'White'].indexOf(player.team);
+                broadcastEffect(room.id, 'scoreAnim', {
+                    x: 80,
+                    y: 15 + teamIndex * 20,
+                    text: '-1',
+                    color: '#F44336'
+                });
 
                 // Respawn player at new position
                 const newPos = spawnPlayerSquare(room, player.axis);

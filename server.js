@@ -162,7 +162,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.ship = {
             x: room.canvas.width / 2,
             y: room.canvas.height / 2,
-            radius: 15, // Reduced from 60 to 15 (4x smaller)
+            radius: 30, // Increased from 15 to 30 (2x larger)
             vx: 0,
             vy: 0,
             rotation: 0,
@@ -382,8 +382,8 @@ function applyEngineThrust(room) {
     room.ship.vx += -Math.cos(angle) * thrust;
     room.ship.vy += -Math.sin(angle) * thrust;
 
-    // Clamp velocity
-    const MAX_SPEED = 8;
+    // Clamp velocity (reduced from 8 to 3 for slower movement)
+    const MAX_SPEED = 3;
     const speed = Math.hypot(room.ship.vx, room.ship.vy);
     if (speed > MAX_SPEED) {
         room.ship.vx = (room.ship.vx / speed) * MAX_SPEED;
@@ -396,7 +396,8 @@ function updateShipPosition(room) {
     room.ship.x += room.ship.vx;
     room.ship.y += room.ship.vy;
 
-    const FRICTION = 0.98;
+    // Increased friction for better control (was 0.98, now 0.88 = 10x more stopping power)
+    const FRICTION = 0.88;
     room.ship.vx *= FRICTION;
     room.ship.vy *= FRICTION;
 
@@ -496,7 +497,7 @@ function createAsteroid(room, size) {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         size,
-        radius: size === 'large' ? 10 : (size === 'medium' ? 6 : 4), // Reduced 4x: was 40/25/15
+        radius: size === 'large' ? 20 : (size === 'medium' ? 12 : 8), // Increased 2x: was 10/6/4
         health, maxHealth,
         baseDamage: damage,
         splits,

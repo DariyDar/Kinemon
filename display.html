@@ -1550,15 +1550,19 @@
                     ctx.fillRect(-10, -4, 20, 8);
                     ctx.restore();
 
-                    // Fire/thrust particles (only when player is actively thrusting)
-                    const thrustAngle = engineAngle; // Fire goes in engine direction (ship moves opposite)
-                    const amplitude = gameState.systems.engine.amplitude || 0;
-                    const hasEnginePlayer = gameState.systems.engine.hasPlayer || false;
-                    const isActiveThrust = hasEnginePlayer && amplitude > 0.5;
+                    // Fire/thrust particles (based on ship velocity, not tilt)
+                    const shipSpeed = Math.hypot(ship.vx || 0, ship.vy || 0);
+                    const maxSpeed = 9; // MAX_SPEED from server
+                    const speedRatio = Math.min(shipSpeed / maxSpeed, 1); // 0-1
 
-                    if (isActiveThrust) {
-                        const thrustIntensity = (amplitude - 0.5) * 2; // 0-1 for upward tilt only
-                        const particleCount = Math.max(3, Math.floor(8 * thrustIntensity));
+                    // Only show fire when ship is actually moving
+                    if (speedRatio > 0.05) {
+                        // Fire direction is opposite to ship movement (reactive thrust)
+                        const movementAngle = Math.atan2(ship.vy || 0, ship.vx || 0);
+                        const thrustAngle = movementAngle + Math.PI; // Opposite direction
+
+                        const thrustIntensity = speedRatio; // Intensity matches speed
+                        const particleCount = Math.max(2, Math.floor(8 * thrustIntensity));
 
                         for (let i = 0; i < particleCount; i++) {
                             const dist = 15 + i * 12 + Math.random() * 5;

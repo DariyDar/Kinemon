@@ -343,14 +343,22 @@ function getSystemPosition(ship, rotation) {
 // Detect pump motion (upward movement from below 0.5 to above 0.5)
 // Returns energy added from the pump
 function detectPump(player, currentTilt) {
-    const lastTilt = player.lastTilt || 0.5;
+    // Initialize lastTilt if not set
+    if (player.lastTilt === undefined) {
+        player.lastTilt = currentTilt;
+        return 0;
+    }
+
+    const lastTilt = player.lastTilt;
     player.lastTilt = currentTilt;
 
     // Detect upward crossing of 0.5 threshold (pump motion)
     if (lastTilt < 0.5 && currentTilt >= 0.5) {
         // Pump detected! Add energy based on how high they lifted
         const pumpStrength = Math.min(currentTilt - 0.5, 0.5) * 2; // 0-1
-        return pumpStrength * 3; // Energy boost from pump
+        const energyBoost = pumpStrength * 3; // Energy boost from pump
+        console.log(`Pump detected! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)}, Energy: +${energyBoost.toFixed(2)}`);
+        return energyBoost;
     }
 
     return 0; // No pump

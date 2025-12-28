@@ -1157,11 +1157,10 @@
 
                     // In single-square mode, render only one square per team
                     if (gameState.singleSquareMode) {
-                        const squareKey = `${player.team}-${player.x}-${player.y}`;
-                        if (renderedSquares.has(squareKey)) {
-                            continue; // Skip duplicate
+                        if (renderedSquares.has(player.team)) {
+                            continue; // Skip duplicate team
                         }
-                        renderedSquares.add(squareKey);
+                        renderedSquares.add(player.team);
                     }
 
                     // Blinking effect for invulnerable players
@@ -1209,8 +1208,8 @@
                 }
             }
 
-            // Draw team scoreboard in top left corner
-            if (gameState.teamScores && gameState.players) {
+            // Draw team scoreboard in top left corner (always show for Pushers)
+            if (gameState.teamScores) {
                 const teams = [
                     { name: 'Blue', color: '#2196F3' },
                     { name: 'Red', color: '#F44336' },
@@ -1228,7 +1227,7 @@
                     const score = gameState.teamScores[team.name] || 0;
 
                     // Show team if it has any players
-                    const hasPlayers = gameState.players.some(p => p.team === team.name);
+                    const hasPlayers = gameState.players && gameState.players.some(p => p.team === team.name);
 
                     if (hasPlayers) {
                         ctx.fillStyle = team.color;

@@ -236,6 +236,102 @@
             color: #888;
             margin-top: 4px;
         }
+
+        /* Live Physics Settings Panel */
+        #physicsPanel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.95);
+            border-top: 2px solid #4CAF50;
+            padding: 15px 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        #physicsPanel.open {
+            transform: translateY(0);
+        }
+
+        #physicsToggle {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            background: #4CAF50;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        #physicsToggle:hover {
+            background: #45a049;
+            transform: scale(1.1);
+        }
+
+        #physicsToggle:active {
+            transform: scale(0.95);
+        }
+
+        .physics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .physics-control {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .physics-control label {
+            display: block;
+            font-size: 12px;
+            color: #4CAF50;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .physics-control .value-display {
+            float: right;
+            color: #FFD700;
+            font-family: monospace;
+        }
+
+        .physics-control input[type="range"] {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .physics-control input[type="range"]::-webkit-slider-thumb {
+            background: #4CAF50;
+        }
+
+        .physics-control input[type="range"]::-moz-range-thumb {
+            background: #4CAF50;
+        }
+
+        .physics-section {
+            margin-bottom: 15px;
+        }
+
+        .physics-section h3 {
+            font-size: 14px;
+            color: #FFD700;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+            padding-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -299,6 +395,66 @@
         </div>
     </div>
 
+    <!-- Physics Settings Toggle Button -->
+    <button id="physicsToggle" style="display: none;">⚙️</button>
+
+    <!-- Physics Settings Panel -->
+    <div id="physicsPanel">
+        <div class="physics-section">
+            <h3>⚡ Энергия и тяга</h3>
+            <div class="physics-grid">
+                <div class="physics-control">
+                    <label>Энергия от накачки <span class="value-display" id="pumpEnergyValue">10.0</span></label>
+                    <input type="range" id="pumpEnergy" min="1" max="20" step="0.5" value="10">
+                </div>
+                <div class="physics-control">
+                    <label>Затухание энергии <span class="value-display" id="energyDecayValue">0.02</span></label>
+                    <input type="range" id="energyDecay" min="0.01" max="0.2" step="0.01" value="0.02">
+                </div>
+                <div class="physics-control">
+                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">0.8</span></label>
+                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="0.8">
+                </div>
+            </div>
+        </div>
+
+        <div class="physics-section">
+            <h3>🚀 Движение корабля</h3>
+            <div class="physics-grid">
+                <div class="physics-control">
+                    <label>Трение (friction) <span class="value-display" id="frictionValue">0.99</span></label>
+                    <input type="range" id="friction" min="0.90" max="0.999" step="0.001" value="0.99">
+                </div>
+                <div class="physics-control">
+                    <label>Макс. скорость <span class="value-display" id="maxSpeedValue">9.0</span></label>
+                    <input type="range" id="maxSpeed" min="3" max="15" step="0.5" value="9">
+                </div>
+                <div class="physics-control">
+                    <label>Порог остановки <span class="value-display" id="stopThresholdValue">0.05</span></label>
+                    <input type="range" id="stopThreshold" min="0.01" max="0.5" step="0.01" value="0.05">
+                </div>
+            </div>
+        </div>
+
+        <div class="physics-section">
+            <h3>🔥 Визуализация огня</h3>
+            <div class="physics-grid">
+                <div class="physics-control">
+                    <label>Порог видимости <span class="value-display" id="fireThresholdValue">0.01</span></label>
+                    <input type="range" id="fireThreshold" min="0.001" max="0.2" step="0.001" value="0.01">
+                </div>
+                <div class="physics-control">
+                    <label>Интенсивность огня <span class="value-display" id="fireIntensityValue">1.0</span></label>
+                    <input type="range" id="fireIntensity" min="0.5" max="3.0" step="0.1" value="1.0">
+                </div>
+                <div class="physics-control">
+                    <label>Макс. частиц <span class="value-display" id="maxParticlesValue">8</span></label>
+                    <input type="range" id="maxParticles" min="3" max="20" step="1" value="8">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- QR Code Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
@@ -308,6 +464,19 @@
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
         let gameSettings = {}; // Store game settings
+
+        // Live physics settings (Ship game only)
+        let physicsSettings = {
+            pumpEnergy: 10.0,
+            energyDecay: 0.02,
+            thrustMult: 0.8,
+            friction: 0.99,
+            maxSpeed: 9.0,
+            stopThreshold: 0.05,
+            fireThreshold: 0.01,
+            fireIntensity: 1.0,
+            maxParticles: 8
+        };
 
         // Visual effects system
         const effects = {
@@ -644,12 +813,60 @@
                 if (gameState && (gameState.gameType === 'pushers' || gameState.gameType === 'ship')) {
                     roomInfo.style.display = 'none';
                     scoreboard.style.display = 'none';
+
+                    // Show physics toggle button for Ship game
+                    if (gameState.gameType === 'ship') {
+                        document.getElementById('physicsToggle').style.display = 'block';
+                    }
                 } else {
                     roomInfo.style.display = 'block';
                     scoreboard.style.display = 'block';
                 }
             }
         }
+
+        // Physics panel toggle
+        document.getElementById('physicsToggle').addEventListener('click', () => {
+            const panel = document.getElementById('physicsPanel');
+            panel.classList.toggle('open');
+        });
+
+        // Physics settings event listeners
+        function setupPhysicsControls() {
+            const controls = [
+                { id: 'pumpEnergy', setting: 'pumpEnergy', display: 'pumpEnergyValue', decimals: 1 },
+                { id: 'energyDecay', setting: 'energyDecay', display: 'energyDecayValue', decimals: 2 },
+                { id: 'thrustMult', setting: 'thrustMult', display: 'thrustMultValue', decimals: 1 },
+                { id: 'friction', setting: 'friction', display: 'frictionValue', decimals: 3 },
+                { id: 'maxSpeed', setting: 'maxSpeed', display: 'maxSpeedValue', decimals: 1 },
+                { id: 'stopThreshold', setting: 'stopThreshold', display: 'stopThresholdValue', decimals: 2 },
+                { id: 'fireThreshold', setting: 'fireThreshold', display: 'fireThresholdValue', decimals: 3 },
+                { id: 'fireIntensity', setting: 'fireIntensity', display: 'fireIntensityValue', decimals: 1 },
+                { id: 'maxParticles', setting: 'maxParticles', display: 'maxParticlesValue', decimals: 0 }
+            ];
+
+            controls.forEach(ctrl => {
+                const slider = document.getElementById(ctrl.id);
+                const display = document.getElementById(ctrl.display);
+
+                slider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    physicsSettings[ctrl.setting] = value;
+                    display.textContent = value.toFixed(ctrl.decimals);
+
+                    // Send updated settings to server
+                    if (ws && ws.readyState === WebSocket.OPEN && roomId) {
+                        ws.send(JSON.stringify({
+                            type: 'update_physics',
+                            roomId: roomId,
+                            physics: physicsSettings
+                        }));
+                    }
+                });
+            });
+        }
+
+        setupPhysicsControls();
 
         function connectToServer() {
             const serverUrl = defaultServerUrl;
@@ -1552,24 +1769,24 @@
 
                     // Fire/thrust particles (based on ship velocity, not tilt)
                     const shipSpeed = Math.hypot(ship.vx || 0, ship.vy || 0);
-                    const maxSpeed = 9; // MAX_SPEED from server
+                    const maxSpeed = physicsSettings.maxSpeed; // Use settings value
                     const speedRatio = Math.min(shipSpeed / maxSpeed, 1); // 0-1
 
-                    // Only show fire when ship is actually moving (lowered threshold from 0.05 to 0.01)
-                    if (speedRatio > 0.01) {
+                    // Only show fire when ship is actually moving (uses settings threshold)
+                    if (speedRatio > physicsSettings.fireThreshold) {
                         // Fire direction is opposite to ship movement (reactive thrust)
                         const movementAngle = Math.atan2(ship.vy || 0, ship.vx || 0);
                         const thrustAngle = movementAngle + Math.PI; // Opposite direction
 
-                        const thrustIntensity = speedRatio; // Intensity matches speed
-                        const particleCount = Math.max(2, Math.floor(8 * thrustIntensity));
+                        const thrustIntensity = speedRatio * physicsSettings.fireIntensity; // Apply intensity multiplier
+                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * speedRatio));
 
                         for (let i = 0; i < particleCount; i++) {
                             const dist = 15 + i * 12 + Math.random() * 5;
                             const spread = (Math.random() - 0.5) * 0.3;
                             const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
                             const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
-                            const alpha = (1 - i / particleCount) * 0.9 * thrustIntensity;
+                            const alpha = (1 - i / particleCount) * 0.9 * Math.min(thrustIntensity, 1);
                             const hue = 30 + Math.random() * 30; // Orange to yellow
                             ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
                             ctx.beginPath();

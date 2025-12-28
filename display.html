@@ -567,8 +567,14 @@
                 scoreboard.style.display = 'none';
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
-                roomInfo.style.display = 'block';
-                scoreboard.style.display = 'block';
+                // Hide right panel for Pushers (team-based game uses canvas scoreboard)
+                if (gameState && gameState.gameType === 'pushers') {
+                    roomInfo.style.display = 'none';
+                    scoreboard.style.display = 'none';
+                } else {
+                    roomInfo.style.display = 'block';
+                    scoreboard.style.display = 'block';
+                }
             }
         }
 
@@ -1132,6 +1138,18 @@
             if (gameState.players) {
                 for (const player of gameState.players) {
                     const halfSize = gameState.squareSize / 2;
+
+                    // Blinking effect for invulnerable players
+                    if (player.invulnerable) {
+                        // Blink every 200ms (5 times per second)
+                        const blinkInterval = 200;
+                        const currentTime = Date.now();
+                        const isVisible = Math.floor(currentTime / blinkInterval) % 2 === 0;
+
+                        if (!isVisible) {
+                            continue; // Skip rendering this frame
+                        }
+                    }
 
                     // Draw square
                     ctx.fillStyle = player.color;

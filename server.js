@@ -558,7 +558,8 @@ function serializeGameState(room) {
             color: p.color,
             axis: p.axis,
             x: p.x,
-            y: p.y
+            y: p.y,
+            invulnerable: p.invulnerable || false
         }));
         state.teamScores = room.teamScores;
         state.smiley = room.smiley;
@@ -921,7 +922,7 @@ function updatePushers(room) {
     // Update player positions based on tilt and axis
     for (const player of room.players.values()) {
         const fieldSize = room.canvas.width; // Square field
-        const margin = room.squareSize / 2;
+        const margin = room.squareSize / 2 + 10; // Unified margin (25px) - matches spawnPlayerSquare
 
         if (player.axis === 'X') {
             // Move only on X axis
@@ -1053,10 +1054,18 @@ function updatePushers(room) {
 
     // Ensure all players stay within field bounds after collision resolution
     const fieldSize = room.canvas.width;
-    const margin = room.squareSize / 2;
+    const margin = room.squareSize / 2 + 10; // Match spawnPlayerSquare margin
     for (const player of room.players.values()) {
         player.x = Math.max(margin, Math.min(fieldSize - margin, player.x));
         player.y = Math.max(margin, Math.min(fieldSize - margin, player.y));
+    }
+
+    // Clear invulnerability after timeout
+    for (const player of room.players.values()) {
+        if (player.invulnerable && Date.now() >= player.invulnerableUntil) {
+            player.invulnerable = false;
+            delete player.invulnerableUntil;
+        }
     }
 
     // Check smiley collection
@@ -1077,7 +1086,7 @@ function updatePushers(room) {
                 broadcastEffect(room.id, 'flash', { color: player.color, intensity: 0.2 });
                 const teamIndex = ['Blue', 'Red', 'Yellow', 'Green', 'White'].indexOf(player.team);
                 broadcastEffect(room.id, 'scoreAnim', {
-                    x: 80,
+                    x: 100, // Aligned with team scoreboard position
                     y: 15 + teamIndex * 20,
                     text: '+1',
                     color: player.color
@@ -1127,6 +1136,9 @@ function updatePushers(room) {
     for (let i = room.ghosts.length - 1; i >= 0; i--) {
         const ghost = room.ghosts[i];
         for (const player of room.players.values()) {
+            // Skip invulnerable players
+            if (player.invulnerable) continue;
+
             const dx = player.x - ghost.x;
             const dy = player.y - ghost.y;
             const distance = Math.hypot(dx, dy);
@@ -1142,7 +1154,7 @@ function updatePushers(room) {
                 broadcastEffect(room.id, 'shake', { intensity: 5 });
                 const teamIndex = ['Blue', 'Red', 'Yellow', 'Green', 'White'].indexOf(player.team);
                 broadcastEffect(room.id, 'scoreAnim', {
-                    x: 80,
+                    x: 100, // Aligned with team scoreboard position
                     y: 15 + teamIndex * 20,
                     text: '-1',
                     color: '#F44336'
@@ -1152,6 +1164,10 @@ function updatePushers(room) {
                 const newPos = spawnPlayerSquare(room, player.axis);
                 player.x = newPos.x;
                 player.y = newPos.y;
+
+                // Add invulnerability period after respawn
+                player.invulnerable = true;
+                player.invulnerableUntil = Date.now() + 2000; // 2 seconds
 
                 // Remove the ghost
                 room.ghosts.splice(i, 1);
@@ -1163,6 +1179,9 @@ function updatePushers(room) {
 
     // Check skull collision
     for (const player of room.players.values()) {
+        // Skip invulnerable players
+        if (player.invulnerable) continue;
+
         for (const skull of room.skulls) {
             const dx = player.x - skull.x;
             const dy = player.y - skull.y;
@@ -1179,7 +1198,7 @@ function updatePushers(room) {
                 broadcastEffect(room.id, 'shake', { intensity: 5 });
                 const teamIndex = ['Blue', 'Red', 'Yellow', 'Green', 'White'].indexOf(player.team);
                 broadcastEffect(room.id, 'scoreAnim', {
-                    x: 80,
+                    x: 100, // Aligned with team scoreboard position
                     y: 15 + teamIndex * 20,
                     text: '-1',
                     color: '#F44336'
@@ -1189,6 +1208,10 @@ function updatePushers(room) {
                 const newPos = spawnPlayerSquare(room, player.axis);
                 player.x = newPos.x;
                 player.y = newPos.y;
+
+                // Add invulnerability period after respawn
+                player.invulnerable = true;
+                player.invulnerableUntil = Date.now() + 2000; // 2 seconds
             }
         }
     }

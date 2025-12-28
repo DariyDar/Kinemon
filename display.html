@@ -1555,8 +1555,8 @@
                     const maxSpeed = 9; // MAX_SPEED from server
                     const speedRatio = Math.min(shipSpeed / maxSpeed, 1); // 0-1
 
-                    // Only show fire when ship is actually moving
-                    if (speedRatio > 0.05) {
+                    // Only show fire when ship is actually moving (lowered threshold from 0.05 to 0.01)
+                    if (speedRatio > 0.01) {
                         // Fire direction is opposite to ship movement (reactive thrust)
                         const movementAngle = Math.atan2(ship.vy || 0, ship.vx || 0);
                         const thrustAngle = movementAngle + Math.PI; // Opposite direction

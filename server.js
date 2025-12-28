@@ -356,7 +356,7 @@ function detectPump(player, currentTilt) {
     if (lastTilt < 0.5 && currentTilt >= 0.5) {
         // Pump detected! Add energy based on how high they lifted
         const pumpStrength = Math.min(currentTilt - 0.5, 0.5) * 2; // 0-1
-        const energyBoost = pumpStrength * 5; // Energy boost from pump (increased from 3 to 5)
+        const energyBoost = pumpStrength * 10; // Energy boost from pump (increased to 10 for stronger impulse)
         console.log(`Pump detected! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)}, Energy: +${energyBoost.toFixed(2)}`);
         return energyBoost;
     }
@@ -368,18 +368,18 @@ function detectPump(player, currentTilt) {
 function calculateEngineThrust(energy, formula) {
     if (energy <= 0) return 0;
 
-    // Energy decays quickly, providing thrust while it lasts
+    // Energy decays slowly, providing sustained thrust
     const normalizedEnergy = Math.min(energy / 10, 1); // 0-1
 
     switch (formula) {
         case 'balanced':
-            return 0.5 * normalizedEnergy;
+            return 0.8 * normalizedEnergy; // Increased from 0.5
         case 'speed':
-            return 0.7 * normalizedEnergy;
+            return 1.0 * normalizedEnergy; // Increased from 0.7
         case 'combo':
-            return 0.4 * normalizedEnergy;
+            return 0.6 * normalizedEnergy; // Increased from 0.4
         default:
-            return 0.5 * normalizedEnergy;
+            return 0.8 * normalizedEnergy;
     }
 }
 
@@ -405,8 +405,8 @@ function applyEngineThrust(room) {
         }
     }
 
-    // Energy decay - energy dissipates over time (reduced from 0.15 to 0.05 for better playability)
-    room.systems.engine.energy = Math.max(0, room.systems.engine.energy - 0.05);
+    // Energy decay - energy dissipates over time (reduced to 0.02 for longer movement)
+    room.systems.engine.energy = Math.max(0, room.systems.engine.energy - 0.02);
 }
 
 // Update ship position with physics
@@ -414,24 +414,14 @@ function updateShipPosition(room) {
     room.ship.x += room.ship.vx;
     room.ship.y += room.ship.vy;
 
-    // No friction - ship stops when no thrust
-    // If there's no active thrust, stop the ship
-    const hasEnginePlayer = room.systems.engine.hasPlayer || false;
-    const isThrusting = hasEnginePlayer && room.systems.engine.amplitude > 0.5;
+    // Minimal friction in space - ship maintains momentum
+    const FRICTION = 0.99; // Very low friction for space physics
+    room.ship.vx *= FRICTION;
+    room.ship.vy *= FRICTION;
 
-    if (!isThrusting) {
-        // Aggressive stopping when no thrust
-        room.ship.vx *= 0.85;
-        room.ship.vy *= 0.85;
-
-        // Full stop at low speeds
-        if (Math.abs(room.ship.vx) < 0.1) room.ship.vx = 0;
-        if (Math.abs(room.ship.vy) < 0.1) room.ship.vy = 0;
-    } else {
-        // Slight friction when actively thrusting
-        room.ship.vx *= 0.96;
-        room.ship.vy *= 0.96;
-    }
+    // Full stop at very low speeds to prevent infinite drift
+    if (Math.abs(room.ship.vx) < 0.05) room.ship.vx = 0;
+    if (Math.abs(room.ship.vy) < 0.05) room.ship.vy = 0;
 
     // Wrap around edges
     if (room.ship.x < 0) room.ship.x = room.canvas.width;
@@ -1880,9 +1870,9 @@ function updateShip(room) {
         if (!room.lastAutoPump) room.lastAutoPump = Date.now();
         const timeSinceLastPump = Date.now() - room.lastAutoPump;
 
-        // Pump every 800ms to demonstrate pump mechanics
-        if (timeSinceLastPump > 800) {
-            room.systems.engine.energy = Math.min(room.systems.engine.energy + 4, 10); // Add pump energy (increased from 2.5 to 4)
+        // Pump every 600ms to demonstrate pump mechanics
+        if (timeSinceLastPump > 600) {
+            room.systems.engine.energy = Math.min(room.systems.engine.energy + 7, 10); // Add pump energy (increased to 7)
             room.lastAutoPump = Date.now();
         }
 

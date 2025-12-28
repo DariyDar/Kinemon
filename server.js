@@ -1136,6 +1136,7 @@ function serializeGameState(room) {
         state.coinsToWin = room.coinsToWin;
         state.asteroidFrequency = room.asteroidFrequency;
 
+        state.gameStarted = room.gameStarted;
         state.gameOver = room.gameOver;
         state.winner = room.winner;
     } else {

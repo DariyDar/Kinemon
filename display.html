@@ -423,6 +423,58 @@
                 document.getElementById('pushersWinScore').value = gameSettings.winScore;
                 document.getElementById('pushersSingleSquare').value = singleSquare;
 
+            } else if (gameType === 'ship') {
+                gameTitle.textContent = '🚀 Настройки Корабль';
+                settingsForm.innerHTML = `
+                    <div class="setting-group">
+                        <label for="shipEngineFormula">Формула двигателя</label>
+                        <select id="shipEngineFormula">
+                            <option value="balanced" selected>Сбалансированная</option>
+                            <option value="speed">Скорость (быстрая реакция)</option>
+                            <option value="combo">Комбо (накопление)</option>
+                        </select>
+                        <div class="setting-info">Как амплитуда и накопление влияют на тягу</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="shipWeaponFormula">Формула оружия</label>
+                        <select id="shipWeaponFormula">
+                            <option value="standard" selected>Стандарт</option>
+                            <option value="sniper">Снайпер (дальнобойность)</option>
+                            <option value="rapid">Быстрый (короткая дистанция)</option>
+                        </select>
+                        <div class="setting-info">Дальность и скорость пуль</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="shipCoinsToWin">Монет для победы</label>
+                        <select id="shipCoinsToWin">
+                            <option value="5">5 монет</option>
+                            <option value="10" selected>10 монет</option>
+                            <option value="15">15 монет</option>
+                            <option value="20">20 монет</option>
+                        </select>
+                        <div class="setting-info">Количество монет для победы</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="shipAsteroidFrequency">Частота астероидов</label>
+                        <select id="shipAsteroidFrequency">
+                            <option value="low">Низкая (3 сек)</option>
+                            <option value="medium" selected>Средняя (2 сек)</option>
+                            <option value="high">Высокая (1.2 сек)</option>
+                        </select>
+                        <div class="setting-info">Скорость появления астероидов</div>
+                    </div>
+                `;
+                // Load saved settings
+                gameSettings.engineFormula = localStorage.getItem('shipEngineFormula') || 'balanced';
+                gameSettings.weaponFormula = localStorage.getItem('shipWeaponFormula') || 'standard';
+                gameSettings.coinsToWin = parseInt(localStorage.getItem('shipCoinsToWin')) || 10;
+                gameSettings.asteroidFrequency = localStorage.getItem('shipAsteroidFrequency') || 'medium';
+
+                document.getElementById('shipEngineFormula').value = gameSettings.engineFormula;
+                document.getElementById('shipWeaponFormula').value = gameSettings.weaponFormula;
+                document.getElementById('shipCoinsToWin').value = gameSettings.coinsToWin;
+                document.getElementById('shipAsteroidFrequency').value = gameSettings.asteroidFrequency;
+
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Pizza Snake';
                 settingsForm.innerHTML = `
@@ -524,6 +576,15 @@
                 gameSettings.singleSquare = document.getElementById('pushersSingleSquare').value === 'true';
                 localStorage.setItem('pushersWinScore', gameSettings.winScore);
                 localStorage.setItem('pushersSingleSquare', gameSettings.singleSquare);
+            } else if (gameType === 'ship') {
+                gameSettings.engineFormula = document.getElementById('shipEngineFormula').value;
+                gameSettings.weaponFormula = document.getElementById('shipWeaponFormula').value;
+                gameSettings.coinsToWin = parseInt(document.getElementById('shipCoinsToWin').value);
+                gameSettings.asteroidFrequency = document.getElementById('shipAsteroidFrequency').value;
+                localStorage.setItem('shipEngineFormula', gameSettings.engineFormula);
+                localStorage.setItem('shipWeaponFormula', gameSettings.weaponFormula);
+                localStorage.setItem('shipCoinsToWin', gameSettings.coinsToWin);
+                localStorage.setItem('shipAsteroidFrequency', gameSettings.asteroidFrequency);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
@@ -579,8 +640,8 @@
                 scoreboard.style.display = 'none';
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
-                // Hide right panel for Pushers (team-based game uses canvas scoreboard)
-                if (gameState && gameState.gameType === 'pushers') {
+                // Hide right panel for Pushers and Ship (team-based/cooperative games use canvas scoreboard)
+                if (gameState && (gameState.gameType === 'pushers' || gameState.gameType === 'ship')) {
                     roomInfo.style.display = 'none';
                     scoreboard.style.display = 'none';
                 } else {
@@ -864,6 +925,8 @@
                 renderPong();
             } else if (gameState.gameType === 'pushers') {
                 renderPushers();
+            } else if (gameState.gameType === 'ship') {
+                renderShip();
             } else {
                 renderSnake();
             }
@@ -877,6 +940,9 @@
             if (gameType === 'pushers') {
                 document.getElementById('winnerName').textContent = `Команда ${winner.team}`;
                 document.getElementById('winMessage').textContent = `Победила с ${winner.score} смайликами!`;
+            } else if (gameType === 'ship') {
+                document.getElementById('winnerName').textContent = winner.team || 'Экипаж корабля';
+                document.getElementById('winMessage').textContent = `Собрал ${winner.score} монет!`;
             } else {
                 document.getElementById('winnerName').textContent = winner.name;
                 if (gameType === 'pong') {
@@ -1261,6 +1327,247 @@
 
             // Score animations
             ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            for (const anim of effects.scoreAnims) {
+                ctx.globalAlpha = anim.alpha;
+                ctx.fillStyle = anim.color;
+                ctx.fillText(anim.text, anim.x, anim.y);
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Helper function for Ship rendering
+        function getSystemPosition(ship, rotation) {
+            const angle = rotation * Math.PI / 180;
+            return {
+                x: ship.x + Math.cos(angle) * ship.radius,
+                y: ship.y + Math.sin(angle) * ship.radius
+            };
+        }
+
+        function renderShip() {
+            // Apply screen shake
+            ctx.save();
+            if (effects.screenShake.active) {
+                ctx.translate(effects.screenShake.offsetX, effects.screenShake.offsetY);
+            }
+
+            // Clear canvas - space background
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const ship = gameState.ship;
+
+            // Draw coins
+            if (gameState.coins) {
+                for (const coin of gameState.coins) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(coin.x, coin.y, 10, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('$', coin.x, coin.y);
+                }
+            }
+
+            // Draw hearts
+            if (gameState.hearts) {
+                for (const heart of gameState.hearts) {
+                    ctx.font = '24px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('❤️', heart.x, heart.y);
+                }
+            }
+
+            // Draw bullets
+            if (gameState.bullets) {
+                for (const bullet of gameState.bullets) {
+                    ctx.fillStyle = '#FFD700';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // Draw asteroids
+            if (gameState.asteroids) {
+                for (const asteroid of gameState.asteroids) {
+                    ctx.save();
+                    ctx.translate(asteroid.x, asteroid.y);
+                    ctx.rotate(asteroid.rotation);
+
+                    // Flash white when hit
+                    const isFlashing = Date.now() < asteroid.flashUntil;
+                    ctx.fillStyle = isFlashing ? '#FFFFFF' : '#888888';
+
+                    // Draw irregular polygon
+                    const sides = 8;
+                    ctx.beginPath();
+                    for (let i = 0; i < sides; i++) {
+                        const angle = (Math.PI * 2 * i) / sides;
+                        const variance = 0.7 + (Math.sin(i * 2.5) * 0.15);
+                        const r = asteroid.radius * variance;
+                        const x = Math.cos(angle) * r;
+                        const y = Math.sin(angle) * r;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Health bar
+                    if (asteroid.health < asteroid.maxHealth) {
+                        const barWidth = asteroid.radius * 2;
+                        const barHeight = 4;
+                        const healthPct = asteroid.health / asteroid.maxHealth;
+
+                        ctx.fillStyle = '#333';
+                        ctx.fillRect(-barWidth/2, -asteroid.radius - 10, barWidth, barHeight);
+
+                        ctx.fillStyle = healthPct > 0.5 ? '#4CAF50' : '#FF5722';
+                        ctx.fillRect(-barWidth/2, -asteroid.radius - 10, barWidth * healthPct, barHeight);
+                    }
+
+                    ctx.restore();
+                }
+            }
+
+            // Draw ship
+            if (ship) {
+                // Ship body - flash red when damaged
+                const timeSinceDamage = Date.now() - ship.lastDamageTime;
+                const isRedFlash = timeSinceDamage < 200;
+
+                // Invulnerable blink
+                if (ship.invulnerable) {
+                    const blinkVisible = Math.floor(Date.now() / 150) % 2 === 0;
+                    if (!blinkVisible) {
+                        ctx.globalAlpha = 0.5;
+                    }
+                }
+
+                ctx.fillStyle = isRedFlash ? '#FF0000' : '#2196F3';
+                ctx.beginPath();
+                ctx.arc(ship.x, ship.y, ship.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.globalAlpha = 1.0;
+
+                // Ship hull outline
+                ctx.strokeStyle = '#FFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw shield arc (cyan)
+                if (gameState.systems && gameState.systems.shield.active) {
+                    const shieldRot = gameState.systems.shield.rotation * Math.PI / 180;
+                    const arcSize = gameState.systems.shield.arcSize * Math.PI / 180;
+
+                    ctx.strokeStyle = '#00FFFF';
+                    ctx.lineWidth = 6;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#00FFFF';
+                    ctx.beginPath();
+                    ctx.arc(
+                        ship.x, ship.y,
+                        ship.radius + 5,
+                        shieldRot - arcSize/2,
+                        shieldRot + arcSize/2
+                    );
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+
+                // Draw engine position (orange thruster)
+                if (gameState.systems) {
+                    const enginePos = getSystemPosition(ship, gameState.systems.rudder.rotation);
+                    ctx.fillStyle = '#FF9800';
+                    ctx.beginPath();
+                    ctx.arc(enginePos.x, enginePos.y, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Thrust particles (if engine active)
+                    if (gameState.systems.engine.amplitude > 0.55) {
+                        const thrustAngle = gameState.systems.rudder.rotation * Math.PI / 180 + Math.PI;
+                        for (let i = 0; i < 3; i++) {
+                            const dist = 15 + i * 10;
+                            const x = enginePos.x + Math.cos(thrustAngle) * dist;
+                            const y = enginePos.y + Math.sin(thrustAngle) * dist;
+                            ctx.fillStyle = `rgba(255, 152, 0, ${0.8 - i * 0.25})`;
+                            ctx.beginPath();
+                            ctx.arc(x, y, 6 - i * 2, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    // Draw weapon position (yellow cannon)
+                    const weaponPos = getSystemPosition(ship, gameState.systems.weaponDirection.rotation);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.beginPath();
+                    ctx.arc(weaponPos.x, weaponPos.y, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+
+            // Draw HUD (top)
+            if (ship) {
+                ctx.font = '24px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#FFF';
+                ctx.fillText(`❤️ ${ship.hearts}/10`, 20, 30);
+                ctx.fillText(`💰 ${ship.coins}/${gameState.coinsToWin || 10}`, 20, 60);
+            }
+
+            // Player list (right side)
+            if (gameState.players) {
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#FFF';
+                let y = 30;
+                const roleNames = {
+                    engine: 'Двигатель',
+                    rudder: 'Руль',
+                    weapon: 'Оружие',
+                    weaponDirection: 'Прицел',
+                    shield: 'Щит'
+                };
+
+                for (const player of gameState.players) {
+                    if (!player.systemRole) continue;
+                    ctx.fillStyle = player.color;
+                    ctx.fillText(`${player.name} - ${roleNames[player.systemRole]}`, canvas.width - 20, y);
+                    y += 25;
+                }
+            }
+
+            // Render visual effects
+            for (const p of effects.particles) {
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            if (effects.flash.active) {
+                ctx.fillStyle = effects.flash.color;
+                ctx.globalAlpha = effects.flash.alpha;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
+
+            ctx.font = 'bold 24px Arial';
             ctx.textAlign = 'center';
             for (const anim of effects.scoreAnims) {
                 ctx.globalAlpha = anim.alpha;

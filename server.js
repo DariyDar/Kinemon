@@ -149,6 +149,76 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.ghosts = [];
         room.smileysCollected = 0;
         room.ghostSize = PUSHERS_SKULL_SIZE; // 30px
+    } else if (gameType === 'ship') {
+        // Ship: cooperative space game
+        // Set canvas size based on client viewport dimensions (like Snake)
+        if (settings.canvasWidth && settings.canvasHeight) {
+            const width = Math.max(400, Math.min(2560, settings.canvasWidth));
+            const height = Math.max(600, Math.min(3840, settings.canvasHeight));
+            room.canvas = { width, height };
+            console.log(`Ship canvas: ${width}x${height}`);
+        }
+
+        room.ship = {
+            x: room.canvas.width / 2,
+            y: room.canvas.height / 2,
+            radius: 60,
+            vx: 0,
+            vy: 0,
+            rotation: 0,
+            hearts: 10,
+            coins: 0,
+            lastDamageTime: 0,
+            invulnerable: false,
+            invulnerableUntil: 0
+        };
+
+        room.systems = {
+            engine: {
+                amplitude: 0,
+                accumulation: 0,
+                rotation: 0
+            },
+            rudder: {
+                rotation: 0,
+                autoRotateSpeed: 0.5
+            },
+            weapon: {
+                amplitude: 0,
+                accumulation: 0,
+                lastFireTime: 0,
+                fireInterval: 1000
+            },
+            weaponDirection: {
+                rotation: 0,
+                autoRotateSpeed: 0.7
+            },
+            shield: {
+                rotation: 0,
+                arcSize: 72,
+                active: false
+            }
+        };
+
+        room.bullets = [];
+        room.asteroids = [];
+        room.lastAsteroidSpawn = Date.now();
+        room.coins = [];
+        room.hearts = [];
+
+        // Settings
+        room.engineFormula = settings.engineFormula || 'balanced';
+        room.weaponFormula = settings.weaponFormula || 'standard';
+        room.coinsToWin = settings.coinsToWin || 10;
+        room.asteroidFrequency = settings.asteroidFrequency || 'medium';
+
+        // Initialize coins
+        const coinCount = 20;
+        for (let i = 0; i < coinCount; i++) {
+            room.coins.push(spawnCoin(room));
+        }
+
+        room.gameStarted = false;
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -249,6 +319,391 @@ function spawnGhost(room) {
         size: room.ghostSize,
         id: Date.now() + Math.random()
     };
+}
+
+// ===== Ship helper functions =====
+
+// Spawn coin for Ship game
+function spawnCoin(room) {
+    const margin = 50;
+    return {
+        x: margin + Math.random() * (room.canvas.width - 2 * margin),
+        y: margin + Math.random() * (room.canvas.height - 2 * margin),
+        id: Date.now() + Math.random()
+    };
+}
+
+// Get position on ship hull for a system at given rotation
+function getSystemPosition(ship, rotation) {
+    const angle = rotation * Math.PI / 180;
+    return {
+        x: ship.x + Math.cos(angle) * ship.radius,
+        y: ship.y + Math.sin(angle) * ship.radius,
+        angle: angle
+    };
+}
+
+// Calculate engine thrust based on amplitude and accumulation
+function calculateEngineThrust(amplitude, accumulation, formula) {
+    const amp = Math.abs(amplitude - 0.5) * 2; // 0-1
+
+    switch (formula) {
+        case 'balanced':
+            return 0.15 * amp + 0.05 * Math.min(accumulation, 10) / 10;
+        case 'speed':
+            return 0.25 * amp + 0.02 * Math.min(accumulation, 10) / 10;
+        case 'combo':
+            return 0.08 * amp + 0.08 * Math.min(accumulation, 15) / 15;
+        default:
+            return 0.15 * amp;
+    }
+}
+
+// Update accumulation (combo counter)
+function updateAccumulation(player, currentTilt) {
+    const threshold = 0.15;
+    const deviation = Math.abs(currentTilt - 0.5);
+
+    if (deviation > threshold) {
+        player.accumulation = Math.min(player.accumulation + 1/60, 20);
+    } else {
+        player.accumulation = Math.max(0, player.accumulation - 2/60);
+    }
+}
+
+// Apply engine thrust to ship
+function applyEngineThrust(room) {
+    const thrust = calculateEngineThrust(
+        room.systems.engine.amplitude,
+        room.systems.engine.accumulation,
+        room.engineFormula
+    );
+
+    const angle = room.systems.rudder.rotation * Math.PI / 180;
+
+    // Reactive thrust - ship moves OPPOSITE to engine direction
+    room.ship.vx += -Math.cos(angle) * thrust;
+    room.ship.vy += -Math.sin(angle) * thrust;
+
+    // Clamp velocity
+    const MAX_SPEED = 8;
+    const speed = Math.hypot(room.ship.vx, room.ship.vy);
+    if (speed > MAX_SPEED) {
+        room.ship.vx = (room.ship.vx / speed) * MAX_SPEED;
+        room.ship.vy = (room.ship.vy / speed) * MAX_SPEED;
+    }
+}
+
+// Update ship position with physics
+function updateShipPosition(room) {
+    room.ship.x += room.ship.vx;
+    room.ship.y += room.ship.vy;
+
+    const FRICTION = 0.98;
+    room.ship.vx *= FRICTION;
+    room.ship.vy *= FRICTION;
+
+    // Wrap around edges
+    if (room.ship.x < 0) room.ship.x = room.canvas.width;
+    if (room.ship.x > room.canvas.width) room.ship.x = 0;
+    if (room.ship.y < 0) room.ship.y = room.canvas.height;
+    if (room.ship.y > room.canvas.height) room.ship.y = 0;
+
+    // Aesthetic rotation toward velocity direction
+    if (Math.hypot(room.ship.vx, room.ship.vy) > 0.5) {
+        room.ship.rotation = Math.atan2(room.ship.vy, room.ship.vx);
+    }
+}
+
+// Calculate bullet power from weapon amplitude
+function calculateBulletPower(amplitude, accumulation, formula) {
+    const amp = Math.abs(amplitude - 0.5) * 2;
+
+    switch (formula) {
+        case 'standard':
+            return { speed: 8 + amp * 4, distance: 400 + amp * 200 };
+        case 'sniper':
+            return { speed: 12 + amp * 6, distance: 600 + amp * 400 };
+        case 'rapid':
+            return { speed: 10 + amp * 2, distance: 300 + amp * 100 };
+        default:
+            return { speed: 10, distance: 500 };
+    }
+}
+
+// Fire bullet from weapon
+function fireBullet(room) {
+    const now = Date.now();
+    if (now - room.systems.weapon.lastFireTime < 1000) return;
+
+    const power = calculateBulletPower(
+        room.systems.weapon.amplitude,
+        room.systems.weapon.accumulation,
+        room.weaponFormula
+    );
+
+    const angle = room.systems.weaponDirection.rotation * Math.PI / 180;
+    const weaponPos = getSystemPosition(room.ship, room.systems.weaponDirection.rotation);
+
+    room.bullets.push({
+        x: weaponPos.x,
+        y: weaponPos.y,
+        vx: Math.cos(angle) * power.speed,
+        vy: Math.sin(angle) * power.speed,
+        damage: 1,
+        distanceTraveled: 0,
+        maxDistance: power.distance,
+        id: Date.now() + Math.random()
+    });
+
+    room.systems.weapon.lastFireTime = now;
+
+    broadcastEffect(room.id, 'particle', { x: weaponPos.x, y: weaponPos.y, color: '#FFD700', count: 8 });
+    broadcastEffect(room.id, 'shake', { intensity: 1 });
+}
+
+// Create asteroid
+function createAsteroid(room, size) {
+    // Spawn OUTSIDE field boundaries
+    const margin = 100;
+    const side = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
+
+    let x, y;
+    switch(side) {
+        case 0: x = Math.random() * room.canvas.width; y = -margin; break;
+        case 1: x = room.canvas.width + margin; y = Math.random() * room.canvas.height; break;
+        case 2: x = Math.random() * room.canvas.width; y = room.canvas.height + margin; break;
+        case 3: x = -margin; y = Math.random() * room.canvas.height; break;
+    }
+
+    // Vector toward center with random offset
+    const centerX = room.canvas.width / 2;
+    const centerY = room.canvas.height / 2;
+    const angle = Math.atan2(centerY - y, centerX - x) + (Math.random() - 0.5) * 0.4;
+
+    let speed, health, maxHealth, damage, splits;
+    switch(size) {
+        case 'large':
+            speed = 1.5; health = 10; maxHealth = 10; damage = 3; splits = 2;
+            break;
+        case 'medium':
+            speed = 2.0; health = 5; maxHealth = 5; damage = 2; splits = 3;
+            break;
+        case 'small':
+            speed = 2.5; health = 2; maxHealth = 2; damage = 1; splits = 0;
+            break;
+    }
+
+    return {
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size,
+        radius: size === 'large' ? 40 : (size === 'medium' ? 25 : 15),
+        health, maxHealth,
+        baseDamage: damage,
+        splits,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.05,
+        flashUntil: 0,
+        id: Date.now() + Math.random()
+    };
+}
+
+// Spawn asteroids based on frequency
+function spawnAsteroidIfNeeded(room) {
+    const now = Date.now();
+    const intervals = { low: 3000, medium: 2000, high: 1200 };
+    const interval = intervals[room.asteroidFrequency] || 2000;
+
+    if (now - room.lastAsteroidSpawn > interval) {
+        const rand = Math.random();
+        const size = rand < 0.5 ? 'small' : (rand < 0.8 ? 'medium' : 'large');
+
+        room.asteroids.push(createAsteroid(room, size));
+        room.lastAsteroidSpawn = now;
+    }
+}
+
+// Handle asteroid destruction and splitting
+function handleAsteroidDestruction(room, asteroid, index) {
+    // 3% chance to drop heart (small asteroids only)
+    if (asteroid.size === 'small' && Math.random() < 0.03) {
+        room.hearts.push({ x: asteroid.x, y: asteroid.y, id: Date.now() + Math.random() });
+    }
+
+    // Split into smaller asteroids
+    if (asteroid.splits > 0) {
+        const newSize = asteroid.size === 'large' ? 'medium' : 'small';
+        const spreadAngle = Math.PI * 2 / asteroid.splits;
+
+        for (let i = 0; i < asteroid.splits; i++) {
+            const angle = spreadAngle * i;
+            const speed = asteroid.size === 'large' ? 2.0 : 2.5;
+
+            room.asteroids.push({
+                ...createAsteroid(room, newSize),
+                x: asteroid.x,
+                y: asteroid.y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed
+            });
+        }
+    }
+
+    room.asteroids.splice(index, 1);
+
+    broadcastEffect(room.id, 'particle', { x: asteroid.x, y: asteroid.y, color: '#888888', count: 25 });
+    broadcastEffect(room.id, 'shake', { intensity: 3 });
+}
+
+// Check if angle is within shield arc
+function isAngleInShieldArc(angle, shieldRotation, arcSize) {
+    const normalizeAngle = (a) => ((a % 360) + 360) % 360;
+
+    const normAngle = normalizeAngle(angle);
+    const shieldStart = normalizeAngle(shieldRotation - arcSize / 2);
+    const shieldEnd = normalizeAngle(shieldRotation + arcSize / 2);
+
+    if (shieldStart < shieldEnd) {
+        return normAngle >= shieldStart && normAngle <= shieldEnd;
+    } else {
+        return normAngle >= shieldStart || normAngle <= shieldEnd;
+    }
+}
+
+// Deflect asteroid elastically
+function deflectAsteroid(asteroid, ship, shieldRotation, room) {
+    const dx = asteroid.x - ship.x;
+    const dy = asteroid.y - ship.y;
+    const angle = Math.atan2(dy, dx);
+
+    const normalX = Math.cos(angle);
+    const normalY = Math.sin(angle);
+    const dotProduct = asteroid.vx * normalX + asteroid.vy * normalY;
+
+    // Elastic reflection
+    asteroid.vx = asteroid.vx - 2 * dotProduct * normalX;
+    asteroid.vy = asteroid.vy - 2 * dotProduct * normalY;
+
+    // Increase speed (shield "repels")
+    asteroid.vx *= 1.2;
+    asteroid.vy *= 1.2;
+
+    // Push away from ship
+    const pushDistance = ship.radius + asteroid.radius + 5;
+    asteroid.x = ship.x + Math.cos(angle) * pushDistance;
+    asteroid.y = ship.y + Math.sin(angle) * pushDistance;
+
+    broadcastEffect(room.id, 'particle', { x: asteroid.x, y: asteroid.y, color: '#00FFFF', count: 12 });
+    broadcastEffect(room.id, 'shake', { intensity: 2 });
+}
+
+// Check all Ship collisions
+function checkShipCollisions(room) {
+    const ship = room.ship;
+
+    // Bullet-Asteroid collisions
+    for (let i = room.bullets.length - 1; i >= 0; i--) {
+        const bullet = room.bullets[i];
+
+        for (let j = room.asteroids.length - 1; j >= 0; j--) {
+            const asteroid = room.asteroids[j];
+            const dist = Math.hypot(bullet.x - asteroid.x, bullet.y - asteroid.y);
+
+            if (dist < asteroid.radius + 2) {
+                asteroid.health -= bullet.damage;
+                asteroid.flashUntil = Date.now() + 100;
+
+                room.bullets.splice(i, 1);
+
+                if (asteroid.health <= 0) {
+                    handleAsteroidDestruction(room, asteroid, j);
+                }
+
+                broadcastEffect(room.id, 'particle', { x: asteroid.x, y: asteroid.y, color: '#FFFFFF', count: 6 });
+                break;
+            }
+        }
+    }
+
+    // Ship-Asteroid collisions
+    for (let i = room.asteroids.length - 1; i >= 0; i--) {
+        const asteroid = room.asteroids[i];
+        const dist = Math.hypot(asteroid.x - ship.x, asteroid.y - ship.y);
+
+        if (dist < ship.radius + asteroid.radius) {
+            const angleToAsteroid = Math.atan2(asteroid.y - ship.y, asteroid.x - ship.x) * 180 / Math.PI;
+
+            // Check if shield blocks
+            if (room.systems.shield.active && isAngleInShieldArc(angleToAsteroid, room.systems.shield.rotation, 72)) {
+                deflectAsteroid(asteroid, ship, room.systems.shield.rotation, room);
+            } else {
+                // Impulse-based damage
+                const relativeSpeed = Math.hypot(asteroid.vx - ship.vx, asteroid.vy - ship.vy);
+                const sizeMultiplier = { large: 1.5, medium: 1.0, small: 0.5 }[asteroid.size];
+                const impulseDamage = Math.ceil(relativeSpeed * sizeMultiplier * 0.3);
+                const damage = Math.max(1, impulseDamage);
+
+                if (!ship.invulnerable) {
+                    ship.hearts = Math.max(0, ship.hearts - damage);
+                    ship.lastDamageTime = Date.now();
+                    ship.invulnerable = true;
+                    ship.invulnerableUntil = Date.now() + 1000;
+
+                    // Bounce asteroid
+                    const angle = Math.atan2(asteroid.y - ship.y, asteroid.x - ship.x);
+                    asteroid.vx = Math.cos(angle) * 3;
+                    asteroid.vy = Math.sin(angle) * 3;
+
+                    broadcastEffect(room.id, 'particle', { x: ship.x, y: ship.y, color: '#FF0000', count: 20 });
+                    broadcastEffect(room.id, 'flash', { color: '#FF0000', intensity: 0.4 });
+                    broadcastEffect(room.id, 'shake', { intensity: 6 });
+
+                    if (ship.hearts <= 0) {
+                        room.gameOver = true;
+                        room.winner = null;
+                    }
+                }
+            }
+        }
+    }
+
+    // Ship-Coin collisions
+    for (let i = room.coins.length - 1; i >= 0; i--) {
+        const coin = room.coins[i];
+        const dist = Math.hypot(coin.x - ship.x, coin.y - ship.y);
+
+        if (dist < ship.radius + 10) {
+            ship.coins++;
+            room.coins.splice(i, 1);
+            room.coins.push(spawnCoin(room));
+
+            broadcastEffect(room.id, 'particle', { x: coin.x, y: coin.y, color: '#FFD700', count: 10 });
+            broadcastEffect(room.id, 'scoreAnim', { x: ship.x, y: ship.y - ship.radius - 20, text: '+1', color: '#FFD700' });
+
+            if (ship.coins >= room.coinsToWin) {
+                room.winner = { team: 'Ship Crew', score: ship.coins };
+                room.gameOver = true;
+            }
+        }
+    }
+
+    // Ship-Heart collisions
+    for (let i = room.hearts.length - 1; i >= 0; i--) {
+        const heart = room.hearts[i];
+        const dist = Math.hypot(heart.x - ship.x, heart.y - ship.y);
+
+        if (dist < ship.radius + 12) {
+            if (ship.hearts < 10) {
+                ship.hearts = Math.min(10, ship.hearts + 1);
+                room.hearts.splice(i, 1);
+
+                broadcastEffect(room.id, 'particle', { x: heart.x, y: heart.y, color: '#FF1744', count: 15 });
+                broadcastEffect(room.id, 'flash', { color: '#FF1744', intensity: 0.2 });
+            }
+        }
+    }
 }
 
 // Broadcast visual effect to all clients in a room
@@ -390,6 +845,18 @@ wss.on('connection', (ws) => {
                     player.x = spawnPos.x;
                     player.y = spawnPos.y;
                     player.alive = true;
+                } else if (room.gameType === 'ship') {
+                    // Ship: assign to one of 5 systems
+                    const systemIndex = room.players.size; // 0-4
+                    const systems = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
+
+                    player.systemRole = systemIndex < 5 ? systems[systemIndex] : null;
+                    player.systemIndex = systemIndex < 5 ? systemIndex + 1 : null; // 1-5
+                    player.accumulation = 0;      // Combo counter
+                    player.lastTilt = 0.5;        // Previous tilt value
+                    player.alive = true;          // All players share ship health
+
+                    console.log(`Player ${player.name} assigned to system: ${player.systemRole || 'observer'}`);
                 } else {
                     // Snake: segments and position
                     player.alive = true;
@@ -606,6 +1073,46 @@ function serializeGameState(room) {
             team: room.winner.team,
             score: room.winner.score
         } : null;
+    } else if (room.gameType === 'ship') {
+        // Ship state
+        state.ship = {
+            x: room.ship.x,
+            y: room.ship.y,
+            radius: room.ship.radius,
+            vx: room.ship.vx,
+            vy: room.ship.vy,
+            rotation: room.ship.rotation,
+            hearts: room.ship.hearts,
+            coins: room.ship.coins,
+            lastDamageTime: room.ship.lastDamageTime,
+            invulnerable: room.ship.invulnerable
+        };
+
+        state.systems = room.systems;
+
+        state.bullets = room.bullets.map(b => ({ x: b.x, y: b.y, id: b.id }));
+
+        state.asteroids = room.asteroids.map(a => ({
+            x: a.x, y: a.y, size: a.size, radius: a.radius,
+            health: a.health, maxHealth: a.maxHealth,
+            rotation: a.rotation, flashUntil: a.flashUntil, id: a.id
+        }));
+
+        state.coins = room.coins;
+        state.hearts = room.hearts;
+
+        state.players = Array.from(room.players.values()).map(p => ({
+            id: p.id, name: p.name, color: p.color,
+            systemRole: p.systemRole, systemIndex: p.systemIndex, alive: p.alive
+        }));
+
+        state.engineFormula = room.engineFormula;
+        state.weaponFormula = room.weaponFormula;
+        state.coinsToWin = room.coinsToWin;
+        state.asteroidFrequency = room.asteroidFrequency;
+
+        state.gameOver = room.gameOver;
+        state.winner = room.winner;
     } else {
         // Snake state
         state.players = Array.from(room.players.values()).map(p => ({
@@ -640,6 +1147,8 @@ function gameLoop(roomId) {
         updatePong(room);
     } else if (room.gameType === 'pushers') {
         updatePushers(room);
+    } else if (room.gameType === 'ship') {
+        updateShip(room);
     } else {
         updateSnake(room);
     }
@@ -1280,6 +1789,105 @@ function updatePushers(room) {
                 player.invulnerable = true;
                 player.invulnerableUntil = Date.now() + 2000; // 2 seconds
             }
+        }
+    }
+}
+
+// Update Ship game (60 FPS)
+function updateShip(room) {
+    // 1. Update system states from players
+    for (const player of room.players.values()) {
+        if (!player.systemRole) continue;
+
+        const tilt = player.tilt;
+        updateAccumulation(player, tilt);
+
+        switch (player.systemRole) {
+            case 'engine':
+                room.systems.engine.amplitude = tilt;
+                room.systems.engine.accumulation = player.accumulation;
+                break;
+            case 'rudder':
+                room.systems.rudder.rotation = tilt * 360;
+                break;
+            case 'weapon':
+                room.systems.weapon.amplitude = tilt;
+                room.systems.weapon.accumulation = player.accumulation;
+                break;
+            case 'weaponDirection':
+                room.systems.weaponDirection.rotation = tilt * 360;
+                break;
+            case 'shield':
+                room.systems.shield.rotation = tilt * 360;
+                room.systems.shield.active = true;
+                break;
+        }
+    }
+
+    // 2. Auto-rotate unoccupied systems
+    const occupied = new Set(Array.from(room.players.values()).map(p => p.systemRole).filter(r => r !== null));
+
+    if (!occupied.has('rudder')) {
+        room.systems.rudder.rotation = (room.systems.rudder.rotation + 0.5) % 360;
+    }
+    if (!occupied.has('weaponDirection')) {
+        room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation + 0.7) % 360;
+    }
+    if (!occupied.has('shield')) {
+        room.systems.shield.active = false;
+    }
+
+    // 3. Apply engine thrust
+    applyEngineThrust(room);
+
+    // 4. Update ship position
+    updateShipPosition(room);
+
+    // 5. Fire weapon (every second)
+    if (occupied.has('weapon')) {
+        fireBullet(room);
+    }
+
+    // 6. Update bullets
+    for (let i = room.bullets.length - 1; i >= 0; i--) {
+        const bullet = room.bullets[i];
+        bullet.x += bullet.vx;
+        bullet.y += bullet.vy;
+        bullet.distanceTraveled += Math.hypot(bullet.vx, bullet.vy);
+
+        const margin = 100;
+        if (bullet.distanceTraveled > bullet.maxDistance ||
+            bullet.x < -margin || bullet.x > room.canvas.width + margin ||
+            bullet.y < -margin || bullet.y > room.canvas.height + margin) {
+            room.bullets.splice(i, 1);
+        }
+    }
+
+    // 7. Spawn asteroids
+    spawnAsteroidIfNeeded(room);
+
+    // 8. Update asteroids
+    for (const asteroid of room.asteroids) {
+        asteroid.x += asteroid.vx;
+        asteroid.y += asteroid.vy;
+        asteroid.rotation += asteroid.rotationSpeed;
+    }
+
+    // 9. Collision detection
+    checkShipCollisions(room);
+
+    // 10. Clear invulnerability
+    if (room.ship.invulnerable && Date.now() >= room.ship.invulnerableUntil) {
+        room.ship.invulnerable = false;
+    }
+
+    // 11. Remove off-screen asteroids
+    for (let i = room.asteroids.length - 1; i >= 0; i--) {
+        const asteroid = room.asteroids[i];
+        const margin = 150;
+        if (asteroid.x < -margin || asteroid.x > room.canvas.width + margin ||
+            asteroid.y < -margin || asteroid.y > room.canvas.height + margin) {
+            room.asteroids.splice(i, 1);
         }
     }
 }

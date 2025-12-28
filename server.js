@@ -341,28 +341,35 @@ function getSystemPosition(ship, rotation) {
 }
 
 // Calculate engine thrust based on amplitude and accumulation
-function calculateEngineThrust(amplitude, accumulation, formula) {
-    const amp = Math.abs(amplitude - 0.5) * 2; // 0-1
+// Returns thrust only for upward movement (tilt > 0.5), downward is idle
+function calculateEngineThrust(amplitude, accumulation, formula, isActiveThrust) {
+    // Only thrust when tilting up (amplitude > 0.5)
+    if (!isActiveThrust || amplitude <= 0.5) {
+        return 0;
+    }
+
+    const amp = (amplitude - 0.5) * 2; // 0-1, only for upward tilt
 
     switch (formula) {
         case 'balanced':
-            return 0.15 * amp + 0.05 * Math.min(accumulation, 10) / 10;
+            return 0.4 * amp + 0.1 * Math.min(accumulation, 10) / 10; // Increased from 0.15/0.05
         case 'speed':
-            return 0.25 * amp + 0.02 * Math.min(accumulation, 10) / 10;
+            return 0.6 * amp + 0.05 * Math.min(accumulation, 10) / 10; // Increased from 0.25/0.02
         case 'combo':
-            return 0.08 * amp + 0.08 * Math.min(accumulation, 15) / 15;
+            return 0.2 * amp + 0.15 * Math.min(accumulation, 15) / 15; // Increased from 0.08/0.08
         default:
-            return 0.15 * amp;
+            return 0.4 * amp;
     }
 }
 
-// Update accumulation (combo counter)
+// Update accumulation (combo counter) - only for upward movement
 function updateAccumulation(player, currentTilt) {
-    const threshold = 0.15;
-    const deviation = Math.abs(currentTilt - 0.5);
+    const threshold = 0.5; // Threshold is now neutral position
 
-    if (deviation > threshold) {
-        player.accumulation = Math.min(player.accumulation + 1/60, 20);
+    // Only accumulate when tilting upward (> 0.5)
+    if (currentTilt > threshold) {
+        const deviation = currentTilt - 0.5;
+        player.accumulation = Math.min(player.accumulation + deviation * 3/60, 20);
     } else {
         player.accumulation = Math.max(0, player.accumulation - 2/60);
     }
@@ -370,24 +377,29 @@ function updateAccumulation(player, currentTilt) {
 
 // Apply engine thrust to ship
 function applyEngineThrust(room) {
+    const hasEnginePlayer = room.systems.engine.hasPlayer || false;
+
     const thrust = calculateEngineThrust(
         room.systems.engine.amplitude,
         room.systems.engine.accumulation,
-        room.engineFormula
+        room.engineFormula,
+        hasEnginePlayer
     );
 
-    const angle = room.systems.rudder.rotation * Math.PI / 180;
+    if (thrust > 0) {
+        const angle = room.systems.rudder.rotation * Math.PI / 180;
 
-    // Reactive thrust - ship moves OPPOSITE to engine direction
-    room.ship.vx += -Math.cos(angle) * thrust;
-    room.ship.vy += -Math.sin(angle) * thrust;
+        // Reactive thrust - ship moves OPPOSITE to engine direction
+        room.ship.vx += -Math.cos(angle) * thrust;
+        room.ship.vy += -Math.sin(angle) * thrust;
 
-    // Clamp velocity (increased from 3 to 9 for 3x faster movement)
-    const MAX_SPEED = 9;
-    const speed = Math.hypot(room.ship.vx, room.ship.vy);
-    if (speed > MAX_SPEED) {
-        room.ship.vx = (room.ship.vx / speed) * MAX_SPEED;
-        room.ship.vy = (room.ship.vy / speed) * MAX_SPEED;
+        // Clamp velocity (increased from 3 to 9 for 3x faster movement)
+        const MAX_SPEED = 9;
+        const speed = Math.hypot(room.ship.vx, room.ship.vy);
+        if (speed > MAX_SPEED) {
+            room.ship.vx = (room.ship.vx / speed) * MAX_SPEED;
+            room.ship.vy = (room.ship.vy / speed) * MAX_SPEED;
+        }
     }
 }
 
@@ -396,10 +408,24 @@ function updateShipPosition(room) {
     room.ship.x += room.ship.vx;
     room.ship.y += room.ship.vy;
 
-    // Increased friction for better control (was 0.98, now 0.88 = 10x more stopping power)
-    const FRICTION = 0.88;
-    room.ship.vx *= FRICTION;
-    room.ship.vy *= FRICTION;
+    // No friction - ship stops when no thrust
+    // If there's no active thrust, stop the ship
+    const hasEnginePlayer = room.systems.engine.hasPlayer || false;
+    const isThrusting = hasEnginePlayer && room.systems.engine.amplitude > 0.5;
+
+    if (!isThrusting) {
+        // Aggressive stopping when no thrust
+        room.ship.vx *= 0.85;
+        room.ship.vy *= 0.85;
+
+        // Full stop at low speeds
+        if (Math.abs(room.ship.vx) < 0.1) room.ship.vx = 0;
+        if (Math.abs(room.ship.vy) < 0.1) room.ship.vy = 0;
+    } else {
+        // Slight friction when actively thrusting
+        room.ship.vx *= 0.96;
+        room.ship.vy *= 0.96;
+    }
 
     // Wrap around edges
     if (room.ship.x < 0) room.ship.x = room.canvas.width;
@@ -456,7 +482,8 @@ function fireBullet(room) {
 
     room.systems.weapon.lastFireTime = now;
 
-    broadcastEffect(room.id, 'particle', { x: weaponPos.x, y: weaponPos.y, color: '#FFD700', count: 8 });
+    // Small cyan particle effect at cannon mouth (matching bullet color)
+    broadcastEffect(room.id, 'particle', { x: weaponPos.x, y: weaponPos.y, color: '#00FFFF', count: 3 });
     broadcastEffect(room.id, 'shake', { intensity: 1 });
 }
 
@@ -1793,6 +1820,10 @@ function updatePushers(room) {
 
 // Update Ship game (60 FPS)
 function updateShip(room) {
+    // Reset hasPlayer flags for all systems
+    room.systems.engine.hasPlayer = false;
+    room.systems.weapon.hasPlayer = false;
+
     // 1. Update system states from players
     for (const player of room.players.values()) {
         if (!player.systemRole) continue;
@@ -1804,6 +1835,7 @@ function updateShip(room) {
             case 'engine':
                 room.systems.engine.amplitude = tilt;
                 room.systems.engine.accumulation = player.accumulation;
+                room.systems.engine.hasPlayer = true;
                 break;
             case 'rudder':
                 room.systems.rudder.rotation = tilt * 360;
@@ -1811,6 +1843,7 @@ function updateShip(room) {
             case 'weapon':
                 room.systems.weapon.amplitude = tilt;
                 room.systems.weapon.accumulation = player.accumulation;
+                room.systems.weapon.hasPlayer = true;
                 break;
             case 'weaponDirection':
                 room.systems.weaponDirection.rotation = tilt * 360;

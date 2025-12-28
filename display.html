@@ -1384,27 +1384,34 @@
                 }
             }
 
-            // Draw bullets - cannonballs
+            // Draw bullets - glowing energy particles
             if (gameState.bullets) {
                 for (const bullet of gameState.bullets) {
-                    // Dark iron ball
-                    ctx.fillStyle = '#222';
+                    ctx.save();
+
+                    // Outer glow
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#00FFFF';
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 8, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Inner bright core
+                    ctx.shadowBlur = 10;
+                    ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
                     ctx.beginPath();
                     ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Highlight (shiny metal effect)
-                    ctx.fillStyle = '#555';
+                    // Brightest center
+                    ctx.shadowBlur = 5;
+                    ctx.fillStyle = '#FFFFFF';
                     ctx.beginPath();
-                    ctx.arc(bullet.x - 1.5, bullet.y - 1.5, 2, 0, Math.PI * 2);
+                    ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Outline
-                    ctx.strokeStyle = '#111';
-                    ctx.lineWidth = 1;
-                    ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
-                    ctx.stroke();
+                    ctx.restore();
                 }
             }
 
@@ -1543,23 +1550,28 @@
                     ctx.fillRect(-10, -4, 20, 8);
                     ctx.restore();
 
-                    // Fire/thrust particles (always show some activity)
+                    // Fire/thrust particles (only when player is actively thrusting)
                     const thrustAngle = engineAngle; // Fire goes in engine direction (ship moves opposite)
-                    const amplitude = gameState.systems.engine.amplitude || 0.5;
-                    const thrustIntensity = Math.abs(amplitude - 0.5) * 2;
-                    const particleCount = Math.max(3, Math.floor(5 * thrustIntensity));
+                    const amplitude = gameState.systems.engine.amplitude || 0;
+                    const hasEnginePlayer = gameState.systems.engine.hasPlayer || false;
+                    const isActiveThrust = hasEnginePlayer && amplitude > 0.5;
 
-                    for (let i = 0; i < particleCount; i++) {
-                        const dist = 15 + i * 12 + Math.random() * 5;
-                        const spread = (Math.random() - 0.5) * 0.3;
-                        const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
-                        const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
-                        const alpha = (1 - i / particleCount) * 0.9;
-                        const hue = 30 + Math.random() * 30; // Orange to yellow
-                        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
-                        ctx.beginPath();
-                        ctx.arc(x, y, 8 - i * 1.5, 0, Math.PI * 2);
-                        ctx.fill();
+                    if (isActiveThrust) {
+                        const thrustIntensity = (amplitude - 0.5) * 2; // 0-1 for upward tilt only
+                        const particleCount = Math.max(3, Math.floor(8 * thrustIntensity));
+
+                        for (let i = 0; i < particleCount; i++) {
+                            const dist = 15 + i * 12 + Math.random() * 5;
+                            const spread = (Math.random() - 0.5) * 0.3;
+                            const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
+                            const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
+                            const alpha = (1 - i / particleCount) * 0.9 * thrustIntensity;
+                            const hue = 30 + Math.random() * 30; // Orange to yellow
+                            ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+                            ctx.beginPath();
+                            ctx.arc(x, y, 8 - i * 1.5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
                     }
 
                     // Draw weapon - old pirate cannon

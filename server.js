@@ -441,6 +441,18 @@ wss.on('connection', (ws) => {
 
                 const room = rooms.get(roomId);
 
+                // Apply settings from display (if provided)
+                if (data.settings) {
+                    room.settings = data.settings;
+
+                    // Update winScore if provided in settings
+                    if (data.settings.winScore) {
+                        room.winScore = data.settings.winScore;
+                    }
+
+                    console.log(`Applied settings to room ${roomId}:`, data.settings);
+                }
+
                 ws.send(JSON.stringify({
                     type: 'init',
                     roomId: roomId,

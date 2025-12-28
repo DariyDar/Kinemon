@@ -676,7 +676,8 @@
                         // Join the room as display
                         ws.send(JSON.stringify({
                             type: 'join_display',
-                            roomId: roomId
+                            roomId: roomId,
+                            settings: gameSettings
                         }));
 
                     } else if (data.type === 'init') {

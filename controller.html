@@ -385,9 +385,12 @@
         const gameName = gameType === 'pong' ? 'Pong' : (gameType === 'pushers' ? 'Толкатели' : 'Pizza Snake');
         document.querySelector('#roomInputScreen h1').textContent = `🎮 ${gameName} Controller`;
 
-        // Show team selector for pushers game
+        // Show team selector for pushers game (unless single-square mode)
         if (gameType === 'pushers') {
-            document.getElementById('teamSelector').style.display = 'block';
+            const singleSquareMode = localStorage.getItem('pushersSingleSquare') === 'true';
+            if (!singleSquareMode) {
+                document.getElementById('teamSelector').style.display = 'block';
+            }
         }
 
         // Auto-fill room code if available from QR scan

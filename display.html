@@ -408,19 +408,20 @@
                         <div class="setting-info">Количество смайликов для победы команды</div>
                     </div>
                     <div class="setting-group">
-                        <label class="setting-label">
-                            <input type="checkbox" id="pushersSingleSquare" />
-                            Режим одного квадрата на команду
-                        </label>
-                        <div class="setting-info">Два игрока управляют одним квадратом (один по X, другой по Y)</div>
+                        <label for="pushersSingleSquare">Режим игры</label>
+                        <select id="pushersSingleSquare">
+                            <option value="false">Обычный - каждый игрок свой квадрат</option>
+                            <option value="true">Один квадрат на команду - кооператив</option>
+                        </select>
+                        <div class="setting-info">В кооперативе два игрока управляют одним квадратом (один по X, другой по Y)</div>
                     </div>
                 `;
                 // Load saved settings
                 gameSettings.winScore = parseInt(localStorage.getItem('pushersWinScore')) || 15;
-                const singleSquare = localStorage.getItem('pushersSingleSquare') === 'true';
+                const singleSquare = localStorage.getItem('pushersSingleSquare') || 'false';
 
                 document.getElementById('pushersWinScore').value = gameSettings.winScore;
-                document.getElementById('pushersSingleSquare').checked = singleSquare;
+                document.getElementById('pushersSingleSquare').value = singleSquare;
 
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Pizza Snake';
@@ -520,7 +521,7 @@
                 localStorage.setItem('pongWinScore', gameSettings.winScore);
             } else if (gameType === 'pushers') {
                 gameSettings.winScore = parseInt(document.getElementById('pushersWinScore').value);
-                gameSettings.singleSquare = document.getElementById('pushersSingleSquare').checked;
+                gameSettings.singleSquare = document.getElementById('pushersSingleSquare').value === 'true';
                 localStorage.setItem('pushersWinScore', gameSettings.winScore);
                 localStorage.setItem('pushersSingleSquare', gameSettings.singleSquare);
             } else {
@@ -1208,7 +1209,7 @@
             }
 
             // Draw team scoreboard in top left corner
-            if (gameState.teamScores) {
+            if (gameState.teamScores && gameState.players) {
                 const teams = [
                     { name: 'Blue', color: '#2196F3' },
                     { name: 'Red', color: '#F44336' },
@@ -1225,12 +1226,13 @@
                 for (const team of teams) {
                     const score = gameState.teamScores[team.name] || 0;
 
-                    // Only show teams with score > 0 or with active players
-                    const hasPlayers = gameState.players && gameState.players.some(p => p.team === team.name);
+                    // Show team if it has any players
+                    const hasPlayers = gameState.players.some(p => p.team === team.name);
 
-                    if (score > 0 || hasPlayers) {
+                    if (hasPlayers) {
                         ctx.fillStyle = team.color;
-                        ctx.fillText(`${team.name}: ${score}/${gameState.winScore}`, 15, y);
+                        const winScore = gameState.winScore || 15;
+                        ctx.fillText(`${team.name}: ${score}/${winScore}`, 15, y);
                         y += 20;
                     }
                 }

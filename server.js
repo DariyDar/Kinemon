@@ -362,13 +362,30 @@ wss.on('connection', (ws) => {
                 } else if (room.gameType === 'pushers') {
                     // Pushers: axis-locked movement
                     const team = data.team || 'White';
-                    const axis = room.nextPlayerId % 2 === 0 ? 'X' : 'Y'; // Alternate X, Y, X, Y...
+                    let assignedTeam = team;
+                    let axis;
+
+                    // Single-square mode: auto-assign teams and roles
+                    if (room.settings && room.settings.singleSquare) {
+                        const teamColors = ['Blue', 'Red', 'Yellow', 'Green', 'White'];
+                        const teamIndex = Math.floor(room.nextPlayerId / 2);
+                        assignedTeam = teamColors[teamIndex % 5];
+
+                        // Determine axis based on position within team (0 = X, 1 = Y)
+                        const roleInTeam = room.nextPlayerId % 2;
+                        axis = roleInTeam === 0 ? 'X' : 'Y';
+                        player.role = roleInTeam === 0 ? 'controller-x' : 'controller-y';
+                    } else {
+                        // Normal mode: alternate axis
+                        axis = room.nextPlayerId % 2 === 0 ? 'X' : 'Y';
+                    }
+
                     room.nextPlayerId++;
 
                     const spawnPos = spawnPlayerSquare(room, axis);
 
-                    player.team = team;
-                    player.color = getTeamColor(team);
+                    player.team = assignedTeam;
+                    player.color = getTeamColor(assignedTeam);
                     player.axis = axis;
                     player.x = spawnPos.x;
                     player.y = spawnPos.y;
@@ -569,6 +586,7 @@ function serializeGameState(room) {
         state.smileySize = room.smileySize;
         state.skullSize = room.skullSize;
         state.ghostSize = room.ghostSize;
+        state.singleSquareMode = (room.settings && room.settings.singleSquare) || false;
         state.winScore = room.winScore;
         state.gameOver = room.gameOver;
         state.winner = room.winner ? {
@@ -920,28 +938,66 @@ function updatePushers(room) {
     }
 
     // Update player positions based on tilt and axis
-    for (const player of room.players.values()) {
-        const fieldSize = room.canvas.width; // Square field
-        const margin = room.squareSize / 2 + 10; // Unified margin (25px) - matches spawnPlayerSquare
+    const fieldSize = room.canvas.width; // Square field
+    const margin = room.squareSize / 2 + 10; // Unified margin (25px) - matches spawnPlayerSquare
+    const settings = room.settings || {};
 
-        if (player.axis === 'X') {
-            // Move only on X axis
-            // tilt 0 (left) -> x = margin
-            // tilt 1 (right) -> x = fieldSize - margin
-            const targetX = margin + player.tilt * (fieldSize - 2 * margin);
-            player.x = targetX;
+    if (settings.singleSquare) {
+        // Single-square mode: combine X and Y controllers for each team
+        const teamSquares = new Map(); // team -> {xController, yController}
 
-            // Y position stays fixed (within bounds)
-            player.y = Math.max(margin, Math.min(fieldSize - margin, player.y));
-        } else {
-            // Move only on Y axis
-            // tilt 0 (top) -> y = margin
-            // tilt 1 (bottom) -> y = fieldSize - margin
-            const targetY = margin + player.tilt * (fieldSize - 2 * margin);
-            player.y = targetY;
+        // Group players by team
+        for (const player of room.players.values()) {
+            if (!teamSquares.has(player.team)) {
+                teamSquares.set(player.team, {});
+            }
+            const squad = teamSquares.get(player.team);
+            if (player.axis === 'X') {
+                squad.xController = player;
+            } else {
+                squad.yController = player;
+            }
+        }
 
-            // X position stays fixed (within bounds)
-            player.x = Math.max(margin, Math.min(fieldSize - margin, player.x));
+        // Update positions based on combined input
+        for (const [team, squad] of teamSquares.entries()) {
+            const { xController, yController } = squad;
+
+            if (xController && yController) {
+                // Both controllers present - shared position
+                const sharedX = margin + xController.tilt * (fieldSize - 2 * margin);
+                const sharedY = margin + yController.tilt * (fieldSize - 2 * margin);
+
+                xController.x = sharedX;
+                xController.y = sharedY;
+                yController.x = sharedX;
+                yController.y = sharedY;
+            } else if (xController && !yController) {
+                // Only X controller - X axis only, Y stays at current
+                const targetX = margin + xController.tilt * (fieldSize - 2 * margin);
+                xController.x = targetX;
+                xController.y = Math.max(margin, Math.min(fieldSize - margin, xController.y));
+            } else if (yController && !xController) {
+                // Only Y controller - Y axis only, X stays at current
+                const targetY = margin + yController.tilt * (fieldSize - 2 * margin);
+                yController.y = targetY;
+                yController.x = Math.max(margin, Math.min(fieldSize - margin, yController.x));
+            }
+        }
+    } else {
+        // Normal mode: independent axis control
+        for (const player of room.players.values()) {
+            if (player.axis === 'X') {
+                // Move only on X axis
+                const targetX = margin + player.tilt * (fieldSize - 2 * margin);
+                player.x = targetX;
+                player.y = Math.max(margin, Math.min(fieldSize - margin, player.y));
+            } else {
+                // Move only on Y axis
+                const targetY = margin + player.tilt * (fieldSize - 2 * margin);
+                player.y = targetY;
+                player.x = Math.max(margin, Math.min(fieldSize - margin, player.x));
+            }
         }
     }
 
@@ -1053,8 +1109,6 @@ function updatePushers(room) {
     }
 
     // Ensure all players stay within field bounds after collision resolution
-    const fieldSize = room.canvas.width;
-    const margin = room.squareSize / 2 + 10; // Match spawnPlayerSquare margin
     for (const player of room.players.values()) {
         player.x = Math.max(margin, Math.min(fieldSize - margin, player.x));
         player.y = Math.max(margin, Math.min(fieldSize - margin, player.y));

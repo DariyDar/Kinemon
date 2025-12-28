@@ -709,6 +709,12 @@
                                 document.getElementById('axisInfo').style.display = 'block';
                                 console.log('Assigned axis:', myPlayer.axis);
                             }
+
+                            // Hide team selector in single-square mode
+                            if (data.gameState.singleSquareMode) {
+                                document.getElementById('teamSelector').style.display = 'none';
+                                console.log('Single-square mode: team selector hidden');
+                            }
                         }
                     }
 

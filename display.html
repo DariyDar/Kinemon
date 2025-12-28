@@ -407,11 +407,20 @@
                         </select>
                         <div class="setting-info">Количество смайликов для победы команды</div>
                     </div>
+                    <div class="setting-group">
+                        <label class="setting-label">
+                            <input type="checkbox" id="pushersSingleSquare" />
+                            Режим одного квадрата на команду
+                        </label>
+                        <div class="setting-info">Два игрока управляют одним квадратом (один по X, другой по Y)</div>
+                    </div>
                 `;
                 // Load saved settings
                 gameSettings.winScore = parseInt(localStorage.getItem('pushersWinScore')) || 15;
+                const singleSquare = localStorage.getItem('pushersSingleSquare') === 'true';
 
                 document.getElementById('pushersWinScore').value = gameSettings.winScore;
+                document.getElementById('pushersSingleSquare').checked = singleSquare;
 
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Pizza Snake';
@@ -511,7 +520,9 @@
                 localStorage.setItem('pongWinScore', gameSettings.winScore);
             } else if (gameType === 'pushers') {
                 gameSettings.winScore = parseInt(document.getElementById('pushersWinScore').value);
+                gameSettings.singleSquare = document.getElementById('pushersSingleSquare').checked;
                 localStorage.setItem('pushersWinScore', gameSettings.winScore);
+                localStorage.setItem('pushersSingleSquare', gameSettings.singleSquare);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
@@ -1136,8 +1147,19 @@
 
             // Draw player squares
             if (gameState.players) {
+                const renderedSquares = new Set(); // Track rendered team squares in single-square mode
+
                 for (const player of gameState.players) {
                     const halfSize = gameState.squareSize / 2;
+
+                    // In single-square mode, render only one square per team
+                    if (gameState.singleSquareMode) {
+                        const squareKey = `${player.team}-${player.x}-${player.y}`;
+                        if (renderedSquares.has(squareKey)) {
+                            continue; // Skip duplicate
+                        }
+                        renderedSquares.add(squareKey);
+                    }
 
                     // Blinking effect for invulnerable players
                     if (player.invulnerable) {
@@ -1160,19 +1182,27 @@
                         gameState.squareSize
                     );
 
-                    // Draw player name above square
+                    // Draw label above square
                     ctx.fillStyle = player.color;
                     ctx.font = 'bold 12px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'bottom';
-                    ctx.fillText(player.name, player.x, player.y - halfSize - 5);
+                    if (gameState.singleSquareMode) {
+                        // Show team name in single-square mode
+                        ctx.fillText(player.team, player.x, player.y - halfSize - 5);
+                    } else {
+                        // Show player name in normal mode
+                        ctx.fillText(player.name, player.x, player.y - halfSize - 5);
+                    }
 
-                    // Draw axis indicator below square
-                    ctx.fillStyle = '#FFF';
-                    ctx.font = 'bold 10px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'top';
-                    ctx.fillText(player.axis, player.x, player.y + halfSize + 3);
+                    // Draw axis indicator below square (only in normal mode)
+                    if (!gameState.singleSquareMode) {
+                        ctx.fillStyle = '#FFF';
+                        ctx.font = 'bold 10px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'top';
+                        ctx.fillText(player.axis, player.x, player.y + halfSize + 3);
+                    }
                 }
             }
 

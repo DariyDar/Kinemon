@@ -911,6 +911,13 @@ function resetBall(room) {
 
 // Update Pushers game
 function updatePushers(room) {
+    // Initialize ghost system for old rooms (backward compatibility)
+    if (!room.ghosts) {
+        room.ghosts = [];
+        room.smileysCollected = 0;
+        room.ghostSize = PUSHERS_SKULL_SIZE;
+    }
+
     // Update player positions based on tilt and axis
     for (const player of room.players.values()) {
         const fieldSize = room.canvas.width; // Square field
@@ -1040,16 +1047,16 @@ function updatePushers(room) {
                         }
                     }
                 }
-
-                // Ensure players stay within field bounds
-                const margin = room.squareSize / 2;
-                const fieldSize = room.canvas.width;
-                p1.x = Math.max(margin, Math.min(fieldSize - margin, p1.x));
-                p1.y = Math.max(margin, Math.min(fieldSize - margin, p1.y));
-                p2.x = Math.max(margin, Math.min(fieldSize - margin, p2.x));
-                p2.y = Math.max(margin, Math.min(fieldSize - margin, p2.y));
             }
         }
+    }
+
+    // Ensure all players stay within field bounds after collision resolution
+    const fieldSize = room.canvas.width;
+    const margin = room.squareSize / 2;
+    for (const player of room.players.values()) {
+        player.x = Math.max(margin, Math.min(fieldSize - margin, player.x));
+        player.y = Math.max(margin, Math.min(fieldSize - margin, player.y));
     }
 
     // Check smiley collection

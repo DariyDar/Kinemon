@@ -1866,6 +1866,13 @@ function updateShip(room) {
     }
     if (!occupied.has('weapon')) {
         room.systems.weapon.amplitude = 0.5; // Default medium power when no player
+        room.systems.weapon.hasPlayer = true; // Enable auto-fire
+    }
+    if (!occupied.has('engine')) {
+        // Auto-pilot: gentle pulsing thrust for demonstration
+        const time = Date.now() / 1000;
+        room.systems.engine.amplitude = 0.5 + Math.sin(time) * 0.3; // Oscillate 0.2-0.8
+        room.systems.engine.hasPlayer = true; // Enable auto-thrust
     }
     // Shield always active, rotates slowly when no player
     if (!occupied.has('shield')) {

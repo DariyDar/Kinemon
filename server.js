@@ -162,7 +162,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.ship = {
             x: room.canvas.width / 2,
             y: room.canvas.height / 2,
-            radius: 60,
+            radius: 15, // Reduced from 60 to 15 (4x smaller)
             vx: 0,
             vy: 0,
             rotation: 0,
@@ -212,11 +212,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.coinsToWin = settings.coinsToWin || 10;
         room.asteroidFrequency = settings.asteroidFrequency || 'medium';
 
-        // Initialize coins
-        const coinCount = 20;
-        for (let i = 0; i < coinCount; i++) {
-            room.coins.push(spawnCoin(room));
-        }
+        // Initialize coins - only 1 coin at a time
+        room.coins.push(spawnCoin(room));
 
         room.gameStarted = false;
     } else {
@@ -499,7 +496,7 @@ function createAsteroid(room, size) {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         size,
-        radius: size === 'large' ? 40 : (size === 'medium' ? 25 : 15),
+        radius: size === 'large' ? 10 : (size === 'medium' ? 6 : 4), // Reduced 4x: was 40/25/15
         health, maxHealth,
         baseDamage: damage,
         splits,

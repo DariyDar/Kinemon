@@ -672,9 +672,9 @@
                     clearTimeout(connectionTimeout);
                     console.log('✅ Connected to server');
 
-                    // Get viewport dimensions for Snake
+                    // Get viewport dimensions for Snake and Ship
                     const dimensions = getAvailableCanvasDimensions();
-                    if (gameType === 'snake') {
+                    if (gameType === 'snake' || gameType === 'ship') {
                         gameSettings.canvasWidth = dimensions.width;
                         gameSettings.canvasHeight = dimensions.height;
                     }

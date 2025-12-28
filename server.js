@@ -430,10 +430,11 @@ wss.on('connection', (ws) => {
 
             } else if (data.type === 'join_display') {
                 const roomId = data.roomId;
+                const gameType = data.gameType || 'snake';
 
                 // Create room if it doesn't exist
                 if (!rooms.has(roomId)) {
-                    createRoom(roomId);
+                    createRoom(roomId, gameType, data.settings || {});
                 }
 
                 ws.roomId = roomId;
@@ -441,7 +442,7 @@ wss.on('connection', (ws) => {
 
                 const room = rooms.get(roomId);
 
-                // Apply settings from display (if provided)
+                // Apply settings from display (if provided and room already existed)
                 if (data.settings) {
                     room.settings = data.settings;
 

@@ -1384,16 +1384,27 @@
                 }
             }
 
-            // Draw bullets
+            // Draw bullets - cannonballs
             if (gameState.bullets) {
                 for (const bullet of gameState.bullets) {
-                    ctx.fillStyle = '#FFD700';
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = '#FFD700';
+                    // Dark iron ball
+                    ctx.fillStyle = '#222';
                     ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 3, 0, Math.PI * 2);
+                    ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
                     ctx.fill();
-                    ctx.shadowBlur = 0;
+
+                    // Highlight (shiny metal effect)
+                    ctx.fillStyle = '#555';
+                    ctx.beginPath();
+                    ctx.arc(bullet.x - 1.5, bullet.y - 1.5, 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Outline
+                    ctx.strokeStyle = '#111';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+                    ctx.stroke();
                 }
             }
 
@@ -1466,14 +1477,18 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Draw shield arc (cyan)
+                // Draw shield arc - semi-transparent with shimmer
                 if (gameState.systems && gameState.systems.shield.active) {
                     const shieldRot = gameState.systems.shield.rotation * Math.PI / 180;
                     const arcSize = gameState.systems.shield.arcSize * Math.PI / 180;
 
-                    ctx.strokeStyle = '#00FFFF';
-                    ctx.lineWidth = 6;
-                    ctx.shadowBlur = 15;
+                    // Shimmer effect (pulsing opacity)
+                    const shimmer = 0.4 + Math.sin(Date.now() / 200) * 0.2;
+
+                    // Outer glow
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${shimmer * 0.5})`;
+                    ctx.lineWidth = 12;
+                    ctx.shadowBlur = 20;
                     ctx.shadowColor = '#00FFFF';
                     ctx.beginPath();
                     ctx.arc(
@@ -1483,37 +1498,98 @@
                         shieldRot + arcSize/2
                     );
                     ctx.stroke();
+
+                    // Inner solid line
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${shimmer})`;
+                    ctx.lineWidth = 4;
+                    ctx.shadowBlur = 10;
+                    ctx.beginPath();
+                    ctx.arc(
+                        ship.x, ship.y,
+                        ship.radius + 5,
+                        shieldRot - arcSize/2,
+                        shieldRot + arcSize/2
+                    );
+                    ctx.stroke();
+
+                    // Energy particles along shield
+                    for (let i = 0; i < 5; i++) {
+                        const particleAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
+                        const px = ship.x + Math.cos(particleAngle) * (ship.radius + 5);
+                        const py = ship.y + Math.sin(particleAngle) * (ship.radius + 5);
+                        ctx.fillStyle = `rgba(0, 255, 255, ${shimmer * 0.8})`;
+                        ctx.beginPath();
+                        ctx.arc(px, py, 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
                     ctx.shadowBlur = 0;
                 }
 
-                // Draw engine position (orange thruster)
+                // Draw engine - turbine with fire particles
                 if (gameState.systems) {
                     const enginePos = getSystemPosition(ship, gameState.systems.rudder.rotation);
-                    ctx.fillStyle = '#FF9800';
-                    ctx.beginPath();
-                    ctx.arc(enginePos.x, enginePos.y, 8, 0, Math.PI * 2);
-                    ctx.fill();
+                    const engineAngle = gameState.systems.rudder.rotation * Math.PI / 180;
 
-                    // Thrust particles (if engine active)
-                    if (gameState.systems.engine.amplitude > 0.55) {
-                        const thrustAngle = gameState.systems.rudder.rotation * Math.PI / 180 + Math.PI;
-                        for (let i = 0; i < 3; i++) {
-                            const dist = 15 + i * 10;
-                            const x = enginePos.x + Math.cos(thrustAngle) * dist;
-                            const y = enginePos.y + Math.sin(thrustAngle) * dist;
-                            ctx.fillStyle = `rgba(255, 152, 0, ${0.8 - i * 0.25})`;
-                            ctx.beginPath();
-                            ctx.arc(x, y, 6 - i * 2, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
+                    // Turbine base (metallic gray rectangle)
+                    ctx.save();
+                    ctx.translate(enginePos.x, enginePos.y);
+                    ctx.rotate(engineAngle);
+                    ctx.fillStyle = '#666';
+                    ctx.fillRect(-10, -6, 20, 12);
+                    ctx.fillStyle = '#444';
+                    ctx.fillRect(-10, -4, 20, 8);
+                    ctx.restore();
+
+                    // Fire/thrust particles (always show some activity)
+                    const thrustAngle = engineAngle + Math.PI;
+                    const amplitude = gameState.systems.engine.amplitude || 0.5;
+                    const thrustIntensity = Math.abs(amplitude - 0.5) * 2;
+                    const particleCount = Math.max(3, Math.floor(5 * thrustIntensity));
+
+                    for (let i = 0; i < particleCount; i++) {
+                        const dist = 15 + i * 12 + Math.random() * 5;
+                        const spread = (Math.random() - 0.5) * 0.3;
+                        const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
+                        const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
+                        const alpha = (1 - i / particleCount) * 0.9;
+                        const hue = 30 + Math.random() * 30; // Orange to yellow
+                        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 8 - i * 1.5, 0, Math.PI * 2);
+                        ctx.fill();
                     }
 
-                    // Draw weapon position (yellow cannon)
+                    // Draw weapon - old pirate cannon
                     const weaponPos = getSystemPosition(ship, gameState.systems.weaponDirection.rotation);
-                    ctx.fillStyle = '#FFD700';
+                    const weaponAngle = gameState.systems.weaponDirection.rotation * Math.PI / 180;
+
+                    ctx.save();
+                    ctx.translate(weaponPos.x, weaponPos.y);
+                    ctx.rotate(weaponAngle);
+
+                    // Cannon base (brown wood)
+                    ctx.fillStyle = '#8B4513';
+                    ctx.fillRect(-8, -8, 16, 16);
+
+                    // Cannon barrel (dark gray metal)
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(5, -4, 15, 8);
+                    ctx.fillStyle = '#222';
+                    ctx.fillRect(5, -3, 15, 6);
+
+                    // Cannon mouth (black circle)
+                    ctx.fillStyle = '#000';
                     ctx.beginPath();
-                    ctx.arc(weaponPos.x, weaponPos.y, 6, 0, Math.PI * 2);
+                    ctx.arc(20, 0, 4, 0, Math.PI * 2);
                     ctx.fill();
+
+                    // Metal rim (gray highlight)
+                    ctx.strokeStyle = '#555';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    ctx.restore();
                 }
             }
 

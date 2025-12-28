@@ -382,8 +382,8 @@ function applyEngineThrust(room) {
     room.ship.vx += -Math.cos(angle) * thrust;
     room.ship.vy += -Math.sin(angle) * thrust;
 
-    // Clamp velocity (reduced from 8 to 3 for slower movement)
-    const MAX_SPEED = 3;
+    // Clamp velocity (increased from 3 to 9 for 3x faster movement)
+    const MAX_SPEED = 9;
     const speed = Math.hypot(room.ship.vx, room.ship.vy);
     if (speed > MAX_SPEED) {
         room.ship.vx = (room.ship.vx / speed) * MAX_SPEED;
@@ -482,13 +482,13 @@ function createAsteroid(room, size) {
     let speed, health, maxHealth, damage, splits;
     switch(size) {
         case 'large':
-            speed = 1.5; health = 10; maxHealth = 10; damage = 3; splits = 2;
+            speed = 0.75; health = 10; maxHealth = 10; damage = 3; splits = 2; // Reduced 2x: was 1.5
             break;
         case 'medium':
-            speed = 2.0; health = 5; maxHealth = 5; damage = 2; splits = 3;
+            speed = 1.0; health = 5; maxHealth = 5; damage = 2; splits = 3; // Reduced 2x: was 2.0
             break;
         case 'small':
-            speed = 2.5; health = 2; maxHealth = 2; damage = 1; splits = 0;
+            speed = 1.25; health = 2; maxHealth = 2; damage = 1; splits = 0; // Reduced 2x: was 2.5
             break;
     }
 
@@ -1829,10 +1829,14 @@ function updateShip(room) {
         room.systems.rudder.rotation = (room.systems.rudder.rotation + 0.5) % 360;
     }
     if (!occupied.has('weaponDirection')) {
-        room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation + 0.7) % 360;
+        room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation - 0.7) % 360; // Opposite direction
     }
+    // Shield always active, rotates slowly when no player
     if (!occupied.has('shield')) {
-        room.systems.shield.active = false;
+        room.systems.shield.active = true; // Always on
+        room.systems.shield.rotation = (room.systems.shield.rotation + 0.3) % 360; // Slow rotation
+    } else {
+        room.systems.shield.active = true;
     }
 
     // 3. Apply engine thrust
@@ -1841,10 +1845,8 @@ function updateShip(room) {
     // 4. Update ship position
     updateShipPosition(room);
 
-    // 5. Fire weapon (every second)
-    if (occupied.has('weapon')) {
-        fireBullet(room);
-    }
+    // 5. Fire weapon (every second) - always fire, even without player
+    fireBullet(room);
 
     // 6. Update bullets
     for (let i = room.bullets.length - 1; i >= 0; i--) {

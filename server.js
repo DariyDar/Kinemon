@@ -176,7 +176,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.systems = {
             engine: {
                 amplitude: 0,
-                accumulation: 0,
+                energy: 0,         // Accumulated energy from pumps
                 rotation: 0
             },
             rudder: {
@@ -340,51 +340,44 @@ function getSystemPosition(ship, rotation) {
     };
 }
 
-// Calculate engine thrust based on amplitude and accumulation
-// Returns thrust only for upward movement (tilt > 0.5), downward is idle
-function calculateEngineThrust(amplitude, accumulation, formula, isActiveThrust) {
-    // Only thrust when tilting up (amplitude > 0.5)
-    if (!isActiveThrust || amplitude <= 0.5) {
-        return 0;
+// Detect pump motion (upward movement from below 0.5 to above 0.5)
+// Returns energy added from the pump
+function detectPump(player, currentTilt) {
+    const lastTilt = player.lastTilt || 0.5;
+    player.lastTilt = currentTilt;
+
+    // Detect upward crossing of 0.5 threshold (pump motion)
+    if (lastTilt < 0.5 && currentTilt >= 0.5) {
+        // Pump detected! Add energy based on how high they lifted
+        const pumpStrength = Math.min(currentTilt - 0.5, 0.5) * 2; // 0-1
+        return pumpStrength * 3; // Energy boost from pump
     }
 
-    const amp = (amplitude - 0.5) * 2; // 0-1, only for upward tilt
+    return 0; // No pump
+}
+
+// Calculate engine thrust from accumulated energy
+function calculateEngineThrust(energy, formula) {
+    if (energy <= 0) return 0;
+
+    // Energy decays quickly, providing thrust while it lasts
+    const normalizedEnergy = Math.min(energy / 10, 1); // 0-1
 
     switch (formula) {
         case 'balanced':
-            return 0.4 * amp + 0.1 * Math.min(accumulation, 10) / 10; // Increased from 0.15/0.05
+            return 0.5 * normalizedEnergy;
         case 'speed':
-            return 0.6 * amp + 0.05 * Math.min(accumulation, 10) / 10; // Increased from 0.25/0.02
+            return 0.7 * normalizedEnergy;
         case 'combo':
-            return 0.2 * amp + 0.15 * Math.min(accumulation, 15) / 15; // Increased from 0.08/0.08
+            return 0.4 * normalizedEnergy;
         default:
-            return 0.4 * amp;
-    }
-}
-
-// Update accumulation (combo counter) - only for upward movement
-function updateAccumulation(player, currentTilt) {
-    const threshold = 0.5; // Threshold is now neutral position
-
-    // Only accumulate when tilting upward (> 0.5)
-    if (currentTilt > threshold) {
-        const deviation = currentTilt - 0.5;
-        player.accumulation = Math.min(player.accumulation + deviation * 3/60, 20);
-    } else {
-        player.accumulation = Math.max(0, player.accumulation - 2/60);
+            return 0.5 * normalizedEnergy;
     }
 }
 
 // Apply engine thrust to ship
 function applyEngineThrust(room) {
-    const hasEnginePlayer = room.systems.engine.hasPlayer || false;
-
-    const thrust = calculateEngineThrust(
-        room.systems.engine.amplitude,
-        room.systems.engine.accumulation,
-        room.engineFormula,
-        hasEnginePlayer
-    );
+    const thrust = calculateEngineThrust(room.systems.engine.energy, room.engineFormula);
 
     if (thrust > 0) {
         const angle = room.systems.rudder.rotation * Math.PI / 180;
@@ -393,7 +386,7 @@ function applyEngineThrust(room) {
         room.ship.vx += -Math.cos(angle) * thrust;
         room.ship.vy += -Math.sin(angle) * thrust;
 
-        // Clamp velocity (increased from 3 to 9 for 3x faster movement)
+        // Clamp velocity
         const MAX_SPEED = 9;
         const speed = Math.hypot(room.ship.vx, room.ship.vy);
         if (speed > MAX_SPEED) {
@@ -401,6 +394,9 @@ function applyEngineThrust(room) {
             room.ship.vy = (room.ship.vy / speed) * MAX_SPEED;
         }
     }
+
+    // Energy decay - energy dissipates quickly
+    room.systems.engine.energy = Math.max(0, room.systems.engine.energy - 0.15);
 }
 
 // Update ship position with physics
@@ -1830,12 +1826,13 @@ function updateShip(room) {
         if (!player.systemRole) continue;
 
         const tilt = player.tilt;
-        updateAccumulation(player, tilt);
 
         switch (player.systemRole) {
             case 'engine':
+                // Detect pump motion and add energy
+                const energyAdded = detectPump(player, tilt);
+                room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 10); // Cap at 10
                 room.systems.engine.amplitude = tilt;
-                room.systems.engine.accumulation = player.accumulation;
                 room.systems.engine.hasPlayer = true;
                 break;
             case 'rudder':
@@ -1843,7 +1840,6 @@ function updateShip(room) {
                 break;
             case 'weapon':
                 room.systems.weapon.amplitude = tilt;
-                room.systems.weapon.accumulation = player.accumulation;
                 room.systems.weapon.hasPlayer = true;
                 break;
             case 'weaponDirection':
@@ -1870,9 +1866,16 @@ function updateShip(room) {
         room.systems.weapon.hasPlayer = true; // Enable auto-fire
     }
     if (!occupied.has('engine')) {
-        // Auto-pilot: gentle pulsing thrust for demonstration
-        const time = Date.now() / 1000;
-        room.systems.engine.amplitude = 0.5 + Math.sin(time) * 0.3; // Oscillate 0.2-0.8
+        // Auto-pilot: simulate pump motions by adding periodic energy pulses
+        if (!room.lastAutoPump) room.lastAutoPump = Date.now();
+        const timeSinceLastPump = Date.now() - room.lastAutoPump;
+
+        // Pump every 800ms to demonstrate pump mechanics
+        if (timeSinceLastPump > 800) {
+            room.systems.engine.energy = Math.min(room.systems.engine.energy + 2.5, 10); // Add pump energy
+            room.lastAutoPump = Date.now();
+        }
+
         room.systems.engine.hasPlayer = true; // Enable auto-thrust
     }
     // Shield always active, rotates slowly when no player

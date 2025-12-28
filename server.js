@@ -348,20 +348,18 @@ function detectPump(player, currentTilt, room) {
     }
 
     const lastTilt = player.lastTilt;
+    const delta = currentTilt - lastTilt;
     player.lastTilt = currentTilt;
 
-    // Apply debouncing filter to reduce sensor noise
-    const delta = currentTilt - lastTilt;
-    const minDelta = (room.physics && room.physics.pumpMinDelta) || 0;
-    if (Math.abs(delta) < minDelta) return 0;
+    // Detect ANY significant upward movement (delta > threshold)
+    const pumpThreshold = (room.physics && room.physics.pumpMinDelta) || 0.15;
 
-    // Detect upward crossing of 0.5 threshold (pump motion)
-    if (lastTilt < 0.5 && currentTilt >= 0.5) {
-        // Pump detected! Add energy based on how high they lifted
-        const pumpStrength = Math.min(currentTilt - 0.5, 0.5) * 2; // 0-1
-        const pumpEnergyMult = (room.physics && room.physics.pumpEnergy) || 10;
+    if (delta > pumpThreshold) {
+        // Pump detected! Energy based on movement magnitude
+        const pumpStrength = Math.min(delta, 0.5) * 2; // 0-1 (normalized)
+        const pumpEnergyMult = (room.physics && room.physics.pumpEnergy) || 16;
         const energyBoost = pumpStrength * pumpEnergyMult;
-        console.log(`Pump detected! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)}, Energy: +${energyBoost.toFixed(2)}`);
+        console.log(`🚀 Pump! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)} (Δ${delta.toFixed(3)}), Energy: +${energyBoost.toFixed(2)}`);
         return energyBoost;
     }
 

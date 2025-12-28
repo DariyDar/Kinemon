@@ -1478,7 +1478,8 @@
                 ctx.stroke();
 
                 // Draw shield arc - semi-transparent with shimmer
-                if (gameState.systems && gameState.systems.shield.active) {
+                if (gameState.systems && gameState.systems.shield && gameState.systems.shield.active) {
+                    ctx.save();
                     const shieldRot = gameState.systems.shield.rotation * Math.PI / 180;
                     const arcSize = gameState.systems.shield.arcSize * Math.PI / 180;
 
@@ -1493,7 +1494,7 @@
                     ctx.beginPath();
                     ctx.arc(
                         ship.x, ship.y,
-                        ship.radius + 5,
+                        ship.radius + 8,
                         shieldRot - arcSize/2,
                         shieldRot + arcSize/2
                     );
@@ -1501,29 +1502,30 @@
 
                     // Inner solid line
                     ctx.strokeStyle = `rgba(0, 255, 255, ${shimmer})`;
-                    ctx.lineWidth = 4;
-                    ctx.shadowBlur = 10;
+                    ctx.lineWidth = 6;
+                    ctx.shadowBlur = 15;
                     ctx.beginPath();
                     ctx.arc(
                         ship.x, ship.y,
-                        ship.radius + 5,
+                        ship.radius + 8,
                         shieldRot - arcSize/2,
                         shieldRot + arcSize/2
                     );
                     ctx.stroke();
 
                     // Energy particles along shield
+                    ctx.shadowBlur = 5;
                     for (let i = 0; i < 5; i++) {
                         const particleAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
-                        const px = ship.x + Math.cos(particleAngle) * (ship.radius + 5);
-                        const py = ship.y + Math.sin(particleAngle) * (ship.radius + 5);
+                        const px = ship.x + Math.cos(particleAngle) * (ship.radius + 8);
+                        const py = ship.y + Math.sin(particleAngle) * (ship.radius + 8);
                         ctx.fillStyle = `rgba(0, 255, 255, ${shimmer * 0.8})`;
                         ctx.beginPath();
                         ctx.arc(px, py, 3, 0, Math.PI * 2);
                         ctx.fill();
                     }
 
-                    ctx.shadowBlur = 0;
+                    ctx.restore();
                 }
 
                 // Draw engine - turbine with fire particles
@@ -1542,7 +1544,7 @@
                     ctx.restore();
 
                     // Fire/thrust particles (always show some activity)
-                    const thrustAngle = engineAngle + Math.PI;
+                    const thrustAngle = engineAngle; // Fire goes in engine direction (ship moves opposite)
                     const amplitude = gameState.systems.engine.amplitude || 0.5;
                     const thrustIntensity = Math.abs(amplitude - 0.5) * 2;
                     const particleCount = Math.max(3, Math.floor(5 * thrustIntensity));

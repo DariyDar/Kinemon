@@ -1829,7 +1829,10 @@ function updateShip(room) {
         room.systems.rudder.rotation = (room.systems.rudder.rotation + 0.5) % 360;
     }
     if (!occupied.has('weaponDirection')) {
-        room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation - 0.7) % 360; // Opposite direction
+        room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation - 0.7 + 360) % 360; // Opposite direction, normalized
+    }
+    if (!occupied.has('weapon')) {
+        room.systems.weapon.amplitude = 0.5; // Default medium power when no player
     }
     // Shield always active, rotates slowly when no player
     if (!occupied.has('shield')) {

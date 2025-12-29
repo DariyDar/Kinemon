@@ -401,7 +401,7 @@
     <!-- Physics Settings Panel -->
     <div id="physicsPanel">
         <!-- Pump System Parameters -->
-        <div id="pumpParams" class="physics-section">
+        <div id="pumpParams" class="physics-section" style="display: none;">
             <h3>⚡ Pump System</h3>
             <div class="physics-grid">
                 <div class="physics-control">
@@ -420,12 +420,12 @@
         </div>
 
         <!-- Gradient System Parameters -->
-        <div id="gradientParams" class="physics-section" style="display: none;">
+        <div id="gradientParams" class="physics-section">
             <h3>📊 Gradient System</h3>
             <div class="physics-grid">
                 <div class="physics-control">
-                    <label>Базовое затухание <span class="value-display" id="gradientBaseDecayValue">50</span> ед/сек</label>
-                    <input type="range" id="gradientBaseDecay" min="10" max="200" step="5" value="50">
+                    <label>Базовое затухание <span class="value-display" id="gradientBaseDecayValue">100</span> ед/сек</label>
+                    <input type="range" id="gradientBaseDecay" min="10" max="200" step="5" value="100">
                 </div>
             </div>
         </div>
@@ -435,8 +435,8 @@
             <h3>🚀 Движение корабля</h3>
             <div class="physics-grid">
                 <div class="physics-control">
-                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">1.4</span></label>
-                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="1.4">
+                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">1.0</span></label>
+                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="1.0">
                 </div>
                 <div class="physics-control">
                     <label>Инерция (торможение) <span class="value-display" id="inertiaValue">50</span></label>
@@ -448,8 +448,8 @@
                     <input type="range" id="maxSpeed" min="3" max="15" step="0.5" value="3">
                 </div>
                 <div class="physics-control">
-                    <label>Порог остановки <span class="value-display" id="stopThresholdValue">0.13</span></label>
-                    <input type="range" id="stopThreshold" min="0.01" max="0.5" step="0.01" value="0.13">
+                    <label>Порог остановки <span class="value-display" id="stopThresholdValue">0.01</span></label>
+                    <input type="range" id="stopThreshold" min="0.01" max="0.5" step="0.01" value="0.01">
                 </div>
             </div>
         </div>
@@ -491,13 +491,13 @@
             pumpMinDelta: 0.15,
 
             // Gradient system parameters
-            gradientBaseDecay: 50,     // Base decay rate (units/sec) for gradient system
+            gradientBaseDecay: 100,    // Base decay rate (units/sec) for gradient system
 
             // Shared parameters
-            thrustMult: 1.4,
+            thrustMult: 1.0,
             inertia: 50,               // Inertia parameter (0-100) controls friction
             maxSpeed: 3.0,
-            stopThreshold: 0.13,
+            stopThreshold: 0.01,
             fireThreshold: 0.089,
             fireIntensity: 1.4,
             maxParticles: 15
@@ -623,8 +623,8 @@
                     <div class="setting-group">
                         <label for="shipThrustSystem">Система тяги</label>
                         <select id="shipThrustSystem">
-                            <option value="pump" selected>Pump (рывки)</option>
-                            <option value="gradient">Gradient (градусы)</option>
+                            <option value="pump">Pump (рывки)</option>
+                            <option value="gradient" selected>Gradient (градусы)</option>
                         </select>
                         <div class="setting-info">Способ начисления энергии двигателю</div>
                     </div>
@@ -667,7 +667,7 @@
                     </div>
                 `;
                 // Load saved settings
-                gameSettings.thrustSystem = localStorage.getItem('shipThrustSystem') || 'pump';
+                gameSettings.thrustSystem = localStorage.getItem('shipThrustSystem') || 'gradient';
                 gameSettings.engineFormula = localStorage.getItem('shipEngineFormula') || 'balanced';
                 gameSettings.weaponFormula = localStorage.getItem('shipWeaponFormula') || 'standard';
                 gameSettings.coinsToWin = parseInt(localStorage.getItem('shipCoinsToWin')) || 10;

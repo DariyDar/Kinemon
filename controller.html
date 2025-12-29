@@ -192,6 +192,66 @@
             letter-spacing: 4px;
             margin: 20px 0;
         }
+
+        /* Role selection panel */
+        .role-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .role-btn {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .role-btn:active:not(:disabled) {
+            background: #0b7dda;
+            transform: scale(0.98);
+        }
+
+        .role-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .role-btn.selected {
+            background: #4CAF50;
+        }
+
+        #releaseRoleBtn {
+            background: #f44336;
+            width: 100%;
+        }
+
+        #releaseRoleBtn:active {
+            background: #da190b;
+        }
+
+        #readyBtn:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        #readyHint {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .role-panel-title {
+            font-size: 20px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -201,12 +261,9 @@
             <h1>📱 Контроллер</h1>
             <p id="joinPrompt">Присоединяйтесь к игре</p>
 
-            <button class="btn" id="scanQrBtn">📷 Сканировать QR-код</button>
-            <p style="font-size: 14px; opacity: 0.5;">или</p>
-
-            <input type="text" id="roomIdInput" placeholder="Код комнаты (например: ABC123)" maxlength="6" style="text-transform: uppercase;">
+            <input type="text" id="roomIdInput" placeholder="Код комнаты" maxlength="15" style="text-transform: uppercase;">
             <br>
-            <input type="text" id="playerName" placeholder="Ваше имя" maxlength="20" value="Player">
+            <input type="text" id="playerName" placeholder="Ваше имя" maxlength="20">
             <br>
             <div id="teamSelector" style="display: none; margin: 10px 0;">
                 <select id="teamSelect" style="width: 100%; padding: 15px; font-size: 16px; border-radius: 10px; background: #222; color: white; border: 2px solid #444;">
@@ -217,13 +274,24 @@
                     <option value="White">⚪ Белая команда</option>
                 </select>
             </div>
-            <input type="text" id="serverUrl" placeholder="Адрес сервера" value="">
-            <br>
+
+            <!-- Role Selection Panel (Ship only) -->
+            <div id="roleSelectionPanel" style="display: none;">
+                <div class="role-panel-title">Выбор роли:</div>
+                <div class="role-buttons">
+                    <button class="role-btn" data-role="engine">⚙️ Двигатель</button>
+                    <button class="role-btn" data-role="rudder">🧭 Руль</button>
+                    <button class="role-btn" data-role="weapon">🔫 Оружие</button>
+                    <button class="role-btn" data-role="weaponDirection">🎯 Прицел</button>
+                    <button class="role-btn" data-role="shield">🛡️ Щит</button>
+                </div>
+
+                <!-- Ready button (disabled until role is selected) -->
+                <button id="readyBtn" class="btn" style="margin-top: 15px; width: 100%;" disabled>Готов</button>
+                <div id="readyHint">Выберите роль, чтобы начать</div>
+            </div>
+
             <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
-            <p id="qrHint" style="font-size: 14px; opacity: 0.6; margin-top: 20px; display: none;">
-                ✅ Данные из QR-кода загружены<br>
-                Нажмите "Подключиться" для продолжения
-            </p>
         </div>
 
         <!-- QR Scanner Screen removed - now using native camera app -->
@@ -256,17 +324,25 @@
         <div id="controllerScreen" class="screen">
             <h2>🎮 Управление</h2>
             <div class="room-display">Комната: <span id="roomDisplay3"></span></div>
-            <div id="statusDisplay" class="status connected">Подключено</div>
             <div class="tilt-display" id="tiltDisplay">0.50</div>
-            <div id="vibrationStatus" style="padding: 15px; margin: 15px 0; border-radius: 10px; background: rgba(255,255,255,0.1); font-size: 16px; cursor: pointer; user-select: none;">
-                🔔 Вибрация: <span id="vibrationStatusText">проверка...</span><br>
-                <small style="opacity: 0.7; font-size: 12px;">Нажмите для теста</small>
-            </div>
             <p>Наклоняйте телефон для управления</p>
             <div class="info">
                 <p id="playerInfo">Игрок: <span id="playerNameDisplay"></span></p>
                 <p id="axisInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold;">Ваша ось: <span id="axisDisplay"></span></p>
             </div>
+
+            <!-- Role Selection Panel (Ship only, during game) -->
+            <div id="roleSelectionPanelGame" style="display: none;">
+                <div class="role-panel-title">Смена роли:</div>
+                <div class="role-buttons">
+                    <button class="role-btn" data-role="engine">⚙️ Двигатель</button>
+                    <button class="role-btn" data-role="rudder">🧭 Руль</button>
+                    <button class="role-btn" data-role="weapon">🔫 Оружие</button>
+                    <button class="role-btn" data-role="weaponDirection">🎯 Прицел</button>
+                    <button class="role-btn" data-role="shield">🛡️ Щит</button>
+                </div>
+            </div>
+
             <button class="btn btn-danger" id="disconnectBtn">Отключиться</button>
         </div>
 
@@ -284,23 +360,24 @@
             </button>
         </div>
 
-        <!-- Control Scheme Selector (shown during gameplay) -->
-        <div id="controlSelector" style="position: fixed; top: 20px; right: 20px; z-index: 1000; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; display: none;">
-            <div style="font-size: 14px; margin-bottom: 10px; opacity: 0.8;">Управление:</div>
-            <select id="controlSchemeSelect" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px; border-radius: 5px; font-size: 14px; width: 200px;">
-                <option value="rotation_smooth">Поворот (плавный)</option>
-                <option value="center_straight">Центр = прямо</option>
-                <option value="rotation_linear">Поворот (быстрый)</option>
-                <option value="fixed_updown">Фиксированные ↑↓</option>
-                <option value="nonlinear_a">Нелинейный A</option>
-                <option value="nonlinear_b">Нелинейный B</option>
-            </select>
-        </div>
     </div>
 
     <script src="motionController.js"></script>
     <script src="calibration.js"></script>
     <script>
+        // Generate random player name on page load
+        function generateRandomPlayerName() {
+            const adjectives = ['Brave', 'Lazy', 'Happy', 'Angry', 'Clever', 'Tiny', 'Huge', 'Swift', 'Bold', 'Shy',
+                                'Wild', 'Calm', 'Loud', 'Quiet', 'Crazy', 'Smart', 'Lucky', 'Grumpy'];
+            const nouns = ['Fox', 'Bear', 'Wolf', 'Eagle', 'Tiger', 'Shark', 'Panda', 'Lion', 'Owl', 'Raven',
+                           'Falcon', 'Jaguar', 'Lynx', 'Otter', 'Hawk', 'Moose', 'Bison', 'Crane'];
+
+            const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+            const noun = nouns[Math.floor(Math.random() * nouns.length)];
+
+            return `${adj} ${noun}`;
+        }
+
         let ws = null;
         let motionController = null;
         let calibration = null;
@@ -321,8 +398,6 @@
 
         const playerNameInput = document.getElementById('playerName');
         const roomIdInput = document.getElementById('roomIdInput');
-        const serverUrlInput = document.getElementById('serverUrl');
-        const scanQrBtn = document.getElementById('scanQrBtn');
         const manualJoinBtn = document.getElementById('manualJoinBtn');
         const setMinBtn = document.getElementById('setMinBtn');
         const setMaxBtn = document.getElementById('setMaxBtn');
@@ -359,19 +434,11 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         console.log('Default server:', defaultServer);
-        console.log('Server input element exists?', serverUrlInput !== null);
         console.log('Room input element exists?', roomIdInput !== null);
 
-        // Use server from URL if available, otherwise use default
-        if (serverFromUrl) {
-            serverUrlInput.value = serverFromUrl;
-            console.log('✅ Set server from URL:', serverFromUrl);
-        } else {
-            serverUrlInput.value = defaultServer;
-            console.log('✅ Set default server:', defaultServer);
-        }
-
-        console.log('Server input current value:', serverUrlInput.value);
+        // Set random player name on page load
+        playerNameInput.value = generateRandomPlayerName();
+        console.log('Generated player name:', playerNameInput.value);
 
         // Wake up Render server on page load (free tier spins down after inactivity)
         if (!isLocalhost) {
@@ -442,17 +509,12 @@
             document.getElementById('roomDisplay3').textContent = room;
         }
 
-        // QR Scanner (now using built-in camera app)
-        scanQrBtn.addEventListener('click', () => {
-            alert('📱 Инструкция по сканированию:\n\n1. Откройте камеру на телефоне\n2. Наведите на QR-код\n3. Нажмите на появившееся уведомление\n4. Автоматически откроется эта страница с заполненными данными!\n\nИли введите код комнаты вручную ниже.');
-        });
-
-        // Cancel scan button removed - now using native camera
+        // QR Scanner removed - users can scan QR with native camera app
 
         // Manual join
         manualJoinBtn.addEventListener('click', async () => {
             const room = roomIdInput.value.trim().toUpperCase();
-            const server = serverUrlInput.value.trim();
+            const server = serverFromUrl || defaultServer;
 
             if (!room) {
                 alert('Введите код комнаты');
@@ -722,6 +784,11 @@
                     }
 
                     if (data.type === 'update' && data.gameState) {
+                        // Update role buttons for Ship game
+                        if (data.gameState.gameType === 'ship') {
+                            updateRoleButtons(data.gameState);
+                        }
+
                         // Check if this player died (only for Snake, not Pong)
                         if (data.gameState.gameType === 'snake') {
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);
@@ -730,9 +797,6 @@
                                 // Show death screen
                                 document.getElementById('deathScore').textContent = myPlayer.score;
                                 showScreen('death');
-
-                                // Hide control selector
-                                document.getElementById('controlSelector').style.display = 'none';
 
                                 // Stop sending motion data while dead
                                 motionController.onTiltChange = null;
@@ -793,24 +857,111 @@
             }
         });
 
-        // Control scheme selector change handler
-        document.getElementById('controlSchemeSelect').addEventListener('change', (e) => {
-            const newScheme = e.target.value;
-            currentControlScheme = newScheme;
+        // Role selection logic for Ship game
+        let currentRole = null;
+        let isReady = false;
 
-            // Save to localStorage
-            localStorage.setItem('playerControlScheme', newScheme);
+        function updateRoleButtons(gameState) {
+            if (gameType !== 'ship') return;
 
-            // Send to server
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'change_control',
-                    controlScheme: newScheme
-                }));
+            const roleButtons = document.querySelectorAll('.role-btn');
+            const players = gameState.players || [];
+            const myPlayer = players.find(p => p.id === playerId);
+
+            roleButtons.forEach(btn => {
+                const role = btn.dataset.role;
+                const occupiedBy = players.find(p => p.systemRole === role);
+
+                // Reset button text to default
+                const roleNames = {
+                    engine: '⚙️ Двигатель',
+                    rudder: '🧭 Руль',
+                    weapon: '🔫 Оружие',
+                    weaponDirection: '🎯 Прицел',
+                    shield: '🛡️ Щит'
+                };
+                btn.textContent = roleNames[role];
+
+                if (occupiedBy && occupiedBy.id !== playerId) {
+                    // Role is taken by another player
+                    btn.disabled = true;
+                    btn.textContent = `${roleNames[role].split(' ')[0]} ${occupiedBy.name}`;
+                    btn.style.opacity = '0.5';
+                    btn.classList.remove('selected');
+                } else if (occupiedBy && occupiedBy.id === playerId) {
+                    // This is my role
+                    btn.disabled = false;
+                    btn.style.opacity = '1.0';
+                    btn.classList.add('selected');
+                    currentRole = role;
+                } else {
+                    // Role is free
+                    btn.disabled = false;
+                    btn.style.opacity = '1.0';
+                    btn.classList.remove('selected');
+                }
+            });
+
+            // Update Ready button state (only on room input screen)
+            const readyBtn = document.getElementById('readyBtn');
+            const readyHint = document.getElementById('readyHint');
+
+            if (readyBtn) {
+                if (currentRole) {
+                    readyBtn.disabled = false;
+                    if (readyHint) readyHint.style.display = 'none';
+                } else {
+                    readyBtn.disabled = true;
+                    if (readyHint) readyHint.style.display = 'block';
+                }
+
+                // If player is ready, show different text
+                if (myPlayer && myPlayer.ready) {
+                    readyBtn.textContent = 'Ожидание других игроков...';
+                    readyBtn.disabled = true;
+                    isReady = true;
+                }
+
+                // If game started, switch to controller screen
+                if (gameState.gameStarted && roomInputScreen.classList.contains('active')) {
+                    showScreen('calibration-min');
+                }
             }
+        }
 
-            console.log('Control scheme changed to:', newScheme);
+        // Role button click handler
+        document.querySelectorAll('.role-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const role = btn.dataset.role;
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'change_role',
+                        role: role
+                    }));
+                }
+            });
         });
+
+        // Ready button click handler
+        const readyBtn = document.getElementById('readyBtn');
+        if (readyBtn) {
+            readyBtn.addEventListener('click', () => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'player_ready'
+                    }));
+                }
+            });
+        }
+
+        // Show role panel if Ship game
+        if (gameType === 'ship') {
+            const rolePanel = document.getElementById('roleSelectionPanel');
+            if (rolePanel) {
+                rolePanel.style.display = 'block';
+            }
+        }
     </script>
 </body>
 </html>

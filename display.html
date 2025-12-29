@@ -384,6 +384,21 @@
         <!-- Game Display -->
         <canvas id="gameCanvas" width="600" height="800"></canvas>
 
+        <!-- Persistent QR Code (bottom-left corner) -->
+        <div id="persistentQRDisplay" style="
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 80px;
+            height: 80px;
+            background: white;
+            padding: 5px;
+            border-radius: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+        "></div>
+
         <div id="roomInfo" class="room-info" style="display: none;">
             <div class="room-label">Комната</div>
             <div class="room-id-display" id="roomIdInfo">------</div>
@@ -1015,6 +1030,19 @@
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.H
                         });
+
+                        // Generate persistent QR code in bottom-left corner
+                        const persistentQR = document.getElementById('persistentQRDisplay');
+                        persistentQR.innerHTML = '';
+                        new QRCode(persistentQR, {
+                            text: qrData,
+                            width: 70,
+                            height: 70,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M
+                        });
+                        persistentQR.style.display = 'block';
 
                         showScreen('waiting');
 

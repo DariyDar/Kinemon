@@ -65,9 +65,33 @@ const PUSHERS_SMILEY_SIZE = 20;
 const PUSHERS_SKULL_SIZE = 30;
 const PUSHERS_FIELD_SIZE = 800;
 
-// Generate random room ID
+// Generate random room ID (word-based with vowel separator)
 function generateRoomId() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    let roomId;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    do {
+        const prefixes = ['CAT', 'DOG', 'NERD', 'DUMB', 'FISH', 'BIRD', 'FROG', 'BEAR',
+                          'WOLF', 'DEER', 'DUCK', 'CRAB', 'SEAL', 'CROW'];
+        const vowels = ['A', 'O', 'E', 'U', 'I'];
+        const suffixes = ['LAND', 'VILL', 'TOWN', 'ZONE', 'BASE', 'CITY'];
+
+        const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+        const vowel = vowels[Math.floor(Math.random() * vowels.length)];
+        const suffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+
+        roomId = prefix + vowel + suffix; // e.g., "CATALAND", "NERDOVILL"
+        attempts++;
+
+        if (attempts >= maxAttempts) {
+            // Fallback: add random number if too many collisions
+            roomId = roomId + Math.floor(Math.random() * 100);
+            break;
+        }
+    } while (rooms.has(roomId));
+
+    return roomId;
 }
 
 // Generate random player color
@@ -937,16 +961,14 @@ wss.on('connection', (ws) => {
                     player.y = spawnPos.y;
                     player.alive = true;
                 } else if (room.gameType === 'ship') {
-                    // Ship: assign to one of 5 systems
-                    const systemIndex = room.players.size; // 0-4
-                    const systems = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
-
-                    player.systemRole = systemIndex < 5 ? systems[systemIndex] : null;
-                    player.systemIndex = systemIndex < 5 ? systemIndex + 1 : null; // 1-5
+                    // Ship: player starts as observer (no role assigned)
+                    player.systemRole = null;
+                    player.systemIndex = null;
                     player.lastTilt = undefined;  // Previous tilt value (undefined allows proper first pump detection)
                     player.alive = true;          // All players share ship health
+                    player.ready = false;         // Player hasn't pressed "Ready" button yet
 
-                    console.log(`Player ${player.name} assigned to system: ${player.systemRole || 'observer'}`);
+                    console.log(`Player ${player.name} joined as observer (no role assigned)`);
                 } else {
                     // Snake: segments and position
                     player.alive = true;
@@ -1081,6 +1103,73 @@ wss.on('connection', (ws) => {
                         console.log(`Player ${player.id} changed control to ${player.controlScheme}`);
                     }
                 }
+            } else if (data.type === 'change_role' && ws.playerId && ws.roomId) {
+                // Handle role change for Ship game
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'ship') {
+                    const player = room.players.get(ws.playerId);
+                    if (!player) return;
+
+                    const requestedRole = data.role; // 'engine' | 'rudder' | 'weapon' | 'weaponDirection' | 'shield' | null
+
+                    // If player wants to release role
+                    if (requestedRole === null) {
+                        player.systemRole = null;
+                        player.systemIndex = null;
+                        console.log(`Player ${player.name} released their role`);
+                        broadcastGameState(room);
+                        return;
+                    }
+
+                    // Check if role is already taken
+                    const roleTaken = Array.from(room.players.values()).some(p =>
+                        p.id !== player.id && p.systemRole === requestedRole
+                    );
+
+                    if (roleTaken) {
+                        ws.send(JSON.stringify({
+                            type: 'error',
+                            message: 'Эта роль уже занята другим игроком'
+                        }));
+                        return;
+                    }
+
+                    // Assign role
+                    const systems = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
+                    player.systemRole = requestedRole;
+                    player.systemIndex = systems.indexOf(requestedRole) + 1; // 1-5
+
+                    console.log(`Player ${player.name} assigned to system: ${player.systemRole}`);
+                    broadcastGameState(room);
+                }
+            } else if (data.type === 'player_ready' && ws.playerId && ws.roomId) {
+                // Handle player ready status for Ship game
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'ship') {
+                    const player = room.players.get(ws.playerId);
+                    if (!player) return;
+
+                    // Player must have a role to be ready
+                    if (!player.systemRole) {
+                        ws.send(JSON.stringify({
+                            type: 'error',
+                            message: 'Выберите роль перед началом игры'
+                        }));
+                        return;
+                    }
+
+                    player.ready = true;
+                    console.log(`Player ${player.name} is ready`);
+
+                    // Check if all players are ready
+                    const allReady = Array.from(room.players.values()).every(p => p.ready);
+                    if (allReady && room.players.size > 0) {
+                        room.gameStarted = true;
+                        console.log(`Game starting in room ${room.id}`);
+                    }
+
+                    broadcastGameState(room);
+                }
             }
         } catch (error) {
             console.error('Error processing message:', error);
@@ -1200,7 +1289,8 @@ function serializeGameState(room) {
 
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id, name: p.name, color: p.color,
-            systemRole: p.systemRole, systemIndex: p.systemIndex, alive: p.alive
+            systemRole: p.systemRole, systemIndex: p.systemIndex, alive: p.alive,
+            ready: p.ready
         }));
 
         state.thrustSystem = room.thrustSystem;

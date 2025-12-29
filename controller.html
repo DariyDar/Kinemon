@@ -791,19 +791,26 @@
 
                         // For Ship game, setup role selection handlers
                         if (gameType === 'ship') {
+                            addDebugLog('⚙️ Настройка обработчиков ролей для Ship', 'info');
+                            console.log('Setting up Ship role handlers, found buttons:', document.querySelectorAll('.role-btn').length);
+
                             // Role button click handler
-                            document.querySelectorAll('.role-btn').forEach(btn => {
+                            document.querySelectorAll('.role-btn').forEach((btn, index) => {
                                 btn.addEventListener('click', () => {
                                     const role = btn.dataset.role;
+                                    addDebugLog(`🔘 Клик на кнопку роли: ${role}`, 'info');
 
                                     if (ws && ws.readyState === WebSocket.OPEN) {
-                                        addDebugLog(`🎯 Выбрана роль: ${role}`, 'info');
+                                        addDebugLog(`🎯 Отправка change_role: ${role}`, 'success');
                                         ws.send(JSON.stringify({
                                             type: 'change_role',
                                             role: role
                                         }));
+                                    } else {
+                                        addDebugLog(`❌ WebSocket не готов (readyState: ${ws?.readyState})`, 'error');
                                     }
                                 });
+                                console.log(`Added handler for role button ${index}: ${btn.dataset.role}`);
                             });
 
                             // Ready button click handler

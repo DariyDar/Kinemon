@@ -527,10 +527,15 @@
 
         // Manual join
         manualJoinBtn.addEventListener('click', async () => {
-            const room = roomFromUrl || 'TESTROOM'; // Use room from URL or default
+            console.log('=== Join button clicked ===');
+            console.log('roomFromUrl:', roomFromUrl);
+            console.log('serverFromUrl:', serverFromUrl);
+            console.log('gameType:', gameType);
+
+            const room = roomFromUrl;
             const server = serverFromUrl || defaultServer;
 
-            if (!roomFromUrl) {
+            if (!room) {
                 alert('Нет кода комнаты в URL. Отсканируйте QR-код с экрана.');
                 return;
             }
@@ -538,14 +543,17 @@
             // CRITICAL: Request sensor permission IMMEDIATELY on user click
             // iOS only allows this during direct user interaction
             try {
+                console.log('Requesting motion permission...');
                 manualJoinBtn.textContent = 'Запрос разрешения...';
                 motionController = new MotionController();
                 await motionController.requestPermission();
                 console.log('✅ Sensor permission granted');
 
                 // Now connect to server
+                console.log('Connecting to room:', room, 'server:', server);
                 connectToRoom(room, server);
             } catch (err) {
+                console.error('Permission error:', err);
                 manualJoinBtn.textContent = 'Подключиться';
                 alert('❌ Необходим доступ к датчикам движения.\n\nОшибка: ' + err.message + '\n\nРазрешите доступ в настройках Safari.');
             }

@@ -205,6 +205,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.hearts = [];
 
         // Settings
+        room.thrustSystem = settings.thrustSystem || 'pump'; // 'pump' or 'gradient'
         room.engineFormula = settings.engineFormula || 'balanced';
         room.weaponFormula = settings.weaponFormula || 'standard';
         room.coinsToWin = settings.coinsToWin || 10;
@@ -366,6 +367,46 @@ function detectPump(player, currentTilt, room) {
     return 0; // No pump
 }
 
+// Calculate energy from tilt angle (gradient system)
+// Returns energy gained from upward phone movement based on degree ranges
+function calculateGradientEnergy(currentTilt, lastTilt) {
+    // tilt range: 0 (horizontal) to 1 (vertical)
+    // Convert to degrees: 0-90
+    const currentDegrees = currentTilt * 90;
+    const lastDegrees = (lastTilt || 0) * 90;
+
+    // Only count upward movement
+    if (currentDegrees <= lastDegrees) return 0;
+
+    let energy = 0;
+
+    // Progressive energy calculation - iterate through degree ranges
+    for (let deg = Math.floor(lastDegrees); deg < Math.floor(currentDegrees); deg++) {
+        if (deg < 70) {
+            energy += 1.0;  // First 70 degrees: 1 point/degree
+        } else if (deg < 85) {
+            energy += 1.5;  // Next 15 degrees: 1.5 points/degree
+        } else if (deg < 89) {
+            energy += 5.0;  // Next 4 degrees: 5 points/degree
+        } else {
+            energy += 10.0; // Last degree: 10 points
+        }
+    }
+
+    return energy;
+}
+
+// Get current energy level (1-5) for gradient system
+// Used for visual feedback and decay rate calculation
+function getEnergyLevel(energy) {
+    if (energy >= 600) return 5; // Red (600-750)
+    if (energy >= 450) return 4; // Orange (450-600)
+    if (energy >= 300) return 3; // Yellow (300-450)
+    if (energy >= 150) return 2; // Green (150-300)
+    if (energy > 0) return 1;    // Blue (0-150)
+    return 0;
+}
+
 // Calculate engine thrust from accumulated energy
 function calculateEngineThrust(energy, formula, room) {
     if (energy <= 0) return 0;
@@ -399,8 +440,16 @@ function applyEngineThrust(room) {
 
         console.log(`Thrust applied: ${thrust.toFixed(3)}, Energy: ${room.systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(room.ship.vx, room.ship.vy).toFixed(2)}`);
 
-        // Clamp velocity (use physics settings)
-        const MAX_SPEED = (room.physics && room.physics.maxSpeed) || 9;
+        // Speed boost for gradient system (+10% per energy level)
+        let speedMultiplier = 1.0;
+        if (room.thrustSystem === 'gradient') {
+            const level = getEnergyLevel(room.systems.engine.energy);
+            speedMultiplier = 1.0 + (level * 0.10); // +10% per level (max +50% at level 5)
+        }
+
+        // Clamp velocity with speed multiplier (use physics settings)
+        const baseMaxSpeed = (room.physics && room.physics.maxSpeed) || 3.0;
+        const MAX_SPEED = baseMaxSpeed * speedMultiplier;
         const speed = Math.hypot(room.ship.vx, room.ship.vy);
         if (speed > MAX_SPEED) {
             room.ship.vx = (room.ship.vx / speed) * MAX_SPEED;
@@ -408,9 +457,27 @@ function applyEngineThrust(room) {
         }
     }
 
-    // Energy decay (use physics settings)
-    const energyDecay = (room.physics && room.physics.energyDecay) || 0.02;
-    room.systems.engine.energy = Math.max(0, room.systems.engine.energy - energyDecay);
+    // Energy decay (depends on thrust system)
+    if (room.thrustSystem === 'gradient') {
+        // Progressive decay based on energy level
+        const level = getEnergyLevel(room.systems.engine.energy);
+        const baseDecay = (room.physics && room.physics.gradientBaseDecay) || 50;
+        const decayMultiplier = 1.0 + (level - 1) * 0.5; // +50% per level above 1
+        const decayRate = baseDecay * decayMultiplier; // units/second
+        const decayPerFrame = decayRate / 60; // Convert to per-frame (60 FPS)
+        room.systems.engine.energy = Math.max(0, room.systems.engine.energy - decayPerFrame);
+    } else {
+        // Pump system - constant decay
+        const energyDecay = (room.physics && room.physics.energyDecay) || 0.05;
+        room.systems.engine.energy = Math.max(0, room.systems.engine.energy - energyDecay);
+    }
+
+    // Inertia friction (new parameter, separate from space friction)
+    // Applied here to allow fine-tuning ship deceleration
+    const inertia = (room.physics && room.physics.inertia) || 50;
+    const inertiaFriction = 1.0 - (inertia / 200); // 0-100 → 1.0-0.5 (higher inertia = more friction)
+    room.ship.vx *= inertiaFriction;
+    room.ship.vy *= inertiaFriction;
 }
 
 // Update ship position with physics
@@ -1138,10 +1205,14 @@ function serializeGameState(room) {
             systemRole: p.systemRole, systemIndex: p.systemIndex, alive: p.alive
         }));
 
+        state.thrustSystem = room.thrustSystem;
         state.engineFormula = room.engineFormula;
         state.weaponFormula = room.weaponFormula;
         state.coinsToWin = room.coinsToWin;
         state.asteroidFrequency = room.asteroidFrequency;
+
+        // Send energy level for gradient system visualization
+        state.energyLevel = room.thrustSystem === 'gradient' ? getEnergyLevel(room.systems.engine.energy) : 0;
 
         state.gameStarted = room.gameStarted;
         state.gameOver = room.gameOver;
@@ -1840,9 +1911,18 @@ function updateShip(room) {
 
         switch (player.systemRole) {
             case 'engine':
-                // Detect pump motion and add energy
-                const energyAdded = detectPump(player, tilt, room);
-                room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 10); // Cap at 10
+                // Energy accumulation depends on thrust system
+                let energyAdded;
+                if (room.thrustSystem === 'gradient') {
+                    // Gradient system: progressive energy from degree-based tilt
+                    energyAdded = calculateGradientEnergy(tilt, player.lastTilt);
+                    room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 750); // Cap at 750 (5 levels × 150)
+                    player.lastTilt = tilt; // Update for next frame
+                } else {
+                    // Pump system: delta-based upward jerks
+                    energyAdded = detectPump(player, tilt, room);
+                    room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 10); // Cap at 10
+                }
                 room.systems.engine.hasPlayer = true;
                 break;
             case 'rudder':

@@ -400,8 +400,9 @@
 
     <!-- Physics Settings Panel -->
     <div id="physicsPanel">
-        <div class="physics-section">
-            <h3>⚡ Энергия и тяга</h3>
+        <!-- Pump System Parameters -->
+        <div id="pumpParams" class="physics-section">
+            <h3>⚡ Pump System</h3>
             <div class="physics-grid">
                 <div class="physics-control">
                     <label>Энергия от накачки <span class="value-display" id="pumpEnergyValue">16.0</span></label>
@@ -412,22 +413,38 @@
                     <input type="range" id="energyDecay" min="0.01" max="0.2" step="0.01" value="0.05">
                 </div>
                 <div class="physics-control">
-                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">1.4</span></label>
-                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="1.4">
-                </div>
-                <div class="physics-control">
                     <label>Мин. дельта pump <span class="value-display" id="pumpMinDeltaValue">0.15</span></label>
                     <input type="range" id="pumpMinDelta" min="0" max="0.5" step="0.01" value="0.15">
                 </div>
             </div>
         </div>
 
+        <!-- Gradient System Parameters -->
+        <div id="gradientParams" class="physics-section" style="display: none;">
+            <h3>📊 Gradient System</h3>
+            <div class="physics-grid">
+                <div class="physics-control">
+                    <label>Базовое затухание <span class="value-display" id="gradientBaseDecayValue">50</span> ед/сек</label>
+                    <input type="range" id="gradientBaseDecay" min="10" max="200" step="5" value="50">
+                </div>
+            </div>
+        </div>
+
+        <!-- Shared Parameters -->
         <div class="physics-section">
             <h3>🚀 Движение корабля</h3>
             <div class="physics-grid">
                 <div class="physics-control">
+                    <label>Множитель тяги <span class="value-display" id="thrustMultValue">1.4</span></label>
+                    <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="1.4">
+                </div>
+                <div class="physics-control">
                     <label>Трение (friction) <span class="value-display" id="frictionValue">0.928</span></label>
                     <input type="range" id="friction" min="0.90" max="0.999" step="0.001" value="0.928">
+                </div>
+                <div class="physics-control">
+                    <label>Инерция <span class="value-display" id="inertiaValue">50</span></label>
+                    <input type="range" id="inertia" min="0" max="100" step="1" value="50">
                 </div>
                 <div class="physics-control">
                     <label>Макс. скорость <span class="value-display" id="maxSpeedValue">3.0</span></label>
@@ -471,8 +488,15 @@
 
         // Live physics settings (Ship game only)
         let physicsSettings = {
+            // Pump system parameters
             pumpEnergy: 16.0,
             energyDecay: 0.05,
+            pumpMinDelta: 0.15,
+
+            // Gradient system parameters
+            gradientBaseDecay: 50,     // Base decay rate (units/sec) for gradient system
+
+            // Shared parameters
             thrustMult: 1.4,
             friction: 0.928,
             maxSpeed: 3.0,
@@ -480,7 +504,7 @@
             fireThreshold: 0.089,
             fireIntensity: 1.4,
             maxParticles: 15,
-            pumpMinDelta: 0.15
+            inertia: 50                // New inertia parameter (0-100)
         };
 
         // Visual effects system
@@ -601,6 +625,14 @@
                 gameTitle.textContent = '🚀 Настройки Корабль';
                 settingsForm.innerHTML = `
                     <div class="setting-group">
+                        <label for="shipThrustSystem">Система тяги</label>
+                        <select id="shipThrustSystem">
+                            <option value="pump" selected>Pump (рывки)</option>
+                            <option value="gradient">Gradient (градусы)</option>
+                        </select>
+                        <div class="setting-info">Способ начисления энергии двигателю</div>
+                    </div>
+                    <div class="setting-group">
                         <label for="shipEngineFormula">Формула двигателя</label>
                         <select id="shipEngineFormula">
                             <option value="balanced" selected>Сбалансированная</option>
@@ -639,15 +671,41 @@
                     </div>
                 `;
                 // Load saved settings
+                gameSettings.thrustSystem = localStorage.getItem('shipThrustSystem') || 'pump';
                 gameSettings.engineFormula = localStorage.getItem('shipEngineFormula') || 'balanced';
                 gameSettings.weaponFormula = localStorage.getItem('shipWeaponFormula') || 'standard';
                 gameSettings.coinsToWin = parseInt(localStorage.getItem('shipCoinsToWin')) || 10;
                 gameSettings.asteroidFrequency = localStorage.getItem('shipAsteroidFrequency') || 'medium';
 
+                document.getElementById('shipThrustSystem').value = gameSettings.thrustSystem;
                 document.getElementById('shipEngineFormula').value = gameSettings.engineFormula;
                 document.getElementById('shipWeaponFormula').value = gameSettings.weaponFormula;
                 document.getElementById('shipCoinsToWin').value = gameSettings.coinsToWin;
                 document.getElementById('shipAsteroidFrequency').value = gameSettings.asteroidFrequency;
+
+                // Add event listener for thrust system change to update physics panel visibility
+                document.getElementById('shipThrustSystem').addEventListener('change', (e) => {
+                    const system = e.target.value;
+                    const pumpParams = document.getElementById('pumpParams');
+                    const gradientParams = document.getElementById('gradientParams');
+
+                    if (pumpParams && gradientParams) {
+                        pumpParams.style.display = system === 'pump' ? 'block' : 'none';
+                        gradientParams.style.display = system === 'gradient' ? 'block' : 'none';
+                    }
+
+                    // Save to localStorage
+                    localStorage.setItem('shipThrustSystem', system);
+                    gameSettings.thrustSystem = system;
+                });
+
+                // Initialize panel visibility based on current selection
+                const pumpParams = document.getElementById('pumpParams');
+                const gradientParams = document.getElementById('gradientParams');
+                if (pumpParams && gradientParams) {
+                    pumpParams.style.display = gameSettings.thrustSystem === 'pump' ? 'block' : 'none';
+                    gradientParams.style.display = gameSettings.thrustSystem === 'gradient' ? 'block' : 'none';
+                }
 
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Pizza Snake';
@@ -751,10 +809,12 @@
                 localStorage.setItem('pushersWinScore', gameSettings.winScore);
                 localStorage.setItem('pushersSingleSquare', gameSettings.singleSquare);
             } else if (gameType === 'ship') {
+                gameSettings.thrustSystem = document.getElementById('shipThrustSystem').value;
                 gameSettings.engineFormula = document.getElementById('shipEngineFormula').value;
                 gameSettings.weaponFormula = document.getElementById('shipWeaponFormula').value;
                 gameSettings.coinsToWin = parseInt(document.getElementById('shipCoinsToWin').value);
                 gameSettings.asteroidFrequency = document.getElementById('shipAsteroidFrequency').value;
+                localStorage.setItem('shipThrustSystem', gameSettings.thrustSystem);
                 localStorage.setItem('shipEngineFormula', gameSettings.engineFormula);
                 localStorage.setItem('shipWeaponFormula', gameSettings.weaponFormula);
                 localStorage.setItem('shipCoinsToWin', gameSettings.coinsToWin);
@@ -839,11 +899,16 @@
         // Physics settings event listeners
         function setupPhysicsControls() {
             const controls = [
+                // Pump system
                 { id: 'pumpEnergy', setting: 'pumpEnergy', display: 'pumpEnergyValue', decimals: 1 },
                 { id: 'energyDecay', setting: 'energyDecay', display: 'energyDecayValue', decimals: 2 },
-                { id: 'thrustMult', setting: 'thrustMult', display: 'thrustMultValue', decimals: 1 },
                 { id: 'pumpMinDelta', setting: 'pumpMinDelta', display: 'pumpMinDeltaValue', decimals: 2 },
+                // Gradient system
+                { id: 'gradientBaseDecay', setting: 'gradientBaseDecay', display: 'gradientBaseDecayValue', decimals: 0 },
+                // Shared
+                { id: 'thrustMult', setting: 'thrustMult', display: 'thrustMultValue', decimals: 1 },
                 { id: 'friction', setting: 'friction', display: 'frictionValue', decimals: 3 },
+                { id: 'inertia', setting: 'inertia', display: 'inertiaValue', decimals: 0 },
                 { id: 'maxSpeed', setting: 'maxSpeed', display: 'maxSpeedValue', decimals: 1 },
                 { id: 'stopThreshold', setting: 'stopThreshold', display: 'stopThresholdValue', decimals: 2 },
                 { id: 'fireThreshold', setting: 'fireThreshold', display: 'fireThresholdValue', decimals: 3 },
@@ -1707,6 +1772,45 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
+                // Energy progress bar (gradient system only)
+                if (gameState.thrustSystem === 'gradient' && gameState.systems && gameState.systems.engine) {
+                    const energy = gameState.systems.engine.energy || 0;
+
+                    if (energy > 0) {
+                        // 5-level color system
+                        const colors = [
+                            { color: '#00BFFF', start: 0, end: 150 },      // Blue
+                            { color: '#00FF00', start: 150, end: 300 },    // Green
+                            { color: '#FFFF00', start: 300, end: 450 },    // Yellow
+                            { color: '#FFA500', start: 450, end: 600 },    // Orange
+                            { color: '#FF0000', start: 600, end: 750 }     // Red
+                        ];
+
+                        ctx.lineWidth = 8;
+                        const innerRadius = ship.radius - 10; // Inside ship circle
+
+                        colors.forEach((level, index) => {
+                            if (energy > level.start) {
+                                const levelEnergy = Math.min(energy, level.end) - level.start;
+                                const levelProgress = levelEnergy / (level.end - level.start);
+                                const segmentArc = (Math.PI * 2 / 5); // Each level takes 1/5 of circle
+                                const arcLength = segmentArc * levelProgress;
+                                const startAngle = -Math.PI / 2 + (index * segmentArc); // Start at top, go clockwise
+                                const endAngle = startAngle + arcLength;
+
+                                ctx.strokeStyle = level.color;
+                                ctx.shadowBlur = 10;
+                                ctx.shadowColor = level.color;
+                                ctx.beginPath();
+                                ctx.arc(ship.x, ship.y, innerRadius, startAngle, endAngle);
+                                ctx.stroke();
+                            }
+                        });
+
+                        ctx.shadowBlur = 0; // Reset shadow
+                    }
+                }
+
                 // Draw shield arc - semi-transparent with shimmer
                 if (gameState.systems && gameState.systems.shield && gameState.systems.shield.active) {
                     ctx.save();
@@ -1787,6 +1891,12 @@
                         const thrustIntensity = speedRatio * physicsSettings.fireIntensity; // Apply intensity multiplier
                         const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * speedRatio));
 
+                        // Gradient system: +5% flame size per energy level
+                        let flameSizeBonus = 1.0;
+                        if (gameState.thrustSystem === 'gradient' && gameState.energyLevel) {
+                            flameSizeBonus = 1.0 + (gameState.energyLevel * 0.05); // +5% per level (max +25% at level 5)
+                        }
+
                         for (let i = 0; i < particleCount; i++) {
                             const dist = 15 + i * 12 + Math.random() * 5;
                             const spread = (Math.random() - 0.5) * 0.3;
@@ -1796,7 +1906,8 @@
                             const hue = 30 + Math.random() * 30; // Orange to yellow
                             ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
                             ctx.beginPath();
-                            const radius = Math.max(1, 8 - i * 1.5); // Prevent negative radius
+                            const baseRadius = Math.max(1, 8 - i * 1.5); // Prevent negative radius
+                            const radius = baseRadius * flameSizeBonus; // Apply gradient bonus
                             ctx.arc(x, y, radius, 0, Math.PI * 2);
                             ctx.fill();
                         }

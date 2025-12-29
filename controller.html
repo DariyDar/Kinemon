@@ -258,12 +258,11 @@
     <div id="container">
         <!-- Room Input Screen -->
         <div id="roomInputScreen" class="screen active">
-            <h1>📱 Контроллер</h1>
-            <p id="joinPrompt">Присоединяйтесь к игре</p>
+            <h1 id="gameTitle">GAME</h1>
+            <h2 id="roomNameDisplay" style="font-size: 28px; color: #4CAF50; margin-bottom: 30px;">ROOMNAME ROOM</h2>
 
-            <input type="text" id="roomIdInput" placeholder="Код комнаты" maxlength="15" style="text-transform: uppercase;">
-            <br>
-            <input type="text" id="playerName" placeholder="Ваше имя" maxlength="20">
+            <label for="playerName" style="display: block; font-size: 16px; margin-bottom: 8px; opacity: 0.8;">Ваше имя:</label>
+            <input type="text" id="playerName" placeholder="Введите имя" maxlength="20">
             <br>
             <div id="teamSelector" style="display: none; margin: 10px 0;">
                 <select id="teamSelect" style="width: 100%; padding: 15px; font-size: 16px; border-radius: 10px; background: #222; color: white; border: 2px solid #444;">
@@ -397,8 +396,9 @@
         const deathScreen = document.getElementById('deathScreen');
 
         const playerNameInput = document.getElementById('playerName');
-        const roomIdInput = document.getElementById('roomIdInput');
         const manualJoinBtn = document.getElementById('manualJoinBtn');
+        const gameTitle = document.getElementById('gameTitle');
+        const roomNameDisplay = document.getElementById('roomNameDisplay');
         const setMinBtn = document.getElementById('setMinBtn');
         const setMaxBtn = document.getElementById('setMaxBtn');
         const disconnectBtn = document.getElementById('disconnectBtn');
@@ -427,6 +427,21 @@
         if (gameFromUrl) {
             gameType = gameFromUrl;
             console.log('Game type from URL:', gameType);
+
+            // Update game title based on game type
+            const gameTitles = {
+                'pong': 'PONG',
+                'snake': 'PIZZA SNAKE',
+                'pushers': 'ТОЛКАТЕЛИ',
+                'ship': 'SHIP GAME'
+            };
+            gameTitle.textContent = gameTitles[gameType] || 'GAME';
+        }
+
+        // Set room name if provided
+        if (roomFromUrl) {
+            roomNameDisplay.textContent = `${roomFromUrl} ROOM`;
+            console.log('Room from URL:', roomFromUrl);
         }
 
         // Set default server URL based on current location
@@ -434,7 +449,6 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         console.log('Default server:', defaultServer);
-        console.log('Room input element exists?', roomIdInput !== null);
 
         // Set random player name on page load
         playerNameInput.value = generateRandomPlayerName();
@@ -513,11 +527,11 @@
 
         // Manual join
         manualJoinBtn.addEventListener('click', async () => {
-            const room = roomIdInput.value.trim().toUpperCase();
+            const room = roomFromUrl || 'TESTROOM'; // Use room from URL or default
             const server = serverFromUrl || defaultServer;
 
-            if (!room) {
-                alert('Введите код комнаты');
+            if (!roomFromUrl) {
+                alert('Нет кода комнаты в URL. Отсканируйте QR-код с экрана.');
                 return;
             }
 

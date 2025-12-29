@@ -370,10 +370,13 @@ function detectPump(player, currentTilt, room) {
 // Calculate energy from tilt angle (gradient system)
 // Returns energy gained from upward phone movement based on degree ranges
 function calculateGradientEnergy(currentTilt, lastTilt) {
+    // Initialize on first call - no energy on first frame
+    if (lastTilt === undefined) return 0;
+
     // tilt range: 0 (horizontal) to 1 (vertical)
     // Convert to degrees: 0-90
     const currentDegrees = currentTilt * 90;
-    const lastDegrees = (lastTilt || 0) * 90;
+    const lastDegrees = lastTilt * 90;
 
     // Only count upward movement
     if (currentDegrees <= lastDegrees) return 0;
@@ -471,13 +474,6 @@ function applyEngineThrust(room) {
         const energyDecay = (room.physics && room.physics.energyDecay) || 0.05;
         room.systems.engine.energy = Math.max(0, room.systems.engine.energy - energyDecay);
     }
-
-    // Inertia friction (new parameter, separate from space friction)
-    // Applied here to allow fine-tuning ship deceleration
-    const inertia = (room.physics && room.physics.inertia) || 50;
-    const inertiaFriction = 1.0 - (inertia / 200); // 0-100 → 1.0-0.5 (higher inertia = more friction)
-    room.ship.vx *= inertiaFriction;
-    room.ship.vy *= inertiaFriction;
 }
 
 // Update ship position with physics
@@ -485,8 +481,10 @@ function updateShipPosition(room) {
     room.ship.x += room.ship.vx;
     room.ship.y += room.ship.vy;
 
-    // Minimal friction in space - ship maintains momentum (use physics settings)
-    const FRICTION = (room.physics && room.physics.friction) || 0.99;
+    // Inertia controls how quickly ship slows down (0=instant stop, 100=no friction)
+    // Convert inertia (0-100) to friction multiplier (0.90-0.995)
+    const inertia = (room.physics && room.physics.inertia !== undefined) ? room.physics.inertia : 50;
+    const FRICTION = 0.90 + (inertia / 100) * 0.095; // Maps 0→0.90, 50→0.9475, 100→0.995
     room.ship.vx *= FRICTION;
     room.ship.vy *= FRICTION;
 

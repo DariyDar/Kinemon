@@ -439,12 +439,9 @@
                     <input type="range" id="thrustMult" min="0.1" max="2.0" step="0.1" value="1.4">
                 </div>
                 <div class="physics-control">
-                    <label>Трение (friction) <span class="value-display" id="frictionValue">0.928</span></label>
-                    <input type="range" id="friction" min="0.90" max="0.999" step="0.001" value="0.928">
-                </div>
-                <div class="physics-control">
-                    <label>Инерция <span class="value-display" id="inertiaValue">50</span></label>
+                    <label>Инерция (торможение) <span class="value-display" id="inertiaValue">50</span></label>
                     <input type="range" id="inertia" min="0" max="100" step="1" value="50">
+                    <div class="setting-info">0 = быстрое торможение, 100 = долгий дрейф</div>
                 </div>
                 <div class="physics-control">
                     <label>Макс. скорость <span class="value-display" id="maxSpeedValue">3.0</span></label>
@@ -498,13 +495,12 @@
 
             // Shared parameters
             thrustMult: 1.4,
-            friction: 0.928,
+            inertia: 50,               // Inertia parameter (0-100) controls friction
             maxSpeed: 3.0,
             stopThreshold: 0.13,
             fireThreshold: 0.089,
             fireIntensity: 1.4,
-            maxParticles: 15,
-            inertia: 50                // New inertia parameter (0-100)
+            maxParticles: 15
         };
 
         // Visual effects system
@@ -907,7 +903,6 @@
                 { id: 'gradientBaseDecay', setting: 'gradientBaseDecay', display: 'gradientBaseDecayValue', decimals: 0 },
                 // Shared
                 { id: 'thrustMult', setting: 'thrustMult', display: 'thrustMultValue', decimals: 1 },
-                { id: 'friction', setting: 'friction', display: 'frictionValue', decimals: 3 },
                 { id: 'inertia', setting: 'inertia', display: 'inertiaValue', decimals: 0 },
                 { id: 'maxSpeed', setting: 'maxSpeed', display: 'maxSpeedValue', decimals: 1 },
                 { id: 'stopThreshold', setting: 'stopThreshold', display: 'stopThresholdValue', decimals: 2 },

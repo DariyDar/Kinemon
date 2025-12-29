@@ -648,10 +648,6 @@
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
 
-                        // Show control selector and set current value
-                        document.getElementById('controlSelector').style.display = 'block';
-                        document.getElementById('controlSchemeSelect').value = currentControlScheme;
-
                         // Request wake lock to prevent phone sleep
                         if ('wakeLock' in navigator) {
                             try {
@@ -829,6 +825,42 @@
                                 console.log('Single-square mode: team selector hidden');
                             }
                         }
+
+                        // For Ship game, setup role selection handlers
+                        if (gameType === 'ship') {
+                            // Role button click handler
+                            document.querySelectorAll('.role-btn').forEach(btn => {
+                                btn.addEventListener('click', () => {
+                                    const role = btn.dataset.role;
+
+                                    if (ws && ws.readyState === WebSocket.OPEN) {
+                                        addDebugLog(`🎯 Выбрана роль: ${role}`, 'info');
+                                        ws.send(JSON.stringify({
+                                            type: 'change_role',
+                                            role: role
+                                        }));
+                                    }
+                                });
+                            });
+
+                            // Ready button click handler
+                            const readyBtn = document.getElementById('readyBtn');
+                            if (readyBtn) {
+                                readyBtn.addEventListener('click', () => {
+                                    if (ws && ws.readyState === WebSocket.OPEN) {
+                                        addDebugLog('✅ Нажата кнопка Готов', 'success');
+                                        ws.send(JSON.stringify({
+                                            type: 'player_ready'
+                                        }));
+                                    }
+                                });
+                            }
+
+                            // Initial role buttons update
+                            if (data.gameState) {
+                                updateRoleButtons(data.gameState);
+                            }
+                        }
                     }
 
                     if (data.type === 'update' && data.gameState) {
@@ -978,33 +1010,7 @@
             }
         }
 
-        // Role button click handler
-        document.querySelectorAll('.role-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const role = btn.dataset.role;
-
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'change_role',
-                        role: role
-                    }));
-                }
-            });
-        });
-
-        // Ready button click handler
-        const readyBtn = document.getElementById('readyBtn');
-        if (readyBtn) {
-            readyBtn.addEventListener('click', () => {
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'player_ready'
-                    }));
-                }
-            });
-        }
-
-        // Show role panel if Ship game
+        // Show role panel if Ship game (moved to page load)
         if (gameType === 'ship') {
             const rolePanel = document.getElementById('roleSelectionPanel');
             if (rolePanel) {

@@ -291,6 +291,12 @@
             </div>
 
             <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
+
+            <!-- Debug Display (for mobile testing) -->
+            <div id="debugDisplay" style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto; display: none;">
+                <div style="font-weight: bold; margin-bottom: 10px; color: #4CAF50;">🔍 Debug Info:</div>
+                <div id="debugLog"></div>
+            </div>
         </div>
 
         <!-- QR Scanner Screen removed - now using native camera app -->
@@ -450,9 +456,33 @@
 
         console.log('Default server:', defaultServer);
 
+        // Debug logging function (displays on screen for mobile testing)
+        const debugDisplay = document.getElementById('debugDisplay');
+        const debugLog = document.getElementById('debugLog');
+        let debugMessages = [];
+
+        function addDebugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff5252' : type === 'success' ? '#4CAF50' : '#fff';
+
+            debugMessages.push(`<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`);
+            if (debugMessages.length > 20) debugMessages.shift(); // Keep last 20 messages
+
+            debugLog.innerHTML = debugMessages.join('');
+            debugDisplay.style.display = 'block';
+
+            console.log(`[DEBUG] ${message}`);
+        }
+
         // Set random player name on page load
         playerNameInput.value = generateRandomPlayerName();
         console.log('Generated player name:', playerNameInput.value);
+
+        // Log initial state to debug display
+        addDebugLog(`📱 Страница загружена`);
+        addDebugLog(`Room: ${roomFromUrl || 'не найдена'}`, roomFromUrl ? 'success' : 'error');
+        addDebugLog(`Game: ${gameFromUrl || 'не найдена'}`, gameFromUrl ? 'success' : 'error');
+        addDebugLog(`Server: ${serverFromUrl || defaultServer}`);
 
         // Wake up Render server on page load (free tier spins down after inactivity)
         if (!isLocalhost) {
@@ -527,6 +557,8 @@
 
         // Manual join
         manualJoinBtn.addEventListener('click', async () => {
+            addDebugLog('🔘 Нажата кнопка Подключиться', 'info');
+
             console.log('=== Join button clicked ===');
             console.log('roomFromUrl:', roomFromUrl);
             console.log('serverFromUrl:', serverFromUrl);
@@ -535,7 +567,11 @@
             const room = roomFromUrl;
             const server = serverFromUrl || defaultServer;
 
+            addDebugLog(`Room: ${room || 'отсутствует'}`, room ? 'success' : 'error');
+            addDebugLog(`Server: ${server}`);
+
             if (!room) {
+                addDebugLog('❌ Нет кода комнаты в URL', 'error');
                 alert('Нет кода комнаты в URL. Отсканируйте QR-код с экрана.');
                 return;
             }
@@ -543,16 +579,22 @@
             // CRITICAL: Request sensor permission IMMEDIATELY on user click
             // iOS only allows this during direct user interaction
             try {
+                addDebugLog('📲 Запрос доступа к датчикам...', 'info');
                 console.log('Requesting motion permission...');
                 manualJoinBtn.textContent = 'Запрос разрешения...';
+
                 motionController = new MotionController();
                 await motionController.requestPermission();
+
+                addDebugLog('✅ Доступ к датчикам получен', 'success');
                 console.log('✅ Sensor permission granted');
 
                 // Now connect to server
+                addDebugLog(`🔌 Подключение к ${room}...`, 'info');
                 console.log('Connecting to room:', room, 'server:', server);
                 connectToRoom(room, server);
             } catch (err) {
+                addDebugLog(`❌ Ошибка разрешения: ${err.message}`, 'error');
                 console.error('Permission error:', err);
                 manualJoinBtn.textContent = 'Подключиться';
                 alert('❌ Необходим доступ к датчикам движения.\n\nОшибка: ' + err.message + '\n\nРазрешите доступ в настройках Safari.');
@@ -564,6 +606,7 @@
             updateRoomDisplay(roomId);
 
             try {
+                addDebugLog(`🌐 Подключение к серверу...`, 'info');
                 console.log('Connecting to:', serverUrl, 'Room:', room);
 
                 // Show loading state
@@ -571,6 +614,7 @@
                 manualJoinBtn.textContent = 'Подключение...';
 
                 // Connect to WebSocket server
+                addDebugLog(`WebSocket: ${serverUrl}`, 'info');
                 ws = new WebSocket(serverUrl);
 
                 // Timeout for connection
@@ -586,6 +630,7 @@
 
                 ws.onopen = async () => {
                     clearTimeout(connectionTimeout);
+                    addDebugLog('✅ Подключено к серверу', 'success');
                     console.log('✅ Connected to server');
                     manualJoinBtn.disabled = false;
                     manualJoinBtn.textContent = 'Подключиться';
@@ -747,6 +792,7 @@
 
                 ws.onerror = (error) => {
                     clearTimeout(connectionTimeout);
+                    addDebugLog('❌ Ошибка WebSocket', 'error');
                     console.error('❌ WebSocket error:', error);
                     alert('❌ Ошибка подключения к серверу.\n\nПроверьте:\n1. Сервер запущен на Render\n2. URL правильный: ' + serverUrl + '\n3. Интернет соединение');
                     manualJoinBtn.disabled = false;
@@ -756,6 +802,7 @@
 
                 ws.onclose = (event) => {
                     clearTimeout(connectionTimeout);
+                    addDebugLog(`🔌 Отключено (код: ${event.code})`, 'error');
                     console.log('Disconnected from server. Code:', event.code, 'Reason:', event.reason);
                     statusDisplay.textContent = 'Отключено';
                     statusDisplay.className = 'status disconnected';
@@ -827,6 +874,7 @@
                     }
                 };
             } catch (error) {
+                addDebugLog(`❌ Ошибка подключения: ${error.message}`, 'error');
                 console.error('Connection error:', error);
                 alert('Ошибка подключения: ' + error.message);
                 showScreen('room-input');

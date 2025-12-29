@@ -412,7 +412,6 @@
         const setMinBtn = document.getElementById('setMinBtn');
         const setMaxBtn = document.getElementById('setMaxBtn');
         const disconnectBtn = document.getElementById('disconnectBtn');
-        const statusDisplay = document.getElementById('statusDisplay');
         const tiltDisplay = document.getElementById('tiltDisplay');
         const playerNameDisplay = document.getElementById('playerNameDisplay');
 
@@ -745,8 +744,6 @@
                     clearTimeout(connectionTimeout);
                     addDebugLog(`🔌 Отключено (код: ${event.code})`, 'error');
                     console.log('Disconnected from server. Code:', event.code, 'Reason:', event.reason);
-                    statusDisplay.textContent = 'Отключено';
-                    statusDisplay.className = 'status disconnected';
                     manualJoinBtn.disabled = false;
                     manualJoinBtn.textContent = 'Подключиться';
 

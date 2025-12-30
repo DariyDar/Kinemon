@@ -394,7 +394,7 @@ function detectPump(player, currentTilt, room) {
 }
 
 // Weapon charging based on tilt position (not pump speed)
-// Energy directly maps to tilt position: 0-1 → 0-10
+// Energy = distance traveled upward from base position
 // Returns { newEnergy, shouldFire, bulletCount }
 function updateWeaponCharge(player, currentTilt, room) {
     const weapon = room.systems.weapon;
@@ -402,16 +402,18 @@ function updateWeaponCharge(player, currentTilt, room) {
     // Initialize on first call
     if (weapon.lastWeaponTilt === undefined) {
         weapon.lastWeaponTilt = currentTilt;
+        weapon.baseTilt = currentTilt;  // Starting position for energy calculation
         weapon.movingUp = false;
-        return { newEnergy: currentTilt * 10, shouldFire: false, bulletCount: 0 };
+        return { newEnergy: 0, shouldFire: false, bulletCount: 0 };
     }
 
     const lastTilt = weapon.lastWeaponTilt;
     const delta = currentTilt - lastTilt;
     weapon.lastWeaponTilt = currentTilt;
 
-    // Energy = current tilt position (0-1 → 0-10)
-    const newEnergy = currentTilt * 10;
+    // Energy = relative distance from base position (0-1 → 0-10)
+    const relativeTilt = Math.max(0, currentTilt - weapon.baseTilt);
+    const newEnergy = relativeTilt * 10;
 
     // Track direction of movement
     const currentlyMovingUp = delta > 0.01;
@@ -426,6 +428,9 @@ function updateWeaponCharge(player, currentTilt, room) {
         shouldFire = true;
         bulletCount = Math.max(1, Math.ceil(weapon.energy)); // Fire based on PREVIOUS energy
         console.log(`💥 Weapon Fire! Energy: ${weapon.energy.toFixed(2)}, Bullets: ${bulletCount}`);
+
+        // Reset base position to current position after firing
+        weapon.baseTilt = currentTilt;
         weapon.movingUp = false;
     } else if (currentlyMovingUp) {
         weapon.movingUp = true;
@@ -433,8 +438,8 @@ function updateWeaponCharge(player, currentTilt, room) {
         weapon.movingUp = false;
     }
 
-    // Always charging when tilt > 0
-    weapon.isCharging = currentTilt > 0.05;
+    // Charging when relative energy > 0
+    weapon.isCharging = relativeTilt > 0.05;
 
     return { newEnergy, shouldFire, bulletCount };
 }

@@ -520,7 +520,7 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
-        console.log('🖥️ Display loaded [v3.15.2 - QR & Calibration Fixes]');
+        console.log('🖥️ Display loaded [v3.15.3 - QR Size & Recalibration Fix]');
 
         let gameSettings = {}; // Store game settings
 
@@ -904,11 +904,17 @@
                 canvas.classList.remove('active');
                 roomInfo.style.display = 'none';
                 scoreboard.style.display = 'none';
+                // Hide persistent QR on waiting screen (large QR shown instead)
+                const persistentQR = document.getElementById('persistentQRDisplay');
+                if (persistentQR) persistentQR.style.display = 'none';
             } else if (screenName === 'lobby') {
                 document.getElementById('lobbyScreen').classList.add('active');
                 canvas.classList.remove('active');
                 roomInfo.style.display = 'none';
                 scoreboard.style.display = 'none';
+                // Show persistent QR on lobby screen
+                const persistentQR = document.getElementById('persistentQRDisplay');
+                if (persistentQR) persistentQR.style.display = 'block';
             } else if (screenName === 'win') {
                 document.getElementById('winScreen').classList.add('active');
                 canvas.classList.remove('active');
@@ -916,6 +922,10 @@
                 scoreboard.style.display = 'none';
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
+                // Show persistent QR on game screen
+                const persistentQR = document.getElementById('persistentQRDisplay');
+                if (persistentQR) persistentQR.style.display = 'block';
+
                 // Hide right panel for Pushers and Ship (team-based/cooperative games use canvas scoreboard)
                 if (gameState && (gameState.gameType === 'pushers' || gameState.gameType === 'ship')) {
                     roomInfo.style.display = 'none';
@@ -1055,8 +1065,8 @@
                         waitingQR.innerHTML = '';
                         new QRCode(waitingQR, {
                             text: qrData,
-                            width: 200,
-                            height: 200,
+                            width: 500,
+                            height: 500,
                             colorDark: '#000000',
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M

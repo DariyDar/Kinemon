@@ -473,7 +473,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.15.2 - QR & Calibration Fixes]', 'success');
+        addDebugLog('📱 Страница загружена [v3.15.3 - QR Size & Recalibration Fix]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -678,6 +678,14 @@
                     calibration.onComplete = async (min, max) => {
                         console.log('Calibration complete:', min, max);
                         addDebugLog('✅ Калибровка завершена', 'success');
+
+                        // Check if this is recalibration (don't send player_ready again)
+                        if (window.isRecalibrating) {
+                            addDebugLog('🔄 Рекалибровка завершена, возврат к игре', 'success');
+                            window.isRecalibrating = false;
+                            showScreen('controller');
+                            return;
+                        }
 
                         // For Ship game: send player_ready after calibration
                         if (gameType === 'ship') {
@@ -1335,24 +1343,20 @@
 
             // Setup Recalibration button handler
             if (recalibrateBtn) {
-                recalibrateBtn.addEventListener('click', async () => {
+                recalibrateBtn.addEventListener('click', () => {
                     addDebugLog('📐 Начало перекалибровки', 'info');
 
-                    try {
-                        // Reset calibration
-                        calibration.reset();
-                        addDebugLog('🔄 Калибровка сброшена', 'info');
+                    // Reset calibration
+                    calibration.reset();
+                    addDebugLog('🔄 Калибровка сброшена', 'info');
 
-                        // Start calibration process (screen will be shown automatically via onStepChange)
-                        await calibration.start();
+                    // Set flag to prevent sending player_ready again during recalibration
+                    window.isRecalibrating = true;
 
-                        addDebugLog('✅ Калибровка завершена', 'success');
-
-                        // Return to controller screen
-                        showScreen('controller');
-                    } catch (err) {
-                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
-                    }
+                    // Start calibration process (screen will be shown automatically via onStepChange)
+                    // After user completes calibration, onComplete callback will return to controller screen
+                    calibration.start();
+                    addDebugLog('📐 Показаны экраны калибровки', 'info');
                 });
             }
         }

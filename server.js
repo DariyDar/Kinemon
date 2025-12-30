@@ -894,12 +894,16 @@ wss.on('connection', (ws) => {
                 const roomId = data.roomId;
                 const gameType = data.gameType || 'snake';
 
+                console.log(`[JOIN] Received join request: room=${roomId}, gameType=${gameType}, player=${data.name}`);
+
                 // Create room if it doesn't exist
                 if (!rooms.has(roomId)) {
+                    console.log(`[JOIN] Creating new room: ${roomId}`);
                     createRoom(roomId, gameType);
                 }
 
                 const room = rooms.get(roomId);
+                console.log(`[JOIN] Room found, current players: ${room.players.size}, gameType: ${room.gameType}`);
 
                 // For Pong: limit to 2 players
                 if (room.gameType === 'pong' && room.players.size >= 2) {
@@ -998,14 +1002,16 @@ wss.on('connection', (ws) => {
                 }
 
                 // Send initial state to new player
-                ws.send(JSON.stringify({
+                const initMessage = {
                     type: 'init',
                     playerId: playerId,
                     roomId: roomId,
                     gameState: serializeGameState(room)
-                }));
+                };
+                console.log(`[JOIN] Sending init message to ${player.name}:`, JSON.stringify(initMessage).substring(0, 100) + '...');
+                ws.send(JSON.stringify(initMessage));
 
-                console.log(`Player ${playerId} joined room ${roomId} as ${player.name} (${room.gameType})`);
+                console.log(`[JOIN] Player ${playerId} joined room ${roomId} as ${player.name} (${room.gameType})`);
 
             } else if (data.type === 'join_display') {
                 const roomId = data.roomId;

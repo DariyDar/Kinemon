@@ -1111,12 +1111,17 @@ wss.on('connection', (ws) => {
                 }
             } else if (data.type === 'change_role' && ws.playerId && ws.roomId) {
                 // Handle role change for Ship game
+                console.log(`[CHANGE_ROLE] Received from player ${ws.playerId}, role: ${data.role}`);
                 const room = rooms.get(ws.roomId);
                 if (room && room.gameType === 'ship') {
                     const player = room.players.get(ws.playerId);
-                    if (!player) return;
+                    if (!player) {
+                        console.log(`[CHANGE_ROLE] ERROR: Player ${ws.playerId} not found in room`);
+                        return;
+                    }
 
                     const requestedRole = data.role; // 'engine' | 'rudder' | 'weapon' | 'weaponDirection' | 'shield' | null
+                    console.log(`[CHANGE_ROLE] Player ${player.name} requesting role: ${requestedRole}`);
 
                     // If player wants to release role
                     if (requestedRole === null) {
@@ -1143,6 +1148,7 @@ wss.on('connection', (ws) => {
                     // Assign role
                     const systems = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
                     player.systemRole = requestedRole;
+                    console.log(`[CHANGE_ROLE] SUCCESS: ${player.name} assigned to role ${requestedRole}`);
                     player.systemIndex = systems.indexOf(requestedRole) + 1; // 1-5
 
                     console.log(`Player ${player.name} assigned to system: ${player.systemRole}`);

@@ -207,9 +207,9 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
                 autoRotateSpeed: 0.5
             },
             weapon: {
-                amplitude: 0,
-                lastFireTime: 0,
-                fireInterval: 1000
+                energy: 0,                    // Накопленная энергия зарядки (0-10)
+                lastWeaponTilt: undefined,    // Для detectWeaponPump()
+                isCharging: false             // Флаг активной зарядки
             },
             weaponDirection: {
                 rotation: 0,
@@ -393,6 +393,51 @@ function detectPump(player, currentTilt, room) {
     return 0; // No pump
 }
 
+// Detect weapon pump motion for charging (upward movement)
+// Returns { energyAdded, shouldFire }
+function detectWeaponPump(player, currentTilt, room) {
+    const weapon = room.systems.weapon;
+
+    // Initialize lastWeaponTilt if not set
+    if (weapon.lastWeaponTilt === undefined) {
+        weapon.lastWeaponTilt = currentTilt;
+        return { energyAdded: 0, shouldFire: false };
+    }
+
+    const lastTilt = weapon.lastWeaponTilt;
+    const delta = currentTilt - lastTilt;
+    weapon.lastWeaponTilt = currentTilt;
+
+    // Detect upward movement (charging)
+    const pumpThreshold = (room.physics && room.physics.pumpMinDelta) || 0.15;
+
+    let energyAdded = 0;
+    let shouldFire = false;
+
+    // CHARGING: Upward movement (delta > threshold)
+    if (delta > pumpThreshold) {
+        weapon.isCharging = true;
+
+        const pumpStrength = Math.min(delta, 0.5) * 2; // 0-1 normalized
+        const pumpEnergyMult = (room.physics && room.physics.pumpEnergy) || 16;
+        energyAdded = pumpStrength * pumpEnergyMult;
+
+        console.log(`⚡ Weapon Charge! Δ${delta.toFixed(3)}, Energy: +${energyAdded.toFixed(2)}`);
+    }
+    // FIRE TRIGGER: Downward movement (delta < -threshold)
+    else if (delta < -pumpThreshold) {
+        shouldFire = true;
+        weapon.isCharging = false;
+
+        console.log(`💥 Weapon Fire! Energy: ${weapon.energy.toFixed(2)}`);
+    }
+    else {
+        weapon.isCharging = false;
+    }
+
+    return { energyAdded, shouldFire };
+}
+
 // Calculate energy from tilt angle (gradient system)
 // Returns energy gained from upward phone movement based on degree ranges
 function calculateGradientEnergy(currentTilt, lastTilt) {
@@ -531,32 +576,38 @@ function updateShipPosition(room) {
     }
 }
 
-// Calculate bullet power from weapon amplitude
-function calculateBulletPower(amplitude, accumulation, formula) {
-    const amp = Math.abs(amplitude - 0.5) * 2;
+// Calculate bullet parameters from weapon energy (0-10)
+// Returns { powerLevel, size, speed, distance, damage }
+function calculateBulletParams(energy) {
+    // Energy 0-10 → power levels 1-10
+    const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
 
-    switch (formula) {
-        case 'standard':
-            return { speed: 8 + amp * 4, distance: 400 + amp * 200 };
-        case 'sniper':
-            return { speed: 12 + amp * 6, distance: 600 + amp * 400 };
-        case 'rapid':
-            return { speed: 10 + amp * 2, distance: 300 + amp * 100 };
-        default:
-            return { speed: 10, distance: 500 };
-    }
+    // SIZE: 4px → 16px (linear)
+    const size = 4 + (powerLevel - 1) * (12 / 9);
+
+    // SPEED: 6 → 15 units/frame (linear)
+    const speed = 6 + (powerLevel - 1) * (9 / 9);
+
+    // DISTANCE: 300 → 900 pixels (linear)
+    const distance = 300 + (powerLevel - 1) * (600 / 9);
+
+    // DAMAGE: x1 for levels 1-9, x2 ONLY for level 10
+    const damage = (powerLevel === 10) ? 2 : 1;
+
+    console.log(`🎯 Bullet: Lv${powerLevel}, Size:${size.toFixed(1)}px, Dmg:${damage}x`);
+
+    return { powerLevel, size, speed, distance, damage };
 }
 
-// Fire bullet from weapon
+// Fire bullet from weapon using accumulated energy
 function fireBullet(room) {
-    const now = Date.now();
-    if (now - room.systems.weapon.lastFireTime < 1000) return;
+    const weapon = room.systems.weapon;
 
-    const power = calculateBulletPower(
-        room.systems.weapon.amplitude,
-        room.systems.weapon.accumulation,
-        room.weaponFormula
-    );
+    // Don't fire if no energy (минимум 0.1)
+    if (weapon.energy < 0.1) return;
+
+    // Calculate bullet parameters from energy
+    const params = calculateBulletParams(weapon.energy);
 
     const angle = room.systems.weaponDirection.rotation * Math.PI / 180;
     const weaponPos = getSystemPosition(room.ship, room.systems.weaponDirection.rotation);
@@ -564,19 +615,31 @@ function fireBullet(room) {
     room.bullets.push({
         x: weaponPos.x,
         y: weaponPos.y,
-        vx: Math.cos(angle) * power.speed,
-        vy: Math.sin(angle) * power.speed,
-        damage: 1,
+        vx: Math.cos(angle) * params.speed,
+        vy: Math.sin(angle) * params.speed,
+        damage: params.damage,
+        size: params.size,              // Для отрисовки
+        powerLevel: params.powerLevel,  // Для цвета (1-9 cyan, 10 red)
         distanceTraveled: 0,
-        maxDistance: power.distance,
+        maxDistance: params.distance,
         id: Date.now() + Math.random()
     });
 
-    room.systems.weapon.lastFireTime = now;
+    // Visual effects
+    const effectColor = (params.powerLevel === 10) ? '#FF0000' : '#00FFFF';
+    const effectCount = Math.ceil(params.powerLevel / 2);
 
-    // Small cyan particle effect at cannon mouth (matching bullet color)
-    broadcastEffect(room.id, 'particle', { x: weaponPos.x, y: weaponPos.y, color: '#00FFFF', count: 3 });
-    broadcastEffect(room.id, 'shake', { intensity: 1 });
+    broadcastEffect(room.id, 'particle', {
+        x: weaponPos.x,
+        y: weaponPos.y,
+        color: effectColor,
+        count: effectCount
+    });
+    broadcastEffect(room.id, 'shake', { intensity: params.powerLevel / 5 });
+
+    // Reset energy after firing
+    weapon.energy = 0;
+    weapon.isCharging = false;
 }
 
 // Create asteroid
@@ -1429,6 +1492,10 @@ function serializeGameState(room) {
         // Send energy level for gradient system visualization
         state.energyLevel = room.thrustSystem === 'gradient' ? getEnergyLevel(room.systems.engine.energy) : 0;
 
+        // Send weapon state for charging cone visualization
+        state.weaponEnergy = room.systems.weapon.energy;        // 0-10 для визуализации
+        state.weaponCharging = room.systems.weapon.isCharging; // true/false для конуса
+
         state.gameStarted = room.gameStarted;
         state.gameOver = room.gameOver;
         state.winner = room.winner;
@@ -2144,7 +2211,22 @@ function updateShip(room) {
                 room.systems.rudder.rotation = tilt * 360;
                 break;
             case 'weapon':
-                room.systems.weapon.amplitude = tilt;
+                // Pump-based weapon charging system
+                const pumpResult = detectWeaponPump(player, tilt, room);
+
+                // Add energy from charging (upward movement)
+                if (pumpResult.energyAdded > 0) {
+                    room.systems.weapon.energy = Math.min(
+                        room.systems.weapon.energy + pumpResult.energyAdded,
+                        10  // Cap at 10
+                    );
+                }
+
+                // Fire on downward movement
+                if (pumpResult.shouldFire) {
+                    fireBullet(room);
+                }
+
                 room.systems.weapon.hasPlayer = true;
                 break;
             case 'weaponDirection':
@@ -2167,8 +2249,19 @@ function updateShip(room) {
         room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation - 0.7 + 360) % 360; // Opposite direction, normalized
     }
     if (!occupied.has('weapon')) {
-        room.systems.weapon.amplitude = 0.5; // Default medium power when no player
-        room.systems.weapon.hasPlayer = true; // Enable auto-fire
+        // Auto-pilot: periodic auto-fire with medium power
+        if (!room.lastAutoWeaponFire) room.lastAutoWeaponFire = Date.now();
+        const timeSinceLastFire = Date.now() - room.lastAutoWeaponFire;
+
+        // Fire every 1500ms
+        if (timeSinceLastFire > 1500) {
+            // Energy 3.5 → Level 4 → distance ~500px (-44% от макс)
+            room.systems.weapon.energy = 3.5;
+            fireBullet(room);
+            room.lastAutoWeaponFire = Date.now();
+        }
+
+        room.systems.weapon.hasPlayer = true;
     }
     if (!occupied.has('engine')) {
         // Auto-pilot: simulate pump motions by adding periodic energy pulses
@@ -2197,8 +2290,9 @@ function updateShip(room) {
     // 4. Update ship position
     updateShipPosition(room);
 
-    // 5. Fire weapon (every second) - always fire, even without player
-    fireBullet(room);
+    // 5. Weapon energy decay (same as engine)
+    const weaponEnergyDecay = (room.physics && room.physics.energyDecay) || 0.05;
+    room.systems.weapon.energy = Math.max(0, room.systems.weapon.energy - weaponEnergyDecay);
 
     // 6. Update bullets
     for (let i = room.bullets.length - 1; i >= 0; i--) {

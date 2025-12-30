@@ -1845,31 +1845,41 @@
                 }
             }
 
-            // Draw bullets - glowing energy particles
+            // Draw bullets - size and color based on power
             if (gameState.bullets) {
                 for (const bullet of gameState.bullets) {
                     ctx.save();
 
+                    // Color: red for max power (10), cyan for others
+                    const isMaxPower = bullet.powerLevel === 10;
+                    const baseColor = isMaxPower ? '#FF0000' : '#00FFFF';
+                    const baseColorRGB = isMaxPower ? '255, 0, 0' : '0, 255, 255';
+
+                    // Size from bullet params (4-16px)
+                    const outerRadius = bullet.size || 8;
+                    const innerRadius = outerRadius * 0.625;
+                    const centerRadius = outerRadius * 0.25;
+
                     // Outer glow
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = '#00FFFF';
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+                    ctx.shadowBlur = outerRadius * 2;
+                    ctx.shadowColor = baseColor;
+                    ctx.fillStyle = `rgba(${baseColorRGB}, 0.3)`;
                     ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 8, 0, Math.PI * 2);
+                    ctx.arc(bullet.x, bullet.y, outerRadius, 0, Math.PI * 2);
                     ctx.fill();
 
                     // Inner bright core
-                    ctx.shadowBlur = 10;
-                    ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+                    ctx.shadowBlur = outerRadius * 1.25;
+                    ctx.fillStyle = `rgba(${baseColorRGB}, 0.8)`;
                     ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
+                    ctx.arc(bullet.x, bullet.y, innerRadius, 0, Math.PI * 2);
                     ctx.fill();
 
                     // Brightest center
-                    ctx.shadowBlur = 5;
+                    ctx.shadowBlur = outerRadius * 0.625;
                     ctx.fillStyle = '#FFFFFF';
                     ctx.beginPath();
-                    ctx.arc(bullet.x, bullet.y, 2, 0, Math.PI * 2);
+                    ctx.arc(bullet.x, bullet.y, centerRadius, 0, Math.PI * 2);
                     ctx.fill();
 
                     ctx.restore();
@@ -2084,6 +2094,57 @@
                             ctx.arc(x, y, radius, 0, Math.PI * 2);
                             ctx.fill();
                         }
+                    }
+
+                    // Draw weapon charging cone (only while charging)
+                    if (gameState.weaponCharging && gameState.weaponEnergy > 0) {
+                        const weaponPos = getSystemPosition(ship, gameState.systems.weaponDirection.rotation);
+                        const weaponAngle = gameState.systems.weaponDirection.rotation * Math.PI / 180;
+
+                        // Calculate cone parameters
+                        const energy = gameState.weaponEnergy;
+                        const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
+
+                        // Size of future bullet
+                        const futureSize = 4 + (powerLevel - 1) * (12 / 9);
+
+                        // Cone dimensions
+                        const coneLength = 80;
+                        const coneStartWidth = futureSize * 0.5;
+                        const coneEndWidth = futureSize * 1.5;
+
+                        // Color based on energy level
+                        let coneColor;
+                        if (energy < 2) coneColor = '#00FFFF';      // Голубой
+                        else if (energy < 4) coneColor = '#00FF00'; // Зелёный
+                        else if (energy < 6) coneColor = '#FFFF00'; // Жёлтый
+                        else if (energy < 8) coneColor = '#FFA500'; // Оранжевый
+                        else coneColor = '#FF0000';                 // Красный
+
+                        ctx.save();
+                        ctx.translate(weaponPos.x, weaponPos.y);
+                        ctx.rotate(weaponAngle);
+
+                        // Gradient cone
+                        const gradient = ctx.createLinearGradient(0, 0, coneLength, 0);
+                        gradient.addColorStop(0, coneColor + '80');
+                        gradient.addColorStop(1, coneColor + '20');
+
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.moveTo(0, -coneStartWidth);
+                        ctx.lineTo(coneLength, -coneEndWidth);
+                        ctx.lineTo(coneLength, coneEndWidth);
+                        ctx.lineTo(0, coneStartWidth);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // Outline
+                        ctx.strokeStyle = coneColor;
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+
+                        ctx.restore();
                     }
 
                     // Draw weapon - old pirate cannon

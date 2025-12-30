@@ -894,9 +894,9 @@
                                 updateRoleButtons(data.gameState);
                             }
 
-                            // Show role selection screen
-                            showScreen('room-input'); // This shows the role selection panel
-                            addDebugLog('👁️ Показан экран выбора роли', 'success');
+                            // Show roleSelectionPanel
+                            document.getElementById('roleSelectionPanel').style.display = 'block';
+                            addDebugLog('👁️ Показана панель выбора роли', 'success');
                         }
                     }
 

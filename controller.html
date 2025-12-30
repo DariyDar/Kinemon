@@ -455,7 +455,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [CODE-v3]', 'success');
+        addDebugLog('📱 Страница загружена [CODE-v5]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -806,8 +806,12 @@
 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
-                    addDebugLog(`📩 Получено сообщение: ${data.type}`, 'info');
-                    console.log('WS Message received:', data);
+
+                    // Only log important messages to avoid spam
+                    if (data.type !== 'update' && data.type !== 'pong') {
+                        addDebugLog(`📩 Получено сообщение: ${data.type}`, 'info');
+                        console.log('WS Message received:', data);
+                    }
 
                     if (data.type === 'init') {
                         playerId = data.playerId;

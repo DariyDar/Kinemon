@@ -351,28 +351,42 @@
 
         <!-- Controller Screen -->
         <div id="controllerScreen" class="screen">
+            <!-- Leave Post button (Ship only) -->
+            <button id="leavePostBtn" style="display: none; position: absolute; top: 10px; left: 10px; padding: 10px 20px; background: #FF5252; color: white; border: none; border-radius: 8px; font-size: 16px; z-index: 100;">
+                ⬅️ Оставить пост
+            </button>
+
             <h2>🎮 Управление</h2>
             <div class="room-display">Комната: <span id="roomDisplay3"></span></div>
             <div class="tilt-display" id="tiltDisplay">0.50</div>
             <p>Наклоняйте телефон для управления</p>
             <div class="info">
                 <p id="playerInfo">Игрок: <span id="playerNameDisplay"></span></p>
+                <p id="roleInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold; color: #4CAF50;">Ваша роль: <span id="roleDisplay"></span></p>
                 <p id="axisInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold;">Ваша ось: <span id="axisDisplay"></span></p>
             </div>
 
-            <!-- Role Selection Panel (Ship only, during game) -->
-            <div id="roleSelectionPanelGame" style="display: none;">
-                <div class="role-panel-title">Смена роли:</div>
-                <div class="role-buttons">
-                    <button class="role-btn" data-role="engine">⚙️ Двигатель</button>
-                    <button class="role-btn" data-role="rudder">🧭 Руль</button>
-                    <button class="role-btn" data-role="weapon">🔫 Оружие</button>
-                    <button class="role-btn" data-role="weaponDirection">🎯 Прицел</button>
-                    <button class="role-btn" data-role="shield">🛡️ Щит</button>
-                </div>
-            </div>
-
             <button class="btn btn-danger" id="disconnectBtn">Отключиться</button>
+        </div>
+
+        <!-- Role Change Overlay (Ship only, during game) -->
+        <div id="roleChangeOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.9); z-index: 1000; align-items: center; justify-content: center;">
+            <div style="background: #1a1a2e; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%;">
+                <h3 style="margin-bottom: 20px;">Смена роли</h3>
+
+                <div id="roleSelectionInGame">
+                    <div class="role-panel-title">Выберите новую роль:</div>
+                    <div class="role-buttons">
+                        <button class="role-btn-overlay" data-role="engine">⚙️ Двигатель</button>
+                        <button class="role-btn-overlay" data-role="rudder">🧭 Руль</button>
+                        <button class="role-btn-overlay" data-role="weapon">🔫 Оружие</button>
+                        <button class="role-btn-overlay" data-role="weaponDirection">🎯 Прицел</button>
+                        <button class="role-btn-overlay" data-role="shield">🛡️ Щит</button>
+                    </div>
+                </div>
+
+                <button id="cancelRoleChange" class="btn" style="margin-top: 20px; width: 100%;">Отмена</button>
+            </div>
         </div>
 
         <!-- Death Screen -->
@@ -691,6 +705,48 @@
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
 
+                        // For Ship game: show Leave Post button and setup role change handlers
+                        if (gameType === 'ship') {
+                            const leavePostBtn = document.getElementById('leavePostBtn');
+                            const roleChangeOverlay = document.getElementById('roleChangeOverlay');
+                            const cancelRoleChange = document.getElementById('cancelRoleChange');
+
+                            // Show Leave Post button
+                            leavePostBtn.style.display = 'block';
+
+                            // Setup Leave Post button handler
+                            leavePostBtn.addEventListener('click', () => {
+                                addDebugLog('🔄 Открытие меню смены роли', 'info');
+                                roleChangeOverlay.style.display = 'flex';
+
+                                // Update available roles in overlay
+                                updateOverlayRoleButtons();
+                            });
+
+                            // Setup Cancel button handler
+                            cancelRoleChange.addEventListener('click', () => {
+                                addDebugLog('❌ Отмена смены роли', 'info');
+                                roleChangeOverlay.style.display = 'none';
+                            });
+
+                            // Setup role button handlers in overlay
+                            const overlayRoleButtons = document.querySelectorAll('.role-btn-overlay');
+                            overlayRoleButtons.forEach(btn => {
+                                btn.addEventListener('click', () => {
+                                    const role = btn.dataset.role;
+                                    addDebugLog(`🎯 Выбрана новая роль: ${role}`, 'success');
+
+                                    if (ws && ws.readyState === WebSocket.OPEN) {
+                                        ws.send(JSON.stringify({
+                                            type: 'change_role',
+                                            role: role
+                                        }));
+                                        // Overlay будет закрыт при получении update с назначенной ролью
+                                    }
+                                });
+                            });
+                        }
+
                         // Request wake lock to prevent phone sleep
                         if ('wakeLock' in navigator) {
                             try {
@@ -953,10 +1009,44 @@
                     }
 
                     if (data.type === 'update' && data.gameState) {
+                        // Save current game state for overlay updates
+                        window.currentGameState = data.gameState;
+
                         // Update role buttons and lobby for Ship game
                         if (data.gameState.gameType === 'ship') {
                             updateRoleButtons(data.gameState);
                             updateLobbyPlayers(data.gameState);
+
+                            // Update role display on controller screen
+                            const myPlayer = data.gameState.players.find(p => p.id === playerId);
+                            if (myPlayer && myPlayer.systemRole) {
+                                const roleNames = {
+                                    engine: '⚙️ Двигатель',
+                                    rudder: '🧭 Руль',
+                                    weapon: '🔫 Оружие',
+                                    weaponDirection: '🎯 Прицел',
+                                    shield: '🛡️ Щит'
+                                };
+                                const roleInfo = document.getElementById('roleInfo');
+                                const roleDisplay = document.getElementById('roleDisplay');
+                                if (roleInfo && roleDisplay) {
+                                    roleInfo.style.display = 'block';
+                                    roleDisplay.textContent = roleNames[myPlayer.systemRole];
+                                }
+
+                                // Close overlay if role was successfully assigned
+                                const roleChangeOverlay = document.getElementById('roleChangeOverlay');
+                                if (roleChangeOverlay && roleChangeOverlay.style.display === 'flex') {
+                                    roleChangeOverlay.style.display = 'none';
+                                    addDebugLog('✅ Роль успешно изменена', 'success');
+                                }
+                            } else {
+                                // No role - hide role display
+                                const roleInfo = document.getElementById('roleInfo');
+                                if (roleInfo) {
+                                    roleInfo.style.display = 'none';
+                                }
+                            }
                         }
 
                         // Check if this player died (only for Snake, not Pong)
@@ -1193,6 +1283,40 @@
                     <span style="color: ${readyColor}; font-weight: bold;">${readyIcon}</span>
                 </div>`;
             }).join('');
+        }
+
+        // Update overlay role buttons (for in-game role change)
+        function updateOverlayRoleButtons() {
+            if (gameType !== 'ship' || !window.currentGameState) return;
+
+            const roleButtons = document.querySelectorAll('.role-btn-overlay');
+            const players = window.currentGameState.players || [];
+
+            const roleNames = {
+                engine: '⚙️ Двигатель',
+                rudder: '🧭 Руль',
+                weapon: '🔫 Оружие',
+                weaponDirection: '🎯 Прицел',
+                shield: '🛡️ Щит'
+            };
+
+            roleButtons.forEach(btn => {
+                const role = btn.dataset.role;
+                const occupiedBy = players.find(p => p.systemRole === role);
+
+                btn.textContent = roleNames[role];
+
+                if (occupiedBy && occupiedBy.id !== playerId) {
+                    // Role is taken by another player
+                    btn.disabled = true;
+                    btn.textContent = `${roleNames[role].split(' ')[0]} ${occupiedBy.name}`;
+                    btn.style.opacity = '0.5';
+                } else {
+                    // Role is free
+                    btn.disabled = false;
+                    btn.style.opacity = '1.0';
+                }
+            });
         }
 
         // Show role panel if Ship game (moved to page load)

@@ -490,7 +490,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.13.3 - Lobby System]', 'success');
+        addDebugLog('📱 Страница загружена [v3.13.4 - Lobby System]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -1112,18 +1112,23 @@
 
                     // Handle start calibration (after countdown finishes)
                     if (data.type === 'start_calibration') {
-                        addDebugLog('🎮 Начинаем калибровку', 'info');
-                        (async () => {
-                            try {
-                                motionController.start();
-                                await calibration.start();
-                                showScreen('calibration-min');
-                                addDebugLog('📐 Калибровка начата', 'info');
-                            } catch (err) {
-                                addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
-                                alert('❌ Ошибка калибровки: ' + err.message);
-                            }
-                        })();
+                        // Only start calibration if we haven't already calibrated
+                        if (!calibration || !calibration.isComplete()) {
+                            addDebugLog('🎮 Начинаем калибровку', 'info');
+                            (async () => {
+                                try {
+                                    motionController.start();
+                                    await calibration.start();
+                                    showScreen('calibration-min');
+                                    addDebugLog('📐 Калибровка начата', 'info');
+                                } catch (err) {
+                                    addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                                    alert('❌ Ошибка калибровки: ' + err.message);
+                                }
+                            })();
+                        } else {
+                            addDebugLog('✅ Калибровка уже завершена, пропускаем', 'info');
+                        }
                     }
                 };
             } catch (error) {

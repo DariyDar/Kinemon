@@ -593,46 +593,56 @@ function updateShipPosition(room) {
 }
 
 // Calculate bullet parameters from weapon energy (0-10)
-// Returns { powerLevel, size, speed, distance, damage }
+// Returns { powerLevel, size, speed, distance, damage, bulletCount }
 function calculateBulletParams(energy) {
     // Energy 0-10 → power levels 1-10
     const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
 
-    // SIZE: 4px → 16px (linear)
-    const size = 4 + (powerLevel - 1) * (12 / 9);
+    // Base values for level 1
+    const baseSize = 6;
+    const baseSpeed = 8;
+    const baseDistance = 400;
 
-    // SPEED: 6 → 15 units/frame (linear)
-    const speed = 6 + (powerLevel - 1) * (9 / 9);
+    // 10% growth per level
+    const growthRate = 0.1;
+    const multiplier = 1 + (powerLevel - 1) * growthRate;
 
-    // DISTANCE: 300 → 900 pixels (linear)
-    const distance = 300 + (powerLevel - 1) * (600 / 9);
+    const size = baseSize * multiplier;
+    const speed = baseSpeed * multiplier;
+    const distance = baseDistance * multiplier;
 
     // DAMAGE: x1 for levels 1-9, x2 ONLY for level 10
     const damage = (powerLevel === 10) ? 2 : 1;
 
-    console.log(`🎯 Bullet: Lv${powerLevel}, Size:${size.toFixed(1)}px, Dmg:${damage}x`);
+    // BULLET COUNT based on power level tiers
+    let bulletCount;
+    if (powerLevel <= 3) bulletCount = 1;
+    else if (powerLevel <= 6) bulletCount = 2;
+    else if (powerLevel <= 9) bulletCount = 3;
+    else bulletCount = 4; // level 10
 
-    return { powerLevel, size, speed, distance, damage };
+    console.log(`🎯 Bullet: Lv${powerLevel}, Count:${bulletCount}, Size:${size.toFixed(1)}px, Dmg:${damage}x`);
+
+    return { powerLevel, size, speed, distance, damage, bulletCount };
 }
 
 // Fire bullets from weapon using accumulated energy
-// bulletCount: number of bullets to fire (based on energy level)
-function fireBullet(room, bulletCount = 1) {
+function fireBullet(room) {
     const weapon = room.systems.weapon;
 
     // Don't fire if no energy (минимум 0.1)
     if (weapon.energy < 0.1) return;
 
-    // Calculate bullet parameters from energy
+    // Calculate bullet parameters from energy (includes bulletCount)
     const params = calculateBulletParams(weapon.energy);
 
     const angle = room.systems.weaponDirection.rotation * Math.PI / 180;
     const weaponPos = getSystemPosition(room.ship, room.systems.weaponDirection.rotation);
 
     // Fire multiple bullets with slight spread
-    for (let i = 0; i < bulletCount; i++) {
+    for (let i = 0; i < params.bulletCount; i++) {
         // Small random spread for multiple bullets
-        const spread = bulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
+        const spread = params.bulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
         const bulletAngle = angle + spread;
 
         room.bullets.push({
@@ -651,7 +661,7 @@ function fireBullet(room, bulletCount = 1) {
 
     // Visual effects
     const effectColor = (params.powerLevel === 10) ? '#FF0000' : '#00FFFF';
-    const effectCount = Math.ceil(bulletCount / 2);
+    const effectCount = Math.ceil(params.bulletCount / 2);
 
     broadcastEffect(room.id, 'particle', {
         x: weaponPos.x,
@@ -2240,7 +2250,7 @@ function updateShip(room) {
 
                 // Fire on downward movement (BEFORE updating energy)
                 if (weaponResult.shouldFire && weaponResult.bulletCount > 0) {
-                    fireBullet(room, weaponResult.bulletCount);
+                    fireBullet(room);
                     // Energy reset to 0 in fireBullet, don't update it
                 } else {
                     // Only update energy if not firing

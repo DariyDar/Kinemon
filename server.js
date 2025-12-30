@@ -394,7 +394,7 @@ function detectPump(player, currentTilt, room) {
 }
 
 // Weapon charging based on tilt position (not pump speed)
-// Energy = distance traveled upward from base position
+// Energy = distance traveled upward from lowest point
 // Returns { newEnergy, shouldFire, bulletCount }
 function updateWeaponCharge(player, currentTilt, room) {
     const weapon = room.systems.weapon;
@@ -402,7 +402,7 @@ function updateWeaponCharge(player, currentTilt, room) {
     // Initialize on first call
     if (weapon.lastWeaponTilt === undefined) {
         weapon.lastWeaponTilt = currentTilt;
-        weapon.baseTilt = currentTilt;  // Starting position for energy calculation
+        weapon.baseTilt = currentTilt;  // Lowest point for energy calculation
         weapon.movingUp = false;
         return { newEnergy: 0, shouldFire: false, bulletCount: 0 };
     }
@@ -411,37 +411,40 @@ function updateWeaponCharge(player, currentTilt, room) {
     const delta = currentTilt - lastTilt;
     weapon.lastWeaponTilt = currentTilt;
 
-    // Energy = relative distance from base position (0-1 → 0-10)
-    const relativeTilt = Math.max(0, currentTilt - weapon.baseTilt);
-    const newEnergy = relativeTilt * 10;
-
     // Track direction of movement
     const currentlyMovingUp = delta > 0.01;
     const currentlyMovingDown = delta < -0.01;
 
-    // FIRE TRIGGER: Was moving up, now moving down (transition moment)
-    let shouldFire = false;
-    let bulletCount = 0;
-
-    if (weapon.movingUp && currentlyMovingDown) {
-        // Fire once at transition
-        shouldFire = true;
-        bulletCount = Math.max(1, Math.ceil(weapon.energy)); // Fire based on PREVIOUS energy
+    // Update base to track the lowest point during movement
+    if (!weapon.movingUp && currentlyMovingUp) {
+        // Starting to move up - set base to current position (lowest point)
+        weapon.baseTilt = currentTilt;
+        weapon.movingUp = true;
+        console.log(`⬆️ Started moving up from base: ${currentTilt.toFixed(3)}`);
+    } else if (weapon.movingUp && currentlyMovingDown) {
+        // Starting to move down - FIRE!
+        const shouldFire = true;
+        const bulletCount = Math.max(1, Math.ceil(weapon.energy));
         console.log(`💥 Weapon Fire! Energy: ${weapon.energy.toFixed(2)}, Bullets: ${bulletCount}`);
 
-        // Reset base position to current position after firing
-        weapon.baseTilt = currentTilt;
         weapon.movingUp = false;
+        return { newEnergy: 0, shouldFire, bulletCount }; // Energy immediately 0 after fire
     } else if (currentlyMovingUp) {
         weapon.movingUp = true;
     } else if (currentlyMovingDown) {
         weapon.movingUp = false;
+        // Continue tracking downward - update base to lowest point
+        weapon.baseTilt = Math.min(weapon.baseTilt, currentTilt);
     }
+
+    // Energy = relative distance from base position (0-1 → 0-10)
+    const relativeTilt = Math.max(0, currentTilt - weapon.baseTilt);
+    const newEnergy = relativeTilt * 10;
 
     // Charging when relative energy > 0
     weapon.isCharging = relativeTilt > 0.05;
 
-    return { newEnergy, shouldFire, bulletCount };
+    return { newEnergy, shouldFire: false, bulletCount: 0 };
 }
 
 // Calculate energy from tilt angle (gradient system)

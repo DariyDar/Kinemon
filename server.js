@@ -600,16 +600,16 @@ function calculateBulletParams(energy) {
 
     // Custom balance table for each level
     const balanceTable = {
-        1:  { size: 2,  speed: 5,  distance: 100, bulletCount: 1 },
-        2:  { size: 4,  speed: 6,  distance: 200, bulletCount: 1 },
-        3:  { size: 6,  speed: 8,  distance: 300, bulletCount: 1 },
-        4:  { size: 8,  speed: 10, distance: 400, bulletCount: 2 },
-        5:  { size: 9,  speed: 10, distance: 500, bulletCount: 2 },
-        6:  { size: 9,  speed: 12, distance: 600, bulletCount: 2 },
-        7:  { size: 10, speed: 12, distance: 650, bulletCount: 3 },
-        8:  { size: 11, speed: 12, distance: 700, bulletCount: 3 },
-        9:  { size: 12, speed: 14, distance: 720, bulletCount: 3 },
-        10: { size: 12, speed: 17, distance: 800, bulletCount: 5 }
+        1:  { size: 1,  speed: 5,  distance: 100, bulletCount: 1, damage: 0.5 },
+        2:  { size: 2,  speed: 6,  distance: 150, bulletCount: 1, damage: 0.6 },
+        3:  { size: 3,  speed: 8,  distance: 200, bulletCount: 1, damage: 0.8 },
+        4:  { size: 4,  speed: 10, distance: 300, bulletCount: 2, damage: 1.0 },
+        5:  { size: 5,  speed: 10, distance: 400, bulletCount: 2, damage: 1.0 },
+        6:  { size: 6,  speed: 12, distance: 500, bulletCount: 2, damage: 1.0 },
+        7:  { size: 7,  speed: 12, distance: 600, bulletCount: 3, damage: 1.1 },
+        8:  { size: 10, speed: 12, distance: 700, bulletCount: 3, damage: 1.2 },
+        9:  { size: 12, speed: 14, distance: 800, bulletCount: 3, damage: 1.3 },
+        10: { size: 14, speed: 17, distance: 900, bulletCount: 5, damage: 1.5 }
     };
 
     const stats = balanceTable[powerLevel];
@@ -617,11 +617,9 @@ function calculateBulletParams(energy) {
     const speed = stats.speed;
     const distance = stats.distance;
     const bulletCount = stats.bulletCount;
+    const damage = stats.damage;
 
-    // DAMAGE: always 1x for all levels (as per table)
-    const damage = 1;
-
-    console.log(`🎯 Bullet: Lv${powerLevel}, Count:${bulletCount}, Size:${size}px, Speed:${speed}, Dist:${distance}`);
+    console.log(`🎯 Bullet: Lv${powerLevel}, Count:${bulletCount}, Size:${size}px, Speed:${speed}, Dist:${distance}, Dmg:${damage}x`);
 
     return { powerLevel, size, speed, distance, damage, bulletCount };
 }

@@ -1,6 +1,6 @@
 {
   "name": "kinemon-games",
-  "version": "3.14.7",
+  "version": "3.14.8",
   "description": "Motion-controlled games with offline and online multiplayer modes",
   "main": "server.js",
   "engines": {

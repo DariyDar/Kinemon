@@ -238,7 +238,9 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         // Initialize coins - only 1 coin at a time
         room.coins.push(spawnCoin(room));
 
-        room.gameStarted = true; // Ship starts immediately (cooperative game, works with any number of players)
+        room.gameStarted = false; // Ship starts after all players ready (lobby system)
+        room.lobbyCountdown = null; // Countdown timer
+        room.lobbyCountdownStart = null; // Countdown start time
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -868,6 +870,69 @@ function dropPizzasFromSnake(room, player) {
     console.log(`${player.name} dropped ${pizzasToDrop} pizzas`);
 }
 
+// Start lobby countdown for Ship game
+function startLobbyCountdown(room) {
+    if (room.lobbyCountdown) return; // Already running
+
+    const COUNTDOWN_DURATION = 5000; // 5 seconds
+    const startTime = Date.now();
+    room.lobbyCountdownStart = startTime;
+
+    console.log(`[LOBBY] Starting countdown in room ${room.id}`);
+
+    // Send startTime to Display only
+    room.players.forEach((player) => {
+        // Check if this is a display connection (doesn't have playerId before init)
+        // For now, send to all - display will show countdown, controllers won't
+        if (player.ws && player.ws.readyState === 1) { // OPEN
+            player.ws.send(JSON.stringify({
+                type: 'lobby_countdown',
+                startTime: startTime,
+                duration: COUNTDOWN_DURATION
+            }));
+        }
+    });
+
+    // Timer for server-side countdown completion
+    room.lobbyCountdown = setTimeout(() => {
+        room.lobbyCountdown = null;
+        room.lobbyCountdownStart = null;
+        room.gameStarted = true;
+        console.log(`[LOBBY] Game started in room ${room.id}`);
+
+        // Send start_calibration to all controllers
+        room.players.forEach((player) => {
+            if (player.ws && player.ws.readyState === 1) {
+                player.ws.send(JSON.stringify({
+                    type: 'start_calibration'
+                }));
+            }
+        });
+
+        broadcastGameState(room);
+    }, COUNTDOWN_DURATION);
+}
+
+// Cancel lobby countdown
+function cancelLobbyCountdown(room) {
+    if (!room.lobbyCountdown) return; // No countdown running
+
+    clearTimeout(room.lobbyCountdown);
+    room.lobbyCountdown = null;
+    room.lobbyCountdownStart = null;
+
+    console.log(`[LOBBY] Countdown cancelled in room ${room.id}`);
+
+    // Notify all clients
+    room.players.forEach((player) => {
+        if (player.ws && player.ws.readyState === 1) {
+            player.ws.send(JSON.stringify({
+                type: 'lobby_countdown_cancelled'
+            }));
+        }
+    });
+}
+
 // Handle WebSocket connections
 wss.on('connection', (ws) => {
     console.log('Client connected');
@@ -1006,7 +1071,8 @@ wss.on('connection', (ws) => {
                     type: 'init',
                     playerId: playerId,
                     roomId: roomId,
-                    gameState: serializeGameState(room)
+                    gameState: serializeGameState(room),
+                    gameStarted: room.gameStarted // Include gameStarted flag for reconnect handling
                 };
                 console.log(`[JOIN] Sending init message to ${player.name}:`, JSON.stringify(initMessage).substring(0, 100) + '...');
                 ws.send(JSON.stringify(initMessage));
@@ -1176,9 +1242,24 @@ wss.on('connection', (ws) => {
                     // Check if all players are ready
                     const allReady = Array.from(room.players.values()).every(p => p.ready);
                     if (allReady && room.players.size > 0) {
-                        room.gameStarted = true;
-                        console.log(`Game starting in room ${room.id}`);
+                        console.log(`[LOBBY] All players ready in room ${room.id}, starting countdown`);
+                        startLobbyCountdown(room);
                     }
+
+                    broadcastGameState(room);
+                }
+            } else if (data.type === 'player_unready' && ws.playerId && ws.roomId) {
+                // Handle player unready status for Ship game
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'ship') {
+                    const player = room.players.get(ws.playerId);
+                    if (!player) return;
+
+                    player.ready = false;
+                    console.log(`[LOBBY] Player ${player.name} is no longer ready`);
+
+                    // Cancel countdown if it was running
+                    cancelLobbyCountdown(room);
 
                     broadcastGameState(room);
                 }
@@ -1192,8 +1273,28 @@ wss.on('connection', (ws) => {
         if (ws.playerId && ws.roomId) {
             const room = rooms.get(ws.roomId);
             if (room) {
+                const player = room.players.get(ws.playerId);
+
+                if (player) {
+                    console.log(`Player ${player.name} disconnected from room ${ws.roomId}`);
+
+                    // For Ship game: handle lobby countdown cancellation
+                    if (room.gameType === 'ship') {
+                        // If player was ready in lobby, cancel countdown
+                        if (!room.gameStarted && player.ready) {
+                            console.log(`[LOBBY] Player ${player.name} was ready - cancelling countdown`);
+                            cancelLobbyCountdown(room);
+                        }
+
+                        // Log role being freed (goes to autopilot)
+                        if (player.systemRole) {
+                            console.log(`[DISCONNECT] Role ${player.systemRole} freed (autopilot)`);
+                        }
+                    }
+                }
+
                 room.players.delete(ws.playerId);
-                console.log(`Player ${ws.playerId} disconnected from room ${ws.roomId}`);
+                broadcastGameState(room);
 
                 // Clean up empty rooms
                 if (room.players.size === 0 && !hasDisplayClient(ws.roomId)) {

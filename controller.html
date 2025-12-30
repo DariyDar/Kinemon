@@ -351,9 +351,9 @@
 
         <!-- Controller Screen -->
         <div id="controllerScreen" class="screen">
-            <!-- Leave Post button (Ship only) -->
-            <button id="leavePostBtn" style="display: none; position: absolute; top: 10px; left: 10px; padding: 10px 20px; background: #FF5252; color: white; border: none; border-radius: 8px; font-size: 16px; z-index: 100;">
-                ⬅️ Оставить пост
+            <!-- Change Role button (Ship only) -->
+            <button id="leavePostBtn" style="display: none; position: absolute; top: 10px; left: 10px; padding: 10px 20px; background: #FF9800; color: white; border: none; border-radius: 8px; font-size: 16px; z-index: 100;">
+                🔄 Сменить роль
             </button>
 
             <h2>🎮 Управление</h2>
@@ -429,6 +429,7 @@
         let gameType = 'snake'; // Default game type
         let wakeLock = null;
         let pingInterval = null;
+        let roleBeforeChange = null; // Track role before opening change overlay
 
         // Load saved control preference from localStorage
         let currentControlScheme = localStorage.getItem('playerControlScheme') || 'rotation_smooth';
@@ -490,7 +491,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.13.4 - Lobby System]', 'success');
+        addDebugLog('📱 Страница загружена [v3.13.5 - Lobby System]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -717,9 +718,17 @@
                             // Show Leave Post button
                             leavePostBtn.style.display = 'block';
 
-                            // Setup Leave Post button handler
+                            // Setup Change Role button handler
                             leavePostBtn.addEventListener('click', () => {
                                 addDebugLog('🔄 Открытие меню смены роли', 'info');
+
+                                // Save current role before opening overlay
+                                if (window.currentGameState) {
+                                    const myPlayer = window.currentGameState.players.find(p => p.id === playerId);
+                                    roleBeforeChange = myPlayer ? myPlayer.systemRole : null;
+                                    addDebugLog(`💾 Текущая роль сохранена: ${roleBeforeChange}`, 'info');
+                                }
+
                                 roleChangeOverlay.style.display = 'flex';
 
                                 // Update available roles in overlay
@@ -730,6 +739,7 @@
                             cancelRoleChange.addEventListener('click', () => {
                                 addDebugLog('❌ Отмена смены роли', 'info');
                                 roleChangeOverlay.style.display = 'none';
+                                roleBeforeChange = null; // Reset saved role
                             });
 
                             // Setup role button handlers in overlay
@@ -1037,11 +1047,17 @@
                                     roleDisplay.textContent = roleNames[myPlayer.systemRole];
                                 }
 
-                                // Close overlay if role was successfully assigned
+                                // Close overlay only if role changed from what it was when overlay opened
                                 const roleChangeOverlay = document.getElementById('roleChangeOverlay');
                                 if (roleChangeOverlay && roleChangeOverlay.style.display === 'flex') {
-                                    roleChangeOverlay.style.display = 'none';
-                                    addDebugLog('✅ Роль успешно изменена', 'success');
+                                    // Check if role actually changed
+                                    if (myPlayer.systemRole !== roleBeforeChange) {
+                                        roleChangeOverlay.style.display = 'none';
+                                        addDebugLog(`✅ Роль изменена: ${roleBeforeChange} → ${myPlayer.systemRole}`, 'success');
+                                        roleBeforeChange = null; // Reset
+                                    } else {
+                                        addDebugLog('⏳ Роль не изменилась, overlay остаётся открытым', 'info');
+                                    }
                                 }
                             } else {
                                 // No role - hide role display

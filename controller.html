@@ -890,21 +890,34 @@
                                 console.log(`Added handler for role button ${index}: ${btn.dataset.role}`);
                             });
 
-                            // Ready button click handler
+                            // Ready button click handler (toggle ready/unready)
                             const readyBtn = document.getElementById('readyBtn');
                             if (readyBtn) {
-                                readyBtn.addEventListener('click', async () => {
-                                    addDebugLog('✅ Нажата кнопка Готов - запуск калибровки', 'success');
+                                readyBtn.addEventListener('click', () => {
+                                    if (!isReady) {
+                                        // Player is marking themselves as ready
+                                        addDebugLog('✅ Отправка player_ready', 'success');
 
-                                    // Start motion tracking and calibration
-                                    try {
-                                        motionController.start();
-                                        await calibration.start();
-                                        showScreen('calibration-min');
-                                        addDebugLog('📐 Калибровка начата', 'info');
-                                    } catch (err) {
-                                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
-                                        alert('❌ Ошибка калибровки: ' + err.message);
+                                        if (ws && ws.readyState === WebSocket.OPEN) {
+                                            ws.send(JSON.stringify({ type: 'player_ready' }));
+                                            isReady = true;
+                                            readyBtn.textContent = '❌ Отменить';
+                                            readyBtn.disabled = false; // Keep enabled for unready
+                                        } else {
+                                            addDebugLog('❌ WebSocket не готов', 'error');
+                                        }
+                                    } else {
+                                        // Player is cancelling their ready state
+                                        addDebugLog('⏹️ Отправка player_unready', 'info');
+
+                                        if (ws && ws.readyState === WebSocket.OPEN) {
+                                            ws.send(JSON.stringify({ type: 'player_unready' }));
+                                            isReady = false;
+                                            readyBtn.textContent = '😊 Готов';
+                                            readyBtn.disabled = false;
+                                        } else {
+                                            addDebugLog('❌ WebSocket не готов', 'error');
+                                        }
                                     }
                                 });
                             }
@@ -959,6 +972,65 @@
                                 motionController.onTiltChange = null;
                             }
                         }
+                    }
+
+                    // Handle lobby countdown cancelled
+                    if (data.type === 'lobby_countdown_cancelled') {
+                        addDebugLog('⚠️ Countdown отменён - кто-то снял готовность', 'info');
+                        const countdownDisplay = document.getElementById('countdownDisplay');
+                        if (countdownDisplay) {
+                            countdownDisplay.style.display = 'none';
+                        }
+                        // Stop local countdown timer if exists
+                        if (window.lobbyCountdownInterval) {
+                            clearInterval(window.lobbyCountdownInterval);
+                            window.lobbyCountdownInterval = null;
+                        }
+                    }
+
+                    // Handle lobby countdown (show countdown in lobby)
+                    if (data.type === 'lobby_countdown') {
+                        addDebugLog('⏱️ Countdown начался!', 'success');
+                        const countdownDisplay = document.getElementById('countdownDisplay');
+                        const countdownNumber = document.getElementById('countdownNumber');
+
+                        if (countdownDisplay && countdownNumber) {
+                            countdownDisplay.style.display = 'block';
+
+                            const startTime = data.startTime;
+                            const duration = data.duration;
+
+                            // Update countdown every 100ms for smooth display
+                            window.lobbyCountdownInterval = setInterval(() => {
+                                const elapsed = Date.now() - startTime;
+                                const remaining = Math.max(0, duration - elapsed);
+                                const count = Math.ceil(remaining / 1000);
+
+                                countdownNumber.textContent = count;
+
+                                if (count === 0) {
+                                    clearInterval(window.lobbyCountdownInterval);
+                                    window.lobbyCountdownInterval = null;
+                                    // Wait for start_calibration message from server
+                                }
+                            }, 100);
+                        }
+                    }
+
+                    // Handle start calibration (after countdown finishes)
+                    if (data.type === 'start_calibration') {
+                        addDebugLog('🎮 Начинаем калибровку', 'info');
+                        (async () => {
+                            try {
+                                motionController.start();
+                                await calibration.start();
+                                showScreen('calibration-min');
+                                addDebugLog('📐 Калибровка начата', 'info');
+                            } catch (err) {
+                                addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                                alert('❌ Ошибка калибровки: ' + err.message);
+                            }
+                        })();
                     }
                 };
             } catch (error) {

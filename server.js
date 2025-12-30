@@ -838,6 +838,20 @@ function broadcastEffect(roomId, effectType, data) {
     });
 }
 
+// Broadcast game state update to all clients in a room
+function broadcastGameState(room) {
+    const message = JSON.stringify({
+        type: 'update',
+        gameState: serializeGameState(room)
+    });
+
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && client.roomId === room.id) {
+            client.send(message);
+        }
+    });
+}
+
 // Drop pizzas from dead snake body
 function dropPizzasFromSnake(room, player) {
     const pizzasToDrop = player.score;

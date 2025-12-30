@@ -278,8 +278,22 @@
                 </select>
             </div>
 
-            <!-- Role Selection Panel (Ship only) -->
-            <div id="roleSelectionPanel" style="display: none;">
+            <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
+
+            <!-- Debug Display (for mobile testing) -->
+            <div id="debugDisplay" style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto; display: none;">
+                <div style="font-weight: bold; margin-bottom: 10px; color: #4CAF50;">🔍 Debug Info:</div>
+                <div id="debugLog"></div>
+            </div>
+        </div>
+
+        <!-- Lobby Screen (Ship only) -->
+        <div id="lobbyScreen" class="screen">
+            <h2>🚀 Лобби</h2>
+            <h3 id="lobbyRoomName" style="font-size: 24px; color: #4CAF50; margin-bottom: 20px;">ROOM NAME</h3>
+
+            <!-- Role Selection Panel -->
+            <div id="roleSelectionPanel" style="display: block;">
                 <div class="role-panel-title">Выбор роли:</div>
                 <div class="role-buttons">
                     <button class="role-btn" data-role="engine">⚙️ Двигатель</button>
@@ -290,16 +304,22 @@
                 </div>
 
                 <!-- Ready button (disabled until role is selected) -->
-                <button id="readyBtn" class="btn" style="margin-top: 15px; width: 100%;" disabled>Готов</button>
-                <div id="readyHint">Выберите роль, чтобы начать</div>
+                <button id="readyBtn" class="btn" style="margin-top: 15px; width: 100%;" disabled>😊 Готов</button>
+                <div id="readyHint" style="margin-top: 10px; font-size: 14px; opacity: 0.7;">Выберите роль, чтобы начать</div>
             </div>
 
-            <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
+            <!-- Other Players in Lobby -->
+            <div id="lobbyPlayers" style="margin-top: 30px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px;">
+                <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">Другие игроки:</div>
+                <div id="lobbyPlayersList" style="font-size: 14px; line-height: 1.8;">
+                    <!-- Динамически заполняется -->
+                </div>
+            </div>
 
-            <!-- Debug Display (for mobile testing) -->
-            <div id="debugDisplay" style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto; display: none;">
-                <div style="font-weight: bold; margin-bottom: 10px; color: #4CAF50;">🔍 Debug Info:</div>
-                <div id="debugLog"></div>
+            <!-- Countdown Display -->
+            <div id="countdownDisplay" style="display: none; margin-top: 30px; text-align: center; padding: 20px; background: rgba(76, 175, 80, 0.2); border-radius: 15px; border: 3px solid #4CAF50;">
+                <h1 id="countdownNumber" style="font-size: 72px; margin: 0; color: #4CAF50;">5</h1>
+                <p style="margin: 10px 0 0 0; font-size: 18px; font-weight: bold;">Все готовы! Игра начинается...</p>
             </div>
         </div>
 
@@ -892,18 +912,38 @@
                             // Initial role buttons update
                             if (data.gameState) {
                                 updateRoleButtons(data.gameState);
+                                updateLobbyPlayers(data.gameState);
                             }
 
-                            // Show roleSelectionPanel
-                            document.getElementById('roleSelectionPanel').style.display = 'block';
-                            addDebugLog('👁️ Показана панель выбора роли', 'success');
+                            // Check if game already started (reconnect handling)
+                            if (data.gameStarted) {
+                                addDebugLog('🎮 Игра уже началась, пропускаем лобби', 'info');
+                                // Game already running - skip lobby, start calibration immediately
+                                (async () => {
+                                    try {
+                                        motionController.start();
+                                        await calibration.start();
+                                        showScreen('controller');
+                                        addDebugLog('📐 Калибровка завершена, присоединяемся к игре как наблюдатель', 'info');
+                                    } catch (err) {
+                                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                                        alert('❌ Ошибка калибровки: ' + err.message);
+                                    }
+                                })();
+                            } else {
+                                // Game in lobby - show lobby screen
+                                document.getElementById('lobbyRoomName').textContent = roomName.toUpperCase() + ' ROOM';
+                                showScreen('lobby');
+                                addDebugLog('👁️ Показан экран лобби', 'success');
+                            }
                         }
                     }
 
                     if (data.type === 'update' && data.gameState) {
-                        // Update role buttons for Ship game
+                        // Update role buttons and lobby for Ship game
                         if (data.gameState.gameType === 'ship') {
                             updateRoleButtons(data.gameState);
+                            updateLobbyPlayers(data.gameState);
                         }
 
                         // Check if this player died (only for Snake, not Pong)
@@ -1045,6 +1085,42 @@
                     showScreen('calibration-min');
                 }
             }
+        }
+
+        // Update lobby players list
+        function updateLobbyPlayers(gameState) {
+            if (gameType !== 'ship') return;
+
+            const lobbyPlayersList = document.getElementById('lobbyPlayersList');
+            if (!lobbyPlayersList) return;
+
+            const players = gameState.players || [];
+            const otherPlayers = players.filter(p => p.id !== playerId);
+
+            if (otherPlayers.length === 0) {
+                lobbyPlayersList.innerHTML = '<div style="opacity: 0.5;">Ожидание других игроков...</div>';
+                return;
+            }
+
+            const roleNames = {
+                engine: '⚙️ Двигатель',
+                rudder: '🧭 Руль',
+                weapon: '🔫 Оружие',
+                weaponDirection: '🎯 Прицел',
+                shield: '🛡️ Щит'
+            };
+
+            lobbyPlayersList.innerHTML = otherPlayers.map(player => {
+                const roleName = player.systemRole ? roleNames[player.systemRole] : '—';
+                const readyIcon = player.ready ? '✓' : '✗';
+                const readyColor = player.ready ? '#4CAF50' : '#FF5252';
+
+                return `<div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                    <span style="color: ${player.color};">${player.name}</span>
+                    <span>${roleName}</span>
+                    <span style="color: ${readyColor}; font-weight: bold;">${readyIcon}</span>
+                </div>`;
+            }).join('');
         }
 
         // Show role panel if Ship game (moved to page load)

@@ -363,8 +363,10 @@
 
             <div class="instruction">
                 <p><strong>Как подключиться:</strong></p>
-                <p>📱 Отсканируйте QR-код камерой телефона внизу слева</p>
+                <p>📱 Отсканируйте QR-код камерой телефона</p>
             </div>
+
+            <div id="waitingQRCode" style="margin: 30px auto;"></div>
 
             <p id="playerCount" style="font-size: 20px; color: #4CAF50;">Игроков: 0</p>
         </div>
@@ -518,7 +520,7 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
-        console.log('🖥️ Display loaded [v3.15.1 - UI/UX Fixes]');
+        console.log('🖥️ Display loaded [v3.15.2 - QR & Calibration Fixes]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1042,12 +1044,23 @@
                         roomCodeDisplay.textContent = roomId;
                         roomIdInfo.textContent = roomId;
 
-                        // QR code generation removed from waiting screen (only persistent QR in bottom-left)
                         // Build controller URL with room, server, and game type parameters
                         const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
                         const qrData = `${baseUrl}?room=${roomId}&game=${gameType}&server=${encodeURIComponent(serverUrl)}`;
 
                         console.log('QR Code URL:', qrData);
+
+                        // Generate large QR code for waiting screen
+                        const waitingQR = document.getElementById('waitingQRCode');
+                        waitingQR.innerHTML = '';
+                        new QRCode(waitingQR, {
+                            text: qrData,
+                            width: 200,
+                            height: 200,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M
+                        });
 
                         // Generate persistent QR code in bottom-left corner
                         const persistentQR = document.getElementById('persistentQRDisplay');

@@ -473,7 +473,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.15.1 - UI/UX Fixes]', 'success');
+        addDebugLog('📱 Страница загружена [v3.15.2 - QR & Calibration Fixes]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -664,6 +664,16 @@
                     // Initialize calibration
                     calibration = new Calibration(motionController);
 
+                    // Set calibration step change callback
+                    calibration.onStepChange = (step) => {
+                        console.log('Calibration step changed:', step);
+                        if (step === 'waiting_min') {
+                            showScreen('calibration-min');
+                        } else if (step === 'waiting_max') {
+                            showScreen('calibration-max');
+                        }
+                    };
+
                     // Set calibration complete callback
                     calibration.onComplete = async (min, max) => {
                         console.log('Calibration complete:', min, max);
@@ -697,84 +707,6 @@
 
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
-
-                        // For Ship game: show Leave Post button and setup role change handlers
-                        if (gameType === 'ship') {
-                            const leavePostBtn = document.getElementById('leavePostBtn');
-                            const roleChangeOverlay = document.getElementById('roleChangeOverlay');
-                            const cancelRoleChange = document.getElementById('cancelRoleChange');
-
-                            // Show Leave Post button
-                            leavePostBtn.style.display = 'block';
-
-                            // Setup Change Role button handler
-                            leavePostBtn.addEventListener('click', () => {
-                                addDebugLog('🔄 Открытие меню смены роли', 'info');
-
-                                // Save current role before opening overlay
-                                if (window.currentGameState) {
-                                    const myPlayer = window.currentGameState.players.find(p => p.id === playerId);
-                                    roleBeforeChange = myPlayer ? myPlayer.systemRole : null;
-                                    addDebugLog(`💾 Текущая роль сохранена: ${roleBeforeChange}`, 'info');
-                                }
-
-                                roleChangeOverlay.style.display = 'flex';
-
-                                // Update available roles in overlay
-                                updateOverlayRoleButtons();
-                            });
-
-                            // Setup Cancel button handler
-                            cancelRoleChange.addEventListener('click', () => {
-                                addDebugLog('❌ Отмена смены роли', 'info');
-                                roleChangeOverlay.style.display = 'none';
-                                roleBeforeChange = null; // Reset saved role
-                            });
-
-                            // Setup role button handlers in overlay
-                            const overlayRoleButtons = document.querySelectorAll('.role-btn-overlay');
-                            overlayRoleButtons.forEach(btn => {
-                                btn.addEventListener('click', () => {
-                                    const role = btn.dataset.role;
-                                    addDebugLog(`🎯 Выбрана новая роль: ${role}`, 'success');
-
-                                    if (ws && ws.readyState === WebSocket.OPEN) {
-                                        ws.send(JSON.stringify({
-                                            type: 'change_role',
-                                            role: role
-                                        }));
-                                        // Overlay будет закрыт при получении update с назначенной ролью
-                                    }
-                                });
-                            });
-
-                            // Setup Recalibration button handler
-                            const recalibrateBtn = document.getElementById('recalibrateBtn');
-                            if (recalibrateBtn) {
-                                recalibrateBtn.style.display = 'block';
-
-                                recalibrateBtn.addEventListener('click', async () => {
-                                    addDebugLog('📐 Начало перекалибровки', 'info');
-
-                                    try {
-                                        // Reset calibration
-                                        calibration.reset();
-                                        addDebugLog('🔄 Калибровка сброшена', 'info');
-
-                                        // Show calibration screen and start calibration process
-                                        showScreen('calibration-min');
-                                        await calibration.start();
-
-                                        addDebugLog('✅ Калибровка завершена', 'success');
-
-                                        // Return to controller screen
-                                        showScreen('controller');
-                                    } catch (err) {
-                                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
-                                    }
-                                });
-                            }
-                        }
 
                         // Request wake lock to prevent phone sleep
                         if ('wakeLock' in navigator) {
@@ -1064,15 +996,14 @@
                                         roleChangeOverlay.style.display = 'none';
                                         addDebugLog(`✅ Роль изменена: ${roleBeforeChange} → ${myPlayer.systemRole}`, 'success');
 
-                                        // For late-joiners: if game started and just got assigned a role, start calibration
+                                        // For late-joiners: if game started and just got assigned a role, start calibration immediately
                                         if (window.isLateJoiner && myPlayer.systemRole) {
-                                            addDebugLog('🎮 Late-joiner получил роль, запускаем калибровку', 'info');
+                                            addDebugLog('🎮 Late-joiner получил роль, запускаем калибровку немедленно', 'info');
                                             window.isLateJoiner = false; // Clear flag
                                             (async () => {
                                                 try {
                                                     motionController.start();
                                                     await calibration.start();
-                                                    showScreen('calibration-min');
                                                     addDebugLog('📐 Калибровка начата для late-joiner', 'info');
                                                 } catch (err) {
                                                     addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
@@ -1130,12 +1061,11 @@
                     if (data.type === 'start_calibration') {
                         // Only start calibration if we haven't already calibrated
                         if (!calibration || !calibration.isComplete()) {
-                            addDebugLog('🎮 Начинаем калибровку', 'info');
+                            addDebugLog('🎮 Начинаем калибровку после countdown', 'info');
                             (async () => {
                                 try {
                                     motionController.start();
                                     await calibration.start();
-                                    showScreen('calibration-min');
                                     addDebugLog('📐 Калибровка начата', 'info');
                                 } catch (err) {
                                     addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
@@ -1348,6 +1278,82 @@
             const rolePanel = document.getElementById('roleSelectionPanel');
             if (rolePanel) {
                 rolePanel.style.display = 'block';
+            }
+        }
+
+        // Global initialization of role change and calibration buttons (Ship game)
+        if (gameType === 'ship') {
+            const leavePostBtn = document.getElementById('leavePostBtn');
+            const roleChangeOverlay = document.getElementById('roleChangeOverlay');
+            const cancelRoleChange = document.getElementById('cancelRoleChange');
+            const recalibrateBtn = document.getElementById('recalibrateBtn');
+
+            // Setup Change Role button handler
+            if (leavePostBtn) {
+                leavePostBtn.addEventListener('click', () => {
+                    addDebugLog('🔄 Открытие меню смены роли', 'info');
+
+                    // Save current role before opening overlay
+                    if (window.currentGameState) {
+                        const myPlayer = window.currentGameState.players.find(p => p.id === playerId);
+                        roleBeforeChange = myPlayer ? myPlayer.systemRole : null;
+                        addDebugLog(`💾 Текущая роль сохранена: ${roleBeforeChange}`, 'info');
+                    }
+
+                    roleChangeOverlay.style.display = 'flex';
+
+                    // Update available roles in overlay
+                    updateOverlayRoleButtons();
+                });
+            }
+
+            // Setup Cancel button handler
+            if (cancelRoleChange) {
+                cancelRoleChange.addEventListener('click', () => {
+                    addDebugLog('❌ Отмена смены роли', 'info');
+                    roleChangeOverlay.style.display = 'none';
+                    roleBeforeChange = null; // Reset saved role
+                });
+            }
+
+            // Setup role button handlers in overlay
+            const overlayRoleButtons = document.querySelectorAll('.role-btn-overlay');
+            overlayRoleButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const role = btn.dataset.role;
+                    addDebugLog(`🎯 Выбрана новая роль: ${role}`, 'success');
+
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'change_role',
+                            role: role
+                        }));
+                        // Overlay будет закрыт при получении update с назначенной ролью
+                    }
+                });
+            });
+
+            // Setup Recalibration button handler
+            if (recalibrateBtn) {
+                recalibrateBtn.addEventListener('click', async () => {
+                    addDebugLog('📐 Начало перекалибровки', 'info');
+
+                    try {
+                        // Reset calibration
+                        calibration.reset();
+                        addDebugLog('🔄 Калибровка сброшена', 'info');
+
+                        // Start calibration process (screen will be shown automatically via onStepChange)
+                        await calibration.start();
+
+                        addDebugLog('✅ Калибровка завершена', 'success');
+
+                        // Return to controller screen
+                        showScreen('controller');
+                    } catch (err) {
+                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                    }
+                });
             }
         }
     </script>

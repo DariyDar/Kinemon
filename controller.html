@@ -231,6 +231,52 @@
             background: #4CAF50;
         }
 
+        /* Role buttons in overlay (match lobby styling) */
+        .role-btn-overlay {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .role-btn-overlay:active:not(:disabled) {
+            background: #0b7dda;
+            transform: scale(0.98);
+        }
+
+        .role-btn-overlay:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .role-btn-overlay.selected {
+            background: #4CAF50;
+        }
+
+        .role-btn-overlay.exit-role {
+            background: #f44336;
+        }
+
+        .role-btn-overlay.exit-role:active:not(:disabled) {
+            background: #da190b;
+        }
+
+        /* Exit role state for both lobby and overlay buttons */
+        .role-btn.exit-role,
+        .role-btn-overlay.exit-role {
+            background: #f44336;
+        }
+
+        .role-btn.exit-role:active:not(:disabled),
+        .role-btn-overlay.exit-role:active:not(:disabled) {
+            background: #da190b;
+        }
+
         #releaseRoleBtn {
             background: #f44336;
             width: 100%;
@@ -473,7 +519,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.15.3 - QR Size & Recalibration Fix]', 'success');
+        addDebugLog('📱 Страница загружена [v3.15.4 - Ship Lobby UX]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -843,10 +889,8 @@
                         });
                     }
 
-                    if (event.code !== 1000 && event.code !== 1001) {
-                        // Abnormal closure
-                        alert('⚠️ Соединение потеряно.\n\nCode: ' + event.code);
-                    }
+                    // Always show friendly message for all disconnect types
+                    alert('👋 Вы успешно покинули игру, заходите ещё!');
                 };
 
                 ws.onmessage = (event) => {
@@ -896,19 +940,33 @@
 
                                 btn.addEventListener('click', () => {
                                     const role = btn.dataset.role;
-                                    addDebugLog(`🔘 КЛИК! Нажата кнопка роли: ${role}`, 'success');
-                                    console.log('Role button clicked!', role);
 
-                                    if (ws && ws.readyState === WebSocket.OPEN) {
-                                        const message = {
-                                            type: 'change_role',
-                                            role: role
-                                        };
-                                        addDebugLog(`🎯 Отправка change_role: ${role}`, 'success');
-                                        console.log('Sending change_role message:', message);
-                                        ws.send(JSON.stringify(message));
+                                    // Проверяем, это кнопка выхода или выбора роли
+                                    const myPlayer = window.currentGameState?.players?.find(p => p.id === playerId);
+                                    const isMyRole = myPlayer && myPlayer.systemRole === role;
+
+                                    if (isMyRole) {
+                                        // Выход из роли
+                                        addDebugLog('🚪 Выход из роли', 'info');
+
+                                        if (ws && ws.readyState === WebSocket.OPEN) {
+                                            ws.send(JSON.stringify({
+                                                type: 'change_role',
+                                                role: null
+                                            }));
+                                        }
                                     } else {
-                                        addDebugLog(`❌ WebSocket не готов (readyState: ${ws?.readyState})`, 'error');
+                                        // Выбор новой роли
+                                        addDebugLog(`🔘 Нажата кнопка роли: ${role}`, 'success');
+
+                                        if (ws && ws.readyState === WebSocket.OPEN) {
+                                            ws.send(JSON.stringify({
+                                                type: 'change_role',
+                                                role: role
+                                            }));
+                                        } else {
+                                            addDebugLog(`❌ WebSocket не готов (readyState: ${ws?.readyState})`, 'error');
+                                        }
                                     }
                                 }, { capture: true });
 
@@ -1052,17 +1110,53 @@
                     // Handle lobby countdown cancelled
                     if (data.type === 'lobby_countdown_cancelled') {
                         addDebugLog('⚠️ Countdown отменён - кто-то снял готовность', 'info');
-                        // Stop local countdown timer if exists
+
+                        // Stop countdown timer
                         if (window.lobbyCountdownInterval) {
                             clearInterval(window.lobbyCountdownInterval);
                             window.lobbyCountdownInterval = null;
                         }
+
+                        // Reset button text
+                        const readyBtn = document.getElementById('readyBtn');
+                        if (readyBtn && isReady) {
+                            readyBtn.textContent = 'Ожидание других игроков...';
+                            readyBtn.disabled = true;
+                        }
                     }
 
-                    // Handle lobby countdown (countdown only shown on Display, not on controllers)
+                    // Handle lobby countdown
                     if (data.type === 'lobby_countdown') {
                         addDebugLog('⏱️ Countdown начался!', 'success');
-                        // Countdown visuals removed from controller - shown only on Display
+
+                        const readyBtn = document.getElementById('readyBtn');
+                        if (!readyBtn) return;
+
+                        const duration = data.duration; // 5000ms
+                        const startTime = data.startTime;
+                        let remainingSeconds = Math.ceil(duration / 1000); // 5
+
+                        // Update immediately
+                        readyBtn.textContent = `Подключаем к игре: ${remainingSeconds}`;
+                        readyBtn.disabled = true;
+
+                        // Clear existing interval if any
+                        if (window.lobbyCountdownInterval) {
+                            clearInterval(window.lobbyCountdownInterval);
+                        }
+
+                        // Update every second
+                        window.lobbyCountdownInterval = setInterval(() => {
+                            const elapsed = Date.now() - startTime;
+                            remainingSeconds = Math.max(1, Math.ceil((duration - elapsed) / 1000));
+
+                            if (remainingSeconds > 0) {
+                                readyBtn.textContent = `Подключаем к игре: ${remainingSeconds}`;
+                            } else {
+                                clearInterval(window.lobbyCountdownInterval);
+                                window.lobbyCountdownInterval = null;
+                            }
+                        }, 1000);
                     }
 
                     // Handle start calibration (after countdown finishes)
@@ -1154,7 +1248,6 @@
                 const role = btn.dataset.role;
                 const occupiedBy = players.find(p => p.systemRole === role);
 
-                // Reset button text to default
                 const roleNames = {
                     engine: '⚙️ Двигатель Тяга',
                     rudder: '🧭 Двигатель Руль',
@@ -1165,22 +1258,24 @@
                 btn.textContent = roleNames[role];
 
                 if (occupiedBy && occupiedBy.id !== playerId) {
-                    // Role is taken by another player
+                    // Роль занята другим игроком
                     btn.disabled = true;
                     btn.textContent = `${roleNames[role].split(' ')[0]} ${occupiedBy.name}`;
                     btn.style.opacity = '0.5';
-                    btn.classList.remove('selected');
+                    btn.classList.remove('selected', 'exit-role');
                 } else if (occupiedBy && occupiedBy.id === playerId) {
-                    // This is my role
+                    // Это МОЯ роль - показываем кнопку выхода
                     btn.disabled = false;
                     btn.style.opacity = '1.0';
-                    btn.classList.add('selected');
+                    btn.classList.remove('selected');
+                    btn.classList.add('exit-role');
+                    btn.textContent = `${roleNames[role]}\n🚪 Выйти из роли`;
                     currentRole = role;
                 } else {
-                    // Role is free
+                    // Роль свободна
                     btn.disabled = false;
                     btn.style.opacity = '1.0';
-                    btn.classList.remove('selected');
+                    btn.classList.remove('selected', 'exit-role');
                 }
             });
 
@@ -1253,6 +1348,7 @@
 
             const roleButtons = document.querySelectorAll('.role-btn-overlay');
             const players = window.currentGameState.players || [];
+            const myPlayer = players.find(p => p.id === playerId);
 
             const roleNames = {
                 engine: '⚙️ Двигатель Тяга',
@@ -1269,14 +1365,23 @@
                 btn.textContent = roleNames[role];
 
                 if (occupiedBy && occupiedBy.id !== playerId) {
-                    // Role is taken by another player
+                    // Занята другим
                     btn.disabled = true;
                     btn.textContent = `${roleNames[role].split(' ')[0]} ${occupiedBy.name}`;
                     btn.style.opacity = '0.5';
-                } else {
-                    // Role is free
+                    btn.classList.remove('selected', 'exit-role');
+                } else if (occupiedBy && occupiedBy.id === playerId) {
+                    // Моя роль - exit button
                     btn.disabled = false;
                     btn.style.opacity = '1.0';
+                    btn.classList.remove('selected');
+                    btn.classList.add('exit-role');
+                    btn.textContent = `${roleNames[role]}\n🚪 Выйти из роли`;
+                } else {
+                    // Свободна
+                    btn.disabled = false;
+                    btn.style.opacity = '1.0';
+                    btn.classList.remove('selected', 'exit-role');
                 }
             });
         }
@@ -1329,14 +1434,30 @@
             overlayRoleButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     const role = btn.dataset.role;
-                    addDebugLog(`🎯 Выбрана новая роль: ${role}`, 'success');
 
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            type: 'change_role',
-                            role: role
-                        }));
-                        // Overlay будет закрыт при получении update с назначенной ролью
+                    const myPlayer = window.currentGameState?.players?.find(p => p.id === playerId);
+                    const isMyRole = myPlayer && myPlayer.systemRole === role;
+
+                    if (isMyRole) {
+                        // Выход из роли
+                        addDebugLog('🚪 Выход из роли в overlay', 'info');
+
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: 'change_role',
+                                role: null
+                            }));
+                        }
+                    } else {
+                        // Выбор роли
+                        addDebugLog(`🎯 Выбрана роль: ${role}`, 'success');
+
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: 'change_role',
+                                role: role
+                            }));
+                        }
                     }
                 });
             });

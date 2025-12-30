@@ -404,6 +404,7 @@ function updateWeaponCharge(player, currentTilt, room) {
         weapon.lastWeaponTilt = currentTilt;
         weapon.baseTilt = currentTilt;  // Lowest point for energy calculation
         weapon.movingUp = false;
+        weapon.justFired = false;
         return { newEnergy: 0, shouldFire: false, bulletCount: 0 };
     }
 
@@ -420,6 +421,7 @@ function updateWeaponCharge(player, currentTilt, room) {
         // Starting to move up - set base to current position (lowest point)
         weapon.baseTilt = currentTilt;
         weapon.movingUp = true;
+        weapon.justFired = false; // Clear fired flag on new upward movement
         console.log(`⬆️ Started moving up from base: ${currentTilt.toFixed(3)}`);
     } else if (weapon.movingUp && currentlyMovingDown) {
         // Starting to move down - FIRE!
@@ -428,17 +430,22 @@ function updateWeaponCharge(player, currentTilt, room) {
         console.log(`💥 Weapon Fire! Energy: ${weapon.energy.toFixed(2)}, Bullets: ${bulletCount}`);
 
         weapon.movingUp = false;
+        weapon.justFired = true; // Mark as just fired
+        weapon.baseTilt = 999; // Set base impossibly high so energy stays 0
         return { newEnergy: 0, shouldFire, bulletCount }; // Energy immediately 0 after fire
     } else if (currentlyMovingUp) {
         weapon.movingUp = true;
     } else if (currentlyMovingDown) {
         weapon.movingUp = false;
-        // Continue tracking downward - update base to lowest point
-        weapon.baseTilt = Math.min(weapon.baseTilt, currentTilt);
+        // Continue tracking downward - update base to lowest point (only if not just fired)
+        if (!weapon.justFired) {
+            weapon.baseTilt = Math.min(weapon.baseTilt, currentTilt);
+        }
     }
 
     // Energy = relative distance from base position (0-1 → 0-10)
-    const relativeTilt = Math.max(0, currentTilt - weapon.baseTilt);
+    // If just fired, keep energy at 0 until new upward movement starts
+    const relativeTilt = weapon.justFired ? 0 : Math.max(0, currentTilt - weapon.baseTilt);
     const newEnergy = relativeTilt * 10;
 
     // Charging when relative energy > 0

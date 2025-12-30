@@ -395,41 +395,48 @@ function detectPump(player, currentTilt, room) {
 
 // Weapon charging based on tilt position (not pump speed)
 // Energy directly maps to tilt position: 0-1 → 0-10
-// Returns { newEnergy, shouldFire }
+// Returns { newEnergy, shouldFire, bulletCount }
 function updateWeaponCharge(player, currentTilt, room) {
     const weapon = room.systems.weapon;
 
     // Initialize on first call
     if (weapon.lastWeaponTilt === undefined) {
         weapon.lastWeaponTilt = currentTilt;
-        weapon.maxTiltReached = currentTilt;
-        return { newEnergy: currentTilt * 10, shouldFire: false };
+        weapon.movingUp = false;
+        return { newEnergy: currentTilt * 10, shouldFire: false, bulletCount: 0 };
     }
 
     const lastTilt = weapon.lastWeaponTilt;
     const delta = currentTilt - lastTilt;
     weapon.lastWeaponTilt = currentTilt;
 
-    // Track maximum tilt reached (for charging)
-    if (currentTilt > weapon.maxTiltReached) {
-        weapon.maxTiltReached = currentTilt;
-    }
-
     // Energy = current tilt position (0-1 → 0-10)
     const newEnergy = currentTilt * 10;
 
-    // FIRE TRIGGER: Movement changes from up to down
+    // Track direction of movement
+    const currentlyMovingUp = delta > 0.01;
+    const currentlyMovingDown = delta < -0.01;
+
+    // FIRE TRIGGER: Was moving up, now moving down (transition moment)
     let shouldFire = false;
-    if (delta < -0.02) { // Small threshold to avoid noise
+    let bulletCount = 0;
+
+    if (weapon.movingUp && currentlyMovingDown) {
+        // Fire once at transition
         shouldFire = true;
-        weapon.maxTiltReached = currentTilt; // Reset max after firing
-        console.log(`💥 Weapon Fire! Tilt: ${currentTilt.toFixed(3)}, Energy: ${newEnergy.toFixed(2)}`);
+        bulletCount = Math.max(1, Math.ceil(weapon.energy)); // Fire based on PREVIOUS energy
+        console.log(`💥 Weapon Fire! Energy: ${weapon.energy.toFixed(2)}, Bullets: ${bulletCount}`);
+        weapon.movingUp = false;
+    } else if (currentlyMovingUp) {
+        weapon.movingUp = true;
+    } else if (currentlyMovingDown) {
+        weapon.movingUp = false;
     }
 
     // Always charging when tilt > 0
     weapon.isCharging = currentTilt > 0.05;
 
-    return { newEnergy, shouldFire };
+    return { newEnergy, shouldFire, bulletCount };
 }
 
 // Calculate energy from tilt angle (gradient system)
@@ -593,8 +600,9 @@ function calculateBulletParams(energy) {
     return { powerLevel, size, speed, distance, damage };
 }
 
-// Fire bullet from weapon using accumulated energy
-function fireBullet(room) {
+// Fire bullets from weapon using accumulated energy
+// bulletCount: number of bullets to fire (based on energy level)
+function fireBullet(room, bulletCount = 1) {
     const weapon = room.systems.weapon;
 
     // Don't fire if no energy (минимум 0.1)
@@ -606,22 +614,29 @@ function fireBullet(room) {
     const angle = room.systems.weaponDirection.rotation * Math.PI / 180;
     const weaponPos = getSystemPosition(room.ship, room.systems.weaponDirection.rotation);
 
-    room.bullets.push({
-        x: weaponPos.x,
-        y: weaponPos.y,
-        vx: Math.cos(angle) * params.speed,
-        vy: Math.sin(angle) * params.speed,
-        damage: params.damage,
-        size: params.size,              // Для отрисовки
-        powerLevel: params.powerLevel,  // Для цвета (1-9 cyan, 10 red)
-        distanceTraveled: 0,
-        maxDistance: params.distance,
-        id: Date.now() + Math.random()
-    });
+    // Fire multiple bullets with slight spread
+    for (let i = 0; i < bulletCount; i++) {
+        // Small random spread for multiple bullets
+        const spread = bulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
+        const bulletAngle = angle + spread;
+
+        room.bullets.push({
+            x: weaponPos.x,
+            y: weaponPos.y,
+            vx: Math.cos(bulletAngle) * params.speed,
+            vy: Math.sin(bulletAngle) * params.speed,
+            damage: params.damage,
+            size: params.size,              // Для отрисовки
+            powerLevel: params.powerLevel,  // Для цвета (1-9 cyan, 10 red)
+            distanceTraveled: 0,
+            maxDistance: params.distance,
+            id: Date.now() + Math.random() + i
+        });
+    }
 
     // Visual effects
     const effectColor = (params.powerLevel === 10) ? '#FF0000' : '#00FFFF';
-    const effectCount = Math.ceil(params.powerLevel / 2);
+    const effectCount = Math.ceil(bulletCount / 2);
 
     broadcastEffect(room.id, 'particle', {
         x: weaponPos.x,
@@ -2208,12 +2223,13 @@ function updateShip(room) {
                 // Position-based weapon charging system
                 const weaponResult = updateWeaponCharge(player, tilt, room);
 
-                // Set energy directly from tilt position
-                room.systems.weapon.energy = weaponResult.newEnergy;
-
-                // Fire on downward movement
-                if (weaponResult.shouldFire) {
-                    fireBullet(room);
+                // Fire on downward movement (BEFORE updating energy)
+                if (weaponResult.shouldFire && weaponResult.bulletCount > 0) {
+                    fireBullet(room, weaponResult.bulletCount);
+                    // Energy reset to 0 in fireBullet, don't update it
+                } else {
+                    // Only update energy if not firing
+                    room.systems.weapon.energy = weaponResult.newEnergy;
                 }
 
                 room.systems.weapon.hasPlayer = true;

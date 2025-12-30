@@ -373,6 +373,34 @@
             <p id="playerCount" style="font-size: 20px; color: #4CAF50;">Игроков: 0</p>
         </div>
 
+        <!-- Lobby Screen (Ship only) -->
+        <div id="lobbyScreen" class="screen">
+            <h2>🚀 Лобби</h2>
+            <div class="room-code" id="lobbyRoomCode">------</div>
+            <p style="font-size: 20px; margin-bottom: 40px;">Код комнаты</p>
+
+            <table style="width: 100%; max-width: 600px; margin: 0 auto; border-collapse: collapse; font-size: 20px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #4CAF50;">
+                        <th style="padding: 15px; text-align: left;">Роль</th>
+                        <th style="padding: 15px; text-align: left;">Игрок</th>
+                        <th style="padding: 15px; text-align: center;">Статус</th>
+                    </tr>
+                </thead>
+                <tbody id="lobbyTableBody">
+                    <!-- Динамически заполняется -->
+                </tbody>
+            </table>
+
+            <!-- Countdown Display -->
+            <div id="lobbyCountdownDisplay" style="display: none; margin-top: 50px; text-align: center; padding: 30px; background: rgba(76, 175, 80, 0.2); border-radius: 20px; border: 4px solid #4CAF50; max-width: 400px; margin-left: auto; margin-right: auto;">
+                <h1 id="lobbyCountdownNumber" style="font-size: 120px; margin: 0; color: #4CAF50; font-weight: bold;">5</h1>
+                <p style="margin: 20px 0 0 0; font-size: 24px; font-weight: bold;">Все готовы! Игра начинается...</p>
+            </div>
+
+            <div id="lobbyQRCode" style="margin-top: 40px;"></div>
+        </div>
+
         <!-- Win Screen -->
         <div id="winScreen" class="screen">
             <h1>🏆 Победа!</h1>
@@ -878,6 +906,11 @@
                 canvas.classList.remove('active');
                 roomInfo.style.display = 'none';
                 scoreboard.style.display = 'none';
+            } else if (screenName === 'lobby') {
+                document.getElementById('lobbyScreen').classList.add('active');
+                canvas.classList.remove('active');
+                roomInfo.style.display = 'none';
+                scoreboard.style.display = 'none';
             } else if (screenName === 'win') {
                 document.getElementById('winScreen').classList.add('active');
                 canvas.classList.remove('active');
@@ -1076,17 +1109,85 @@
 
                         updatePlayerCount();
 
-                        // Switch to game screen when first player joins
-                        if (gameState.players.length > 0 && !canvas.classList.contains('active')) {
-                            showScreen('game');
-                        }
+                        // For Ship game: show lobby instead of game until gameStarted
+                        if (gameType === 'ship') {
+                            if (gameState.players.length > 0 && !gameState.gameStarted) {
+                                const lobbyScreen = document.getElementById('lobbyScreen');
+                                if (!lobbyScreen.classList.contains('active')) {
+                                    showScreen('lobby');
+                                    document.getElementById('lobbyRoomCode').textContent = roomId;
+                                    // Generate QR code in lobby
+                                    document.getElementById('lobbyQRCode').innerHTML = '';
+                                    const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
+                                    const qrData = `${baseUrl}?room=${roomId}&game=${gameType}&server=${encodeURIComponent(serverUrl)}`;
+                                    new QRCode(document.getElementById('lobbyQRCode'), {
+                                        text: qrData,
+                                        width: 200,
+                                        height: 200,
+                                        colorDark: '#000000',
+                                        colorLight: '#ffffff',
+                                        correctLevel: QRCode.CorrectLevel.H
+                                    });
+                                }
+                                updateLobbyTable(gameState);
+                            } else if (gameState.gameStarted) {
+                                const lobbyScreen = document.getElementById('lobbyScreen');
+                                if (lobbyScreen.classList.contains('active')) {
+                                    showScreen('game');
+                                }
+                            } else if (gameState.players.length === 0) {
+                                showScreen('waiting');
+                            }
+                        } else {
+                            // Other games: switch to game screen when first player joins
+                            if (gameState.players.length > 0 && !canvas.classList.contains('active')) {
+                                showScreen('game');
+                            }
 
-                        // Switch back to waiting screen if all players leave
-                        if (gameState.players.length === 0 && canvas.classList.contains('active')) {
-                            showScreen('waiting');
+                            // Switch back to waiting screen if all players leave
+                            if (gameState.players.length === 0 && canvas.classList.contains('active')) {
+                                showScreen('waiting');
+                            }
                         }
                     } else if (data.type === 'effect') {
                         handleEffect(data.effectType, data.data);
+                    } else if (data.type === 'lobby_countdown') {
+                        // Show countdown on lobby screen
+                        const lobbyCountdownDisplay = document.getElementById('lobbyCountdownDisplay');
+                        const lobbyCountdownNumber = document.getElementById('lobbyCountdownNumber');
+
+                        if (lobbyCountdownDisplay && lobbyCountdownNumber) {
+                            lobbyCountdownDisplay.style.display = 'block';
+
+                            const startTime = data.startTime;
+                            const duration = data.duration;
+
+                            // Update countdown every 100ms for smooth display
+                            window.lobbyCountdownInterval = setInterval(() => {
+                                const elapsed = Date.now() - startTime;
+                                const remaining = Math.max(0, duration - elapsed);
+                                const count = Math.ceil(remaining / 1000);
+
+                                lobbyCountdownNumber.textContent = count;
+
+                                if (count === 0) {
+                                    clearInterval(window.lobbyCountdownInterval);
+                                    window.lobbyCountdownInterval = null;
+                                    // Wait for update message with gameStarted=true
+                                }
+                            }, 100);
+                        }
+                    } else if (data.type === 'lobby_countdown_cancelled') {
+                        // Hide countdown
+                        const lobbyCountdownDisplay = document.getElementById('lobbyCountdownDisplay');
+                        if (lobbyCountdownDisplay) {
+                            lobbyCountdownDisplay.style.display = 'none';
+                        }
+                        // Stop countdown timer
+                        if (window.lobbyCountdownInterval) {
+                            clearInterval(window.lobbyCountdownInterval);
+                            window.lobbyCountdownInterval = null;
+                        }
                     }
                 };
             } catch (error) {
@@ -1100,6 +1201,53 @@
             if (gameState) {
                 playerCount.textContent = `Игроков: ${gameState.players.length}`;
             }
+        }
+
+        function updateLobbyTable(gameState) {
+            const lobbyTableBody = document.getElementById('lobbyTableBody');
+            if (!lobbyTableBody || !gameState || !gameState.players) return;
+
+            const roleNames = {
+                engine: '⚙️ Двигатель',
+                rudder: '🧭 Руль',
+                weapon: '🔫 Оружие',
+                weaponDirection: '🎯 Прицел',
+                shield: '🛡️ Щит'
+            };
+
+            const roles = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
+            lobbyTableBody.innerHTML = '';
+
+            roles.forEach(role => {
+                const player = gameState.players.find(p => p.systemRole === role);
+
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+
+                // Role cell
+                const roleCell = document.createElement('td');
+                roleCell.style.padding = '12px';
+                roleCell.textContent = roleNames[role];
+                row.appendChild(roleCell);
+
+                // Player cell
+                const playerCell = document.createElement('td');
+                playerCell.style.padding = '12px';
+                playerCell.textContent = player ? player.name : '—';
+                playerCell.style.color = player ? player.color : '#666';
+                row.appendChild(playerCell);
+
+                // Status cell
+                const statusCell = document.createElement('td');
+                statusCell.style.padding = '12px';
+                statusCell.style.textAlign = 'center';
+                statusCell.style.fontSize = '24px';
+                statusCell.textContent = player && player.ready ? '✓' : '✗';
+                statusCell.style.color = player && player.ready ? '#4CAF50' : '#FF5252';
+                row.appendChild(statusCell);
+
+                lobbyTableBody.appendChild(row);
+            });
         }
 
         // Visual effects handlers

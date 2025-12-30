@@ -366,8 +366,6 @@
             <div class="instruction">
                 <p><strong>Как подключиться:</strong></p>
                 <p>📱 Отсканируйте QR-код камерой телефона</p>
-                <p style="font-size: 14px; opacity: 0.5;">или</p>
-                <p>⌨️ Введите код комнаты вручную</p>
             </div>
 
             <p id="playerCount" style="font-size: 20px; color: #4CAF50;">Игроков: 0</p>
@@ -397,8 +395,6 @@
                 <h1 id="lobbyCountdownNumber" style="font-size: 120px; margin: 0; color: #4CAF50; font-weight: bold;">5</h1>
                 <p style="margin: 20px 0 0 0; font-size: 24px; font-weight: bold;">Все готовы! Игра начинается...</p>
             </div>
-
-            <div id="lobbyQRCode" style="margin-top: 40px;"></div>
         </div>
 
         <!-- Win Screen -->
@@ -524,7 +520,7 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
-        console.log('🖥️ Display loaded [v3.14.8 - Position-based Weapon]');
+        console.log('🖥️ Display loaded [v3.15.0 - Polish & Bug Fixes]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1118,18 +1114,6 @@
                                 if (!lobbyScreen.classList.contains('active')) {
                                     showScreen('lobby');
                                     document.getElementById('lobbyRoomCode').textContent = roomId;
-                                    // Generate QR code in lobby
-                                    document.getElementById('lobbyQRCode').innerHTML = '';
-                                    const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
-                                    const qrData = `${baseUrl}?room=${roomId}&game=${gameType}&server=${encodeURIComponent(serverUrl)}`;
-                                    new QRCode(document.getElementById('lobbyQRCode'), {
-                                        text: qrData,
-                                        width: 200,
-                                        height: 200,
-                                        colorDark: '#000000',
-                                        colorLight: '#ffffff',
-                                        correctLevel: QRCode.CorrectLevel.H
-                                    });
                                 }
                                 updateLobbyTable(gameState);
                             } else if (gameState.gameStarted) {

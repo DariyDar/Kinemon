@@ -315,12 +315,6 @@
                     <!-- Динамически заполняется -->
                 </div>
             </div>
-
-            <!-- Countdown Display -->
-            <div id="countdownDisplay" style="display: none; margin-top: 30px; text-align: center; padding: 20px; background: rgba(76, 175, 80, 0.2); border-radius: 15px; border: 3px solid #4CAF50;">
-                <h1 id="countdownNumber" style="font-size: 72px; margin: 0; color: #4CAF50;">5</h1>
-                <p style="margin: 10px 0 0 0; font-size: 18px; font-weight: bold;">Все готовы! Игра начинается...</p>
-            </div>
         </div>
 
         <!-- QR Scanner Screen removed - now using native camera app -->
@@ -354,6 +348,11 @@
             <!-- Change Role button (Ship only) -->
             <button id="leavePostBtn" style="display: none; position: absolute; top: 10px; left: 10px; padding: 10px 20px; background: #FF9800; color: white; border: none; border-radius: 8px; font-size: 16px; z-index: 100;">
                 🔄 Сменить роль
+            </button>
+
+            <!-- Calibration button (Ship only) -->
+            <button id="recalibrateBtn" style="display: none; position: absolute; top: 10px; left: 200px; padding: 10px 15px; font-size: 14px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 100;">
+                📐 Калибровка
             </button>
 
             <h2>🎮 Управление</h2>
@@ -491,7 +490,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.14.8 - Position-based Weapon]', 'success');
+        addDebugLog('📱 Страница загружена [v3.15.0 - Polish & Bug Fixes]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -571,8 +570,23 @@
                 calibrationMaxScreen.classList.add('active');
             } else if (screenName === 'controller') {
                 controllerScreen.classList.add('active');
+                // Ensure role change and calibration buttons are visible for Ship game players
+                const leavePostBtn = document.getElementById('leavePostBtn');
+                const recalibrateBtn = document.getElementById('recalibrateBtn');
+                if (gameType === 'ship') {
+                    if (leavePostBtn) leavePostBtn.style.display = 'block';
+                    if (recalibrateBtn) recalibrateBtn.style.display = 'block';
+                }
             } else if (screenName === 'death') {
                 deathScreen.classList.add('active');
+            }
+
+            // Hide debug logs after moving past name entry (waiting screen)
+            if (screenName !== 'waiting') {
+                const debugDisplay = document.getElementById('debugDisplay');
+                if (debugDisplay) {
+                    debugDisplay.style.display = 'none';
+                }
             }
         }
 
@@ -758,6 +772,32 @@
                                     }
                                 });
                             });
+
+                            // Setup Recalibration button handler
+                            const recalibrateBtn = document.getElementById('recalibrateBtn');
+                            if (recalibrateBtn) {
+                                recalibrateBtn.style.display = 'block';
+
+                                recalibrateBtn.addEventListener('click', async () => {
+                                    addDebugLog('📐 Начало перекалибровки', 'info');
+
+                                    try {
+                                        // Reset calibration
+                                        calibration.reset();
+                                        addDebugLog('🔄 Калибровка сброшена', 'info');
+
+                                        // Start new calibration
+                                        await calibration.start();
+
+                                        addDebugLog('✅ Калибровка завершена', 'success');
+
+                                        // Return to controller screen
+                                        showScreen('controller');
+                                    } catch (err) {
+                                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                                    }
+                                });
+                            }
                         }
 
                         // Request wake lock to prevent phone sleep
@@ -997,21 +1037,13 @@
                                 updateLobbyPlayers(data.gameState);
                             }
 
-                            // Check if game already started (reconnect handling)
+                            // Check if game already started (late-join handling)
                             if (data.gameStarted) {
-                                addDebugLog('🎮 Игра уже началась, пропускаем лобби', 'info');
-                                // Game already running - skip lobby, start calibration immediately
-                                (async () => {
-                                    try {
-                                        motionController.start();
-                                        await calibration.start();
-                                        showScreen('controller');
-                                        addDebugLog('📐 Калибровка завершена, присоединяемся к игре как наблюдатель', 'info');
-                                    } catch (err) {
-                                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
-                                        alert('❌ Ошибка калибровки: ' + err.message);
-                                    }
-                                })();
+                                addDebugLog('🎮 Игра уже началась, показываем выбор роли', 'info');
+                                // Game already running - show role selection (calibration will follow)
+                                document.getElementById('roleSelectionRoomName').textContent = roomId.toUpperCase() + ' ROOM';
+                                showScreen('role-selection');
+                                addDebugLog('🎯 Показан экран выбора роли для late-joiner', 'success');
                             } else {
                                 // Game in lobby - show lobby screen
                                 document.getElementById('lobbyRoomName').textContent = roomId.toUpperCase() + ' ROOM';
@@ -1086,10 +1118,6 @@
                     // Handle lobby countdown cancelled
                     if (data.type === 'lobby_countdown_cancelled') {
                         addDebugLog('⚠️ Countdown отменён - кто-то снял готовность', 'info');
-                        const countdownDisplay = document.getElementById('countdownDisplay');
-                        if (countdownDisplay) {
-                            countdownDisplay.style.display = 'none';
-                        }
                         // Stop local countdown timer if exists
                         if (window.lobbyCountdownInterval) {
                             clearInterval(window.lobbyCountdownInterval);
@@ -1097,33 +1125,10 @@
                         }
                     }
 
-                    // Handle lobby countdown (show countdown in lobby)
+                    // Handle lobby countdown (countdown only shown on Display, not on controllers)
                     if (data.type === 'lobby_countdown') {
                         addDebugLog('⏱️ Countdown начался!', 'success');
-                        const countdownDisplay = document.getElementById('countdownDisplay');
-                        const countdownNumber = document.getElementById('countdownNumber');
-
-                        if (countdownDisplay && countdownNumber) {
-                            countdownDisplay.style.display = 'block';
-
-                            const startTime = data.startTime;
-                            const duration = data.duration;
-
-                            // Update countdown every 100ms for smooth display
-                            window.lobbyCountdownInterval = setInterval(() => {
-                                const elapsed = Date.now() - startTime;
-                                const remaining = Math.max(0, duration - elapsed);
-                                const count = Math.ceil(remaining / 1000);
-
-                                countdownNumber.textContent = count;
-
-                                if (count === 0) {
-                                    clearInterval(window.lobbyCountdownInterval);
-                                    window.lobbyCountdownInterval = null;
-                                    // Wait for start_calibration message from server
-                                }
-                            }, 100);
-                        }
+                        // Countdown visuals removed from controller - shown only on Display
                     }
 
                     // Handle start calibration (after countdown finishes)

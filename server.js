@@ -501,19 +501,42 @@ function getEnergyLevel(energy) {
 function calculateEngineThrust(energy, formula, room) {
     if (energy <= 0) return 0;
 
-    // Energy decays slowly, providing sustained thrust
-    const normalizedEnergy = Math.min(energy / 10, 1); // 0-1
-    const thrustMult = (room.physics && room.physics.thrustMult) || 0.8;
+    // Base multiplier (zone 1: 0-150)
+    const baseMult = (room.physics && room.physics.thrustMult) || 0.1;
 
+    // Determine zone and calculate compound multiplier (+20% per zone)
+    let zoneMultiplier = 1.0;
+
+    if (energy >= 600) {
+        // Zone 5 (600-750): 4 compounded 20% increases
+        zoneMultiplier = 1.2 * 1.2 * 1.2 * 1.2; // = 2.0736
+    } else if (energy >= 450) {
+        // Zone 4 (450-600): 3 compounded 20% increases
+        zoneMultiplier = 1.2 * 1.2 * 1.2; // = 1.728
+    } else if (energy >= 300) {
+        // Zone 3 (300-450): 2 compounded 20% increases
+        zoneMultiplier = 1.2 * 1.2; // = 1.44
+    } else if (energy >= 150) {
+        // Zone 2 (150-300): 1 compounded 20% increase
+        zoneMultiplier = 1.2;
+    }
+    // Zone 1 (0-150): multiplier = 1.0 (base)
+
+    const finalMult = baseMult * zoneMultiplier;
+
+    // Normalize energy for gradient system (0-750 range)
+    const normalizedEnergy = Math.min(energy / 750, 1);
+
+    // Apply formula modifiers
     switch (formula) {
         case 'balanced':
-            return thrustMult * normalizedEnergy;
+            return finalMult * normalizedEnergy;
         case 'speed':
-            return (thrustMult * 1.25) * normalizedEnergy;
+            return (finalMult * 1.25) * normalizedEnergy;
         case 'combo':
-            return (thrustMult * 0.75) * normalizedEnergy;
+            return (finalMult * 0.75) * normalizedEnergy;
         default:
-            return thrustMult * normalizedEnergy;
+            return finalMult * normalizedEnergy;
     }
 }
 

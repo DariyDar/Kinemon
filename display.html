@@ -2096,8 +2096,8 @@
                         }
                     }
 
-                    // Draw weapon charging cone (only while charging)
-                    if (gameState.weaponCharging && gameState.weaponEnergy > 0) {
+                    // Draw weapon charging cone (visible when energy > 0)
+                    if (gameState.weaponEnergy > 0) {
                         const weaponPos = getSystemPosition(ship, gameState.systems.weaponDirection.rotation);
                         const weaponAngle = gameState.systems.weaponDirection.rotation * Math.PI / 180;
 

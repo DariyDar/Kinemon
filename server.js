@@ -393,52 +393,43 @@ function detectPump(player, currentTilt, room) {
     return 0; // No pump
 }
 
-// Detect weapon pump motion for charging (upward movement)
-// Returns { energyAdded, shouldFire }
-function detectWeaponPump(player, currentTilt, room) {
+// Weapon charging based on tilt position (not pump speed)
+// Energy directly maps to tilt position: 0-1 → 0-10
+// Returns { newEnergy, shouldFire }
+function updateWeaponCharge(player, currentTilt, room) {
     const weapon = room.systems.weapon;
 
     // Initialize on first call
     if (weapon.lastWeaponTilt === undefined) {
         weapon.lastWeaponTilt = currentTilt;
-        weapon.wasCharging = false;
-        return { energyAdded: 0, shouldFire: false };
+        weapon.maxTiltReached = currentTilt;
+        return { newEnergy: currentTilt * 10, shouldFire: false };
     }
 
     const lastTilt = weapon.lastWeaponTilt;
     const delta = currentTilt - lastTilt;
     weapon.lastWeaponTilt = currentTilt;
 
-    const pumpThreshold = (room.physics && room.physics.pumpMinDelta) || 0.15;
+    // Track maximum tilt reached (for charging)
+    if (currentTilt > weapon.maxTiltReached) {
+        weapon.maxTiltReached = currentTilt;
+    }
 
-    let energyAdded = 0;
+    // Energy = current tilt position (0-1 → 0-10)
+    const newEnergy = currentTilt * 10;
+
+    // FIRE TRIGGER: Movement changes from up to down
     let shouldFire = false;
-
-    // CHARGING: Upward movement (delta > threshold)
-    if (delta > pumpThreshold) {
-        weapon.isCharging = true;
-        weapon.wasCharging = true;
-
-        const pumpStrength = Math.min(delta, 0.5) * 2; // 0-1 normalized
-        const pumpEnergyMult = (room.physics && room.physics.pumpEnergy) || 16;
-        energyAdded = pumpStrength * pumpEnergyMult;
-
-        console.log(`⚡ Weapon Charge! Δ${delta.toFixed(3)}, Energy: +${energyAdded.toFixed(2)}`);
-    }
-    // FIRE TRIGGER: Was charging, now movement stopped or reversed
-    else if (weapon.wasCharging && delta < 0) {
+    if (delta < -0.02) { // Small threshold to avoid noise
         shouldFire = true;
-        weapon.isCharging = false;
-        weapon.wasCharging = false;
-
-        console.log(`💥 Weapon Fire Trigger! Δ${delta.toFixed(3)}, Energy: ${weapon.energy.toFixed(2)}`);
-    }
-    else {
-        weapon.isCharging = false;
-        // Don't reset wasCharging here - only reset on fire
+        weapon.maxTiltReached = currentTilt; // Reset max after firing
+        console.log(`💥 Weapon Fire! Tilt: ${currentTilt.toFixed(3)}, Energy: ${newEnergy.toFixed(2)}`);
     }
 
-    return { energyAdded, shouldFire };
+    // Always charging when tilt > 0
+    weapon.isCharging = currentTilt > 0.05;
+
+    return { newEnergy, shouldFire };
 }
 
 // Calculate energy from tilt angle (gradient system)
@@ -2214,19 +2205,14 @@ function updateShip(room) {
                 room.systems.rudder.rotation = tilt * 360;
                 break;
             case 'weapon':
-                // Pump-based weapon charging system
-                const pumpResult = detectWeaponPump(player, tilt, room);
+                // Position-based weapon charging system
+                const weaponResult = updateWeaponCharge(player, tilt, room);
 
-                // Add energy from charging (upward movement)
-                if (pumpResult.energyAdded > 0) {
-                    room.systems.weapon.energy = Math.min(
-                        room.systems.weapon.energy + pumpResult.energyAdded,
-                        10  // Cap at 10
-                    );
-                }
+                // Set energy directly from tilt position
+                room.systems.weapon.energy = weaponResult.newEnergy;
 
                 // Fire on downward movement
-                if (pumpResult.shouldFire) {
+                if (weaponResult.shouldFire) {
                     fireBullet(room);
                 }
 
@@ -2293,11 +2279,7 @@ function updateShip(room) {
     // 4. Update ship position
     updateShipPosition(room);
 
-    // 5. Weapon energy decay (same as engine)
-    const weaponEnergyDecay = (room.physics && room.physics.energyDecay) || 0.05;
-    room.systems.weapon.energy = Math.max(0, room.systems.weapon.energy - weaponEnergyDecay);
-
-    // 6. Update bullets
+    // 5. Update bullets
     for (let i = room.bullets.length - 1; i >= 0; i--) {
         const bullet = room.bullets[i];
         bullet.x += bullet.vx;

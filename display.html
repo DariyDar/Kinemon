@@ -524,7 +524,7 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
-        console.log('🖥️ Display loaded [v3.13.5 - Lobby System]');
+        console.log('🖥️ Display loaded [v3.14.0 - Weapon Pump System]');
 
         let gameSettings = {}; // Store game settings
 
@@ -2113,22 +2113,39 @@
                         const coneStartWidth = futureSize * 0.5;
                         const coneEndWidth = futureSize * 1.5;
 
-                        // Color based on energy level
-                        let coneColor;
-                        if (energy < 2) coneColor = '#00FFFF';      // Голубой
-                        else if (energy < 4) coneColor = '#00FF00'; // Зелёный
-                        else if (energy < 6) coneColor = '#FFFF00'; // Жёлтый
-                        else if (energy < 8) coneColor = '#FFA500'; // Оранжевый
-                        else coneColor = '#FF0000';                 // Красный
-
                         ctx.save();
                         ctx.translate(weaponPos.x, weaponPos.y);
                         ctx.rotate(weaponAngle);
 
-                        // Gradient cone
+                        // Gradient fill: голубой -> зелёный -> жёлтый -> оранжевый -> красный
+                        // Always starts from cyan at base, fills up to current energy level
                         const gradient = ctx.createLinearGradient(0, 0, coneLength, 0);
-                        gradient.addColorStop(0, coneColor + '80');
-                        gradient.addColorStop(1, coneColor + '20');
+
+                        // Progress fill (0-10 energy -> 0-100%)
+                        const fillPercent = Math.min(energy / 10, 1);
+
+                        // Gradient stops based on energy level
+                        gradient.addColorStop(0, '#00FFFF');  // Голубой (всегда у основания)
+
+                        if (fillPercent > 0.2) {
+                            gradient.addColorStop(0.2, '#00FF00');  // Зелёный
+                        }
+                        if (fillPercent > 0.4) {
+                            gradient.addColorStop(0.4, '#FFFF00');  // Жёлтый
+                        }
+                        if (fillPercent > 0.6) {
+                            gradient.addColorStop(0.6, '#FFA500');  // Оранжевый
+                        }
+                        if (fillPercent > 0.8) {
+                            gradient.addColorStop(0.8, '#FF0000');  // Красный
+                        }
+
+                        // Fade out at the end
+                        gradient.addColorStop(fillPercent, fillPercent >= 0.8 ? '#FF0000' :
+                                                           fillPercent >= 0.6 ? '#FFA500' :
+                                                           fillPercent >= 0.4 ? '#FFFF00' :
+                                                           fillPercent >= 0.2 ? '#00FF00' : '#00FFFF');
+                        gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');  // Прозрачный
 
                         ctx.fillStyle = gradient;
                         ctx.beginPath();
@@ -2140,8 +2157,12 @@
                         ctx.fill();
 
                         // Outline
-                        ctx.strokeStyle = coneColor;
-                        ctx.lineWidth = 1;
+                        const outlineColor = fillPercent >= 0.8 ? '#FF0000' :
+                                            fillPercent >= 0.6 ? '#FFA500' :
+                                            fillPercent >= 0.4 ? '#FFFF00' :
+                                            fillPercent >= 0.2 ? '#00FF00' : '#00FFFF';
+                        ctx.strokeStyle = outlineColor;
+                        ctx.lineWidth = 2;
                         ctx.stroke();
 
                         ctx.restore();

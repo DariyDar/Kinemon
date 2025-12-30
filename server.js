@@ -398,9 +398,10 @@ function detectPump(player, currentTilt, room) {
 function detectWeaponPump(player, currentTilt, room) {
     const weapon = room.systems.weapon;
 
-    // Initialize lastWeaponTilt if not set
+    // Initialize on first call
     if (weapon.lastWeaponTilt === undefined) {
         weapon.lastWeaponTilt = currentTilt;
+        weapon.wasCharging = false;
         return { energyAdded: 0, shouldFire: false };
     }
 
@@ -408,7 +409,6 @@ function detectWeaponPump(player, currentTilt, room) {
     const delta = currentTilt - lastTilt;
     weapon.lastWeaponTilt = currentTilt;
 
-    // Detect upward movement (charging)
     const pumpThreshold = (room.physics && room.physics.pumpMinDelta) || 0.15;
 
     let energyAdded = 0;
@@ -417,6 +417,7 @@ function detectWeaponPump(player, currentTilt, room) {
     // CHARGING: Upward movement (delta > threshold)
     if (delta > pumpThreshold) {
         weapon.isCharging = true;
+        weapon.wasCharging = true;
 
         const pumpStrength = Math.min(delta, 0.5) * 2; // 0-1 normalized
         const pumpEnergyMult = (room.physics && room.physics.pumpEnergy) || 16;
@@ -424,15 +425,17 @@ function detectWeaponPump(player, currentTilt, room) {
 
         console.log(`⚡ Weapon Charge! Δ${delta.toFixed(3)}, Energy: +${energyAdded.toFixed(2)}`);
     }
-    // FIRE TRIGGER: Downward movement (delta < -threshold)
-    else if (delta < -pumpThreshold) {
+    // FIRE TRIGGER: Was charging, now movement stopped or reversed
+    else if (weapon.wasCharging && delta < 0) {
         shouldFire = true;
         weapon.isCharging = false;
+        weapon.wasCharging = false;
 
-        console.log(`💥 Weapon Fire! Energy: ${weapon.energy.toFixed(2)}`);
+        console.log(`💥 Weapon Fire Trigger! Δ${delta.toFixed(3)}, Energy: ${weapon.energy.toFixed(2)}`);
     }
     else {
         weapon.isCharging = false;
+        // Don't reset wasCharging here - only reset on fire
     }
 
     return { energyAdded, shouldFire };

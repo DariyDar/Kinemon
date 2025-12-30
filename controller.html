@@ -640,22 +640,33 @@
                     // Set calibration complete callback
                     calibration.onComplete = async (min, max) => {
                         console.log('Calibration complete:', min, max);
+                        addDebugLog('✅ Калибровка завершена', 'success');
 
-                        // Send join message with game type and control scheme
-                        const joinMessage = {
-                            type: 'join',
-                            roomId: roomId,
-                            name: playerNameInput.value.trim() || 'Player',
-                            gameType: gameType,
-                            controlScheme: currentControlScheme
-                        };
+                        // For Ship game: send player_ready after calibration
+                        if (gameType === 'ship') {
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    type: 'player_ready'
+                                }));
+                                addDebugLog('🎮 Отправлено player_ready', 'success');
+                            }
+                        } else {
+                            // For other games: send join message with game type and control scheme
+                            const joinMessage = {
+                                type: 'join',
+                                roomId: roomId,
+                                name: playerNameInput.value.trim() || 'Player',
+                                gameType: gameType,
+                                controlScheme: currentControlScheme
+                            };
 
-                        // Add team for pushers game
-                        if (gameType === 'pushers') {
-                            joinMessage.team = document.getElementById('teamSelect').value;
+                            // Add team for pushers game
+                            if (gameType === 'pushers') {
+                                joinMessage.team = document.getElementById('teamSelect').value;
+                            }
+
+                            ws.send(JSON.stringify(joinMessage));
                         }
-
-                        ws.send(JSON.stringify(joinMessage));
 
                         playerNameDisplay.textContent = playerNameInput.value.trim() || 'Player';
                         showScreen('controller');
@@ -728,14 +739,32 @@
                         };
                     };
 
-                    // Start motion tracking and calibration
-                    try {
-                        motionController.start();
-                        await calibration.start();
-                        showScreen('calibration-min');
-                    } catch (err) {
-                        alert('❌ Ошибка калибровки: ' + err.message);
-                        showScreen('room-input');
+                    // For Ship game: send join immediately, show role selection
+                    if (gameType === 'ship') {
+                        addDebugLog('🚢 Ship игра - отправка join сразу', 'info');
+                        const joinMessage = {
+                            type: 'join',
+                            roomId: roomId,
+                            name: playerNameInput.value.trim() || 'Player',
+                            gameType: gameType,
+                            controlScheme: currentControlScheme
+                        };
+                        ws.send(JSON.stringify(joinMessage));
+                        addDebugLog('✅ Join отправлен, ожидаем init...', 'success');
+                        console.log('Sent join message for Ship game:', joinMessage);
+
+                        // Don't start calibration yet - wait for role selection
+                        // Calibration will start when player clicks "Ready" button
+                    } else {
+                        // For other games: start calibration immediately
+                        try {
+                            motionController.start();
+                            await calibration.start();
+                            showScreen('calibration-min');
+                        } catch (err) {
+                            alert('❌ Ошибка калибровки: ' + err.message);
+                            showScreen('room-input');
+                        }
                     }
                 };
 
@@ -830,12 +859,18 @@
                             // Ready button click handler
                             const readyBtn = document.getElementById('readyBtn');
                             if (readyBtn) {
-                                readyBtn.addEventListener('click', () => {
-                                    if (ws && ws.readyState === WebSocket.OPEN) {
-                                        addDebugLog('✅ Нажата кнопка Готов', 'success');
-                                        ws.send(JSON.stringify({
-                                            type: 'player_ready'
-                                        }));
+                                readyBtn.addEventListener('click', async () => {
+                                    addDebugLog('✅ Нажата кнопка Готов - запуск калибровки', 'success');
+
+                                    // Start motion tracking and calibration
+                                    try {
+                                        motionController.start();
+                                        await calibration.start();
+                                        showScreen('calibration-min');
+                                        addDebugLog('📐 Калибровка начата', 'info');
+                                    } catch (err) {
+                                        addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                                        alert('❌ Ошибка калибровки: ' + err.message);
                                     }
                                 });
                             }
@@ -844,6 +879,10 @@
                             if (data.gameState) {
                                 updateRoleButtons(data.gameState);
                             }
+
+                            // Show role selection screen
+                            showScreen('room-input'); // This shows the role selection panel
+                            addDebugLog('👁️ Показан экран выбора роли', 'success');
                         }
                     }
 

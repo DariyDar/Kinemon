@@ -436,6 +436,7 @@
         if (gameFromUrl) {
             gameType = gameFromUrl;
             console.log('Game type from URL:', gameType);
+            addDebugLog(`🎯 gameType установлен: "${gameType}"`, 'info');
 
             // Update game title based on game type
             const gameTitles = {
@@ -772,6 +773,8 @@
                     if (data.type === 'init') {
                         playerId = data.playerId;
                         console.log('Received player ID:', playerId);
+                        addDebugLog(`🎮 Init получен, gameType: "${gameType}"`, 'info');
+                        console.log('Current gameType:', gameType, 'Type:', typeof gameType);
 
                         // For pushers game, show the assigned axis
                         if (gameType === 'pushers' && data.gameState && data.gameState.players) {
@@ -790,6 +793,7 @@
                         }
 
                         // For Ship game, setup role selection handlers
+                        addDebugLog(`🔍 Проверка: gameType === 'ship' ? ${gameType === 'ship'} (gameType="${gameType}")`, 'info');
                         if (gameType === 'ship') {
                             addDebugLog('⚙️ Настройка обработчиков ролей для Ship', 'info');
                             console.log('Setting up Ship role handlers, found buttons:', document.querySelectorAll('.role-btn').length);

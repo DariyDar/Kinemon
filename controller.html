@@ -415,6 +415,24 @@
         const tiltDisplay = document.getElementById('tiltDisplay');
         const playerNameDisplay = document.getElementById('playerNameDisplay');
 
+        // Debug logging function (displays on screen for mobile testing) - MUST BE DECLARED FIRST
+        const debugDisplay = document.getElementById('debugDisplay');
+        const debugLog = document.getElementById('debugLog');
+        let debugMessages = [];
+
+        function addDebugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff5252' : type === 'success' ? '#4CAF50' : '#fff';
+
+            debugMessages.push(`<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`);
+            if (debugMessages.length > 20) debugMessages.shift(); // Keep last 20 messages
+
+            debugLog.innerHTML = debugMessages.join('');
+            debugDisplay.style.display = 'block';
+
+            console.log(`[DEBUG] ${message}`);
+        }
+
         // Debug: Log all URL info
         console.log('=== QR Code Auto-fill Debug ===');
         console.log('Full URL:', window.location.href);
@@ -432,6 +450,16 @@
             game: gameFromUrl
         });
 
+        // Set default server URL based on current location
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
+        const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
+
+        // Initial page load log
+        addDebugLog('📱 Страница загружена', 'info');
+        addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
+        addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
+        addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
+
         // Set game type if provided
         if (gameFromUrl) {
             gameType = gameFromUrl;
@@ -445,37 +473,17 @@
                 'pushers': 'ТОЛКАТЕЛИ',
                 'ship': 'SHIP GAME'
             };
-            gameTitle.textContent = gameTitles[gameType] || 'GAME';
+            const newTitle = gameTitles[gameType] || 'GAME';
+            gameTitle.textContent = newTitle;
+            addDebugLog(`✏️ Заголовок игры изменен на: "${newTitle}"`, 'success');
         }
 
         // Set room name if provided
         if (roomFromUrl) {
-            roomNameDisplay.textContent = `${roomFromUrl} ROOM`;
+            const newRoomName = `${roomFromUrl} ROOM`;
+            roomNameDisplay.textContent = newRoomName;
+            addDebugLog(`🏠 Название комнаты установлено: "${newRoomName}"`, 'success');
             console.log('Room from URL:', roomFromUrl);
-        }
-
-        // Set default server URL based on current location
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '';
-        const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
-
-        console.log('Default server:', defaultServer);
-
-        // Debug logging function (displays on screen for mobile testing)
-        const debugDisplay = document.getElementById('debugDisplay');
-        const debugLog = document.getElementById('debugLog');
-        let debugMessages = [];
-
-        function addDebugLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const color = type === 'error' ? '#ff5252' : type === 'success' ? '#4CAF50' : '#fff';
-
-            debugMessages.push(`<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`);
-            if (debugMessages.length > 20) debugMessages.shift(); // Keep last 20 messages
-
-            debugLog.innerHTML = debugMessages.join('');
-            debugDisplay.style.display = 'block';
-
-            console.log(`[DEBUG] ${message}`);
         }
 
         // Set random player name on page load

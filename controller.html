@@ -280,11 +280,6 @@
 
             <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
 
-            <!-- Debug Display (for mobile testing) -->
-            <div id="debugDisplay" style="margin-top: 20px; padding: 15px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto; display: none;">
-                <div style="font-weight: bold; margin-bottom: 10px; color: #4CAF50;">🔍 Debug Info:</div>
-                <div id="debugLog"></div>
-            </div>
         </div>
 
         <!-- Lobby Screen (Ship only) -->
@@ -296,10 +291,10 @@
             <div id="roleSelectionPanel" style="display: block;">
                 <div class="role-panel-title">Выбор роли:</div>
                 <div class="role-buttons">
-                    <button class="role-btn" data-role="engine">⚙️ Двигатель</button>
-                    <button class="role-btn" data-role="rudder">🧭 Руль</button>
-                    <button class="role-btn" data-role="weapon">🔫 Оружие</button>
-                    <button class="role-btn" data-role="weaponDirection">🎯 Прицел</button>
+                    <button class="role-btn" data-role="engine">⚙️ Двигатель Тяга</button>
+                    <button class="role-btn" data-role="rudder">🧭 Двигатель Руль</button>
+                    <button class="role-btn" data-role="weapon">🔫 Орудия Стрельба</button>
+                    <button class="role-btn" data-role="weaponDirection">🎯 Орудия Прицеливание</button>
                     <button class="role-btn" data-role="shield">🛡️ Щит</button>
                 </div>
 
@@ -376,10 +371,10 @@
                 <div id="roleSelectionInGame">
                     <div class="role-panel-title">Выберите новую роль:</div>
                     <div class="role-buttons">
-                        <button class="role-btn-overlay" data-role="engine">⚙️ Двигатель</button>
-                        <button class="role-btn-overlay" data-role="rudder">🧭 Руль</button>
-                        <button class="role-btn-overlay" data-role="weapon">🔫 Оружие</button>
-                        <button class="role-btn-overlay" data-role="weaponDirection">🎯 Прицел</button>
+                        <button class="role-btn-overlay" data-role="engine">⚙️ Двигатель Тяга</button>
+                        <button class="role-btn-overlay" data-role="rudder">🧭 Двигатель Руль</button>
+                        <button class="role-btn-overlay" data-role="weapon">🔫 Орудия Стрельба</button>
+                        <button class="role-btn-overlay" data-role="weaponDirection">🎯 Орудия Прицеливание</button>
                         <button class="role-btn-overlay" data-role="shield">🛡️ Щит</button>
                     </div>
                 </div>
@@ -451,21 +446,9 @@
         const playerNameDisplay = document.getElementById('playerNameDisplay');
 
         // Debug logging function (displays on screen for mobile testing) - MUST BE DECLARED FIRST
-        const debugDisplay = document.getElementById('debugDisplay');
-        const debugLog = document.getElementById('debugLog');
-        let debugMessages = [];
-
+        // Debug logging disabled in production
         function addDebugLog(message, type = 'info') {
-            const timestamp = new Date().toLocaleTimeString();
-            const color = type === 'error' ? '#ff5252' : type === 'success' ? '#4CAF50' : '#fff';
-
-            debugMessages.push(`<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`);
-            if (debugMessages.length > 20) debugMessages.shift(); // Keep last 20 messages
-
-            debugLog.innerHTML = debugMessages.join('');
-            debugDisplay.style.display = 'block';
-
-            console.log(`[DEBUG] ${message}`);
+            // No-op - debug logs removed from UI
         }
 
         // Debug: Log all URL info
@@ -490,7 +473,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.15.0 - Polish & Bug Fixes]', 'success');
+        addDebugLog('📱 Страница загружена [v3.15.1 - UI/UX Fixes]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -579,14 +562,6 @@
                 }
             } else if (screenName === 'death') {
                 deathScreen.classList.add('active');
-            }
-
-            // Hide debug logs after moving past name entry (waiting screen)
-            if (screenName !== 'waiting') {
-                const debugDisplay = document.getElementById('debugDisplay');
-                if (debugDisplay) {
-                    debugDisplay.style.display = 'none';
-                }
             }
         }
 
@@ -786,7 +761,8 @@
                                         calibration.reset();
                                         addDebugLog('🔄 Калибровка сброшена', 'info');
 
-                                        // Start new calibration
+                                        // Show calibration screen and start calibration process
+                                        showScreen('calibration-min');
                                         await calibration.start();
 
                                         addDebugLog('✅ Калибровка завершена', 'success');
@@ -1039,11 +1015,12 @@
 
                             // Check if game already started (late-join handling)
                             if (data.gameStarted) {
-                                addDebugLog('🎮 Игра уже началась, показываем выбор роли', 'info');
-                                // Game already running - show role selection (calibration will follow)
-                                document.getElementById('roleSelectionRoomName').textContent = roomId.toUpperCase() + ' ROOM';
-                                showScreen('role-selection');
-                                addDebugLog('🎯 Показан экран выбора роли для late-joiner', 'success');
+                                addDebugLog('🎮 Игра уже началась, показываем лобби для выбора роли', 'info');
+                                // Game already running - show lobby for role selection (calibration will follow after role chosen)
+                                document.getElementById('lobbyRoomName').textContent = roomId.toUpperCase() + ' ROOM';
+                                showScreen('lobby');
+                                window.isLateJoiner = true; // Flag to trigger calibration after role selection
+                                addDebugLog('🎯 Показан лобби для late-joiner, ожидаем выбор роли', 'success');
                             } else {
                                 // Game in lobby - show lobby screen
                                 document.getElementById('lobbyRoomName').textContent = roomId.toUpperCase() + ' ROOM';
@@ -1066,10 +1043,10 @@
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);
                             if (myPlayer && myPlayer.systemRole) {
                                 const roleNames = {
-                                    engine: '⚙️ Двигатель',
-                                    rudder: '🧭 Руль',
-                                    weapon: '🔫 Оружие',
-                                    weaponDirection: '🎯 Прицел',
+                                    engine: '⚙️ Двигатель Тяга',
+                                    rudder: '🧭 Двигатель Руль',
+                                    weapon: '🔫 Орудия Стрельба',
+                                    weaponDirection: '🎯 Орудия Прицеливание',
                                     shield: '🛡️ Щит'
                                 };
                                 const roleInfo = document.getElementById('roleInfo');
@@ -1086,6 +1063,24 @@
                                     if (myPlayer.systemRole !== roleBeforeChange) {
                                         roleChangeOverlay.style.display = 'none';
                                         addDebugLog(`✅ Роль изменена: ${roleBeforeChange} → ${myPlayer.systemRole}`, 'success');
+
+                                        // For late-joiners: if game started and just got assigned a role, start calibration
+                                        if (window.isLateJoiner && myPlayer.systemRole) {
+                                            addDebugLog('🎮 Late-joiner получил роль, запускаем калибровку', 'info');
+                                            window.isLateJoiner = false; // Clear flag
+                                            (async () => {
+                                                try {
+                                                    motionController.start();
+                                                    await calibration.start();
+                                                    showScreen('calibration-min');
+                                                    addDebugLog('📐 Калибровка начата для late-joiner', 'info');
+                                                } catch (err) {
+                                                    addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
+                                                    alert('❌ Ошибка калибровки: ' + err.message);
+                                                }
+                                            })();
+                                        }
+
                                         roleBeforeChange = null; // Reset
                                     } else {
                                         addDebugLog('⏳ Роль не изменилась, overlay остаётся открытым', 'info');
@@ -1223,10 +1218,10 @@
 
                 // Reset button text to default
                 const roleNames = {
-                    engine: '⚙️ Двигатель',
-                    rudder: '🧭 Руль',
-                    weapon: '🔫 Оружие',
-                    weaponDirection: '🎯 Прицел',
+                    engine: '⚙️ Двигатель Тяга',
+                    rudder: '🧭 Двигатель Руль',
+                    weapon: '🔫 Орудия Стрельба',
+                    weaponDirection: '🎯 Орудия Прицеливание',
                     shield: '🛡️ Щит'
                 };
                 btn.textContent = roleNames[role];
@@ -1294,10 +1289,10 @@
             }
 
             const roleNames = {
-                engine: '⚙️ Двигатель',
-                rudder: '🧭 Руль',
-                weapon: '🔫 Оружие',
-                weaponDirection: '🎯 Прицел',
+                engine: '⚙️ Двигатель Тяга',
+                rudder: '🧭 Двигатель Руль',
+                weapon: '🔫 Орудия Стрельба',
+                weaponDirection: '🎯 Орудия Прицеливание',
                 shield: '🛡️ Щит'
             };
 
@@ -1322,10 +1317,10 @@
             const players = window.currentGameState.players || [];
 
             const roleNames = {
-                engine: '⚙️ Двигатель',
-                rudder: '🧭 Руль',
-                weapon: '🔫 Оружие',
-                weaponDirection: '🎯 Прицел',
+                engine: '⚙️ Двигатель Тяга',
+                rudder: '🧭 Двигатель Руль',
+                weapon: '🔫 Орудия Стрельба',
+                weaponDirection: '🎯 Орудия Прицеливание',
                 shield: '🛡️ Щит'
             };
 

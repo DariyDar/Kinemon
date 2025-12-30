@@ -502,7 +502,7 @@ function calculateEngineThrust(energy, formula, room) {
     if (energy <= 0) return 0;
 
     // Base multiplier (zone 1: 0-150)
-    const baseMult = (room.physics && room.physics.thrustMult) || 0.1;
+    const baseMult = (room.physics && room.physics.thrustMult) || 0.5;
 
     // Determine zone and calculate compound multiplier (+20% per zone)
     let zoneMultiplier = 1.0;
@@ -581,7 +581,7 @@ function applyEngineThrust(room) {
         room.systems.engine.energy = Math.max(0, room.systems.engine.energy - decayPerFrame);
     } else {
         // Pump system - constant decay
-        const energyDecay = (room.physics && room.physics.energyDecay) || 0.05;
+        const energyDecay = (room.physics && room.physics.energyDecay) || 50;
         room.systems.engine.energy = Math.max(0, room.systems.engine.energy - energyDecay);
     }
 }
@@ -1012,16 +1012,16 @@ function startLobbyCountdown(room) {
 
     console.log(`[LOBBY] Starting countdown in room ${room.id}`);
 
-    // Send startTime to Display only
-    room.players.forEach((player) => {
-        // Check if this is a display connection (doesn't have playerId before init)
-        // For now, send to all - display will show countdown, controllers won't
-        if (player.ws && player.ws.readyState === 1) { // OPEN
-            player.ws.send(JSON.stringify({
-                type: 'lobby_countdown',
-                startTime: startTime,
-                duration: COUNTDOWN_DURATION
-            }));
+    // Send countdown to all clients in the room (display and controllers)
+    const countdownMessage = JSON.stringify({
+        type: 'lobby_countdown',
+        startTime: startTime,
+        duration: COUNTDOWN_DURATION
+    });
+
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && client.roomId === room.id) {
+            client.send(countdownMessage);
         }
     });
 
@@ -1055,12 +1055,14 @@ function cancelLobbyCountdown(room) {
 
     console.log(`[LOBBY] Countdown cancelled in room ${room.id}`);
 
-    // Notify all clients
-    room.players.forEach((player) => {
-        if (player.ws && player.ws.readyState === 1) {
-            player.ws.send(JSON.stringify({
-                type: 'lobby_countdown_cancelled'
-            }));
+    // Notify all clients in the room (display and controllers)
+    const cancelMessage = JSON.stringify({
+        type: 'lobby_countdown_cancelled'
+    });
+
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && client.roomId === room.id) {
+            client.send(cancelMessage);
         }
     });
 }
@@ -2315,14 +2317,20 @@ function updateShip(room) {
         room.systems.weapon.hasPlayer = true;
     }
     if (!occupied.has('engine')) {
-        // Auto-pilot: simulate pump motions by adding periodic energy pulses
+        // Auto-pilot: random bursts at minimum speed
         if (!room.lastAutoPump) room.lastAutoPump = Date.now();
         const timeSinceLastPump = Date.now() - room.lastAutoPump;
 
-        // Pump every 600ms to demonstrate pump mechanics
-        if (timeSinceLastPump > 600) {
-            room.systems.engine.energy = Math.min(room.systems.engine.energy + 7, 10); // Add pump energy (increased to 7)
+        // Random interval between bursts (1000-3000ms)
+        const randomInterval = room.autoPumpInterval || (1000 + Math.random() * 2000);
+
+        if (timeSinceLastPump > randomInterval) {
+            // Add small random energy (1-3 units for minimal thrust)
+            const burstEnergy = 1 + Math.random() * 2;
+            room.systems.engine.energy = Math.min(room.systems.engine.energy + burstEnergy, 750);
             room.lastAutoPump = Date.now();
+            // Set next random interval
+            room.autoPumpInterval = 1000 + Math.random() * 2000;
         }
 
         room.systems.engine.hasPlayer = true; // Enable auto-thrust

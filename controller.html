@@ -777,6 +777,8 @@
 
                 ws.onmessage = (event) => {
                     const data = JSON.parse(event.data);
+                    addDebugLog(`📩 Получено сообщение: ${data.type}`, 'info');
+                    console.log('WS Message received:', data);
 
                     if (data.type === 'init') {
                         playerId = data.playerId;

@@ -953,32 +953,6 @@
                 gameTitle.textContent = '🚀 Настройки Корабль';
                 settingsForm.innerHTML = `
                     <div class="setting-group">
-                        <label for="shipThrustSystem">Система тяги</label>
-                        <select id="shipThrustSystem">
-                            <option value="pump">Pump (рывки)</option>
-                            <option value="gradient" selected>Gradient (градусы)</option>
-                        </select>
-                        <div class="setting-info">Способ начисления энергии двигателю</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="shipEngineFormula">Формула двигателя</label>
-                        <select id="shipEngineFormula">
-                            <option value="balanced" selected>Сбалансированная</option>
-                            <option value="speed">Скорость (быстрая реакция)</option>
-                            <option value="combo">Комбо (накопление)</option>
-                        </select>
-                        <div class="setting-info">Как амплитуда и накопление влияют на тягу</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="shipWeaponFormula">Формула оружия</label>
-                        <select id="shipWeaponFormula">
-                            <option value="standard" selected>Стандарт</option>
-                            <option value="sniper">Снайпер (дальнобойность)</option>
-                            <option value="rapid">Быстрый (короткая дистанция)</option>
-                        </select>
-                        <div class="setting-info">Дальность и скорость пуль</div>
-                    </div>
-                    <div class="setting-group">
                         <label for="shipCoinsToWin">Монет для победы</label>
                         <select id="shipCoinsToWin">
                             <option value="5">5 монет</option>
@@ -991,49 +965,30 @@
                     <div class="setting-group">
                         <label for="shipAsteroidFrequency">Частота астероидов</label>
                         <select id="shipAsteroidFrequency">
+                            <option value="none">Без астероидов (обучение)</option>
                             <option value="low">Низкая (3 сек)</option>
                             <option value="medium" selected>Средняя (2 сек)</option>
                             <option value="high">Высокая (1.2 сек)</option>
                         </select>
                         <div class="setting-info">Скорость появления астероидов</div>
                     </div>
+                    <div class="setting-group">
+                        <label for="shipAutopilotEnabled">Автопилоты</label>
+                        <select id="shipAutopilotEnabled">
+                            <option value="false" selected>Выключены</option>
+                            <option value="true">Включены</option>
+                        </select>
+                        <div class="setting-info">Автопилоты управляют незанятыми системами</div>
+                    </div>
                 `;
                 // Load saved settings
-                gameSettings.thrustSystem = localStorage.getItem('shipThrustSystem') || 'gradient';
-                gameSettings.engineFormula = localStorage.getItem('shipEngineFormula') || 'balanced';
-                gameSettings.weaponFormula = localStorage.getItem('shipWeaponFormula') || 'standard';
                 gameSettings.coinsToWin = parseInt(localStorage.getItem('shipCoinsToWin')) || 10;
                 gameSettings.asteroidFrequency = localStorage.getItem('shipAsteroidFrequency') || 'medium';
+                gameSettings.autopilotEnabled = localStorage.getItem('shipAutopilotEnabled') === 'true' ? true : false;
 
-                document.getElementById('shipThrustSystem').value = gameSettings.thrustSystem;
-                document.getElementById('shipEngineFormula').value = gameSettings.engineFormula;
-                document.getElementById('shipWeaponFormula').value = gameSettings.weaponFormula;
                 document.getElementById('shipCoinsToWin').value = gameSettings.coinsToWin;
                 document.getElementById('shipAsteroidFrequency').value = gameSettings.asteroidFrequency;
-
-                // Add event listener for thrust system change to update physics panel visibility
-                document.getElementById('shipThrustSystem').addEventListener('change', (e) => {
-                    const system = e.target.value;
-                    const pumpParams = document.getElementById('pumpParams');
-                    const gradientParams = document.getElementById('gradientParams');
-
-                    if (pumpParams && gradientParams) {
-                        pumpParams.style.display = system === 'pump' ? 'block' : 'none';
-                        gradientParams.style.display = system === 'gradient' ? 'block' : 'none';
-                    }
-
-                    // Save to localStorage
-                    localStorage.setItem('shipThrustSystem', system);
-                    gameSettings.thrustSystem = system;
-                });
-
-                // Initialize panel visibility based on current selection
-                const pumpParams = document.getElementById('pumpParams');
-                const gradientParams = document.getElementById('gradientParams');
-                if (pumpParams && gradientParams) {
-                    pumpParams.style.display = gameSettings.thrustSystem === 'pump' ? 'block' : 'none';
-                    gradientParams.style.display = gameSettings.thrustSystem === 'gradient' ? 'block' : 'none';
-                }
+                document.getElementById('shipAutopilotEnabled').value = gameSettings.autopilotEnabled.toString();
 
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Pizza Snake';
@@ -1137,16 +1092,12 @@
                 localStorage.setItem('pushersWinScore', gameSettings.winScore);
                 localStorage.setItem('pushersSingleSquare', gameSettings.singleSquare);
             } else if (gameType === 'ship') {
-                gameSettings.thrustSystem = document.getElementById('shipThrustSystem').value;
-                gameSettings.engineFormula = document.getElementById('shipEngineFormula').value;
-                gameSettings.weaponFormula = document.getElementById('shipWeaponFormula').value;
                 gameSettings.coinsToWin = parseInt(document.getElementById('shipCoinsToWin').value);
                 gameSettings.asteroidFrequency = document.getElementById('shipAsteroidFrequency').value;
-                localStorage.setItem('shipThrustSystem', gameSettings.thrustSystem);
-                localStorage.setItem('shipEngineFormula', gameSettings.engineFormula);
-                localStorage.setItem('shipWeaponFormula', gameSettings.weaponFormula);
+                gameSettings.autopilotEnabled = document.getElementById('shipAutopilotEnabled').value === 'true';
                 localStorage.setItem('shipCoinsToWin', gameSettings.coinsToWin);
                 localStorage.setItem('shipAsteroidFrequency', gameSettings.asteroidFrequency);
+                localStorage.setItem('shipAutopilotEnabled', gameSettings.autopilotEnabled);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;

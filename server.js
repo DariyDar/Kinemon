@@ -262,11 +262,9 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.loot = [];  // v3.17: Loot drops from asteroids
 
         // Settings
-        room.thrustSystem = settings.thrustSystem || 'pump'; // 'pump' or 'gradient'
-        room.engineFormula = settings.engineFormula || 'balanced';
-        room.weaponFormula = settings.weaponFormula || 'standard';
         room.coinsToWin = settings.coinsToWin || 10;
         room.asteroidFrequency = settings.asteroidFrequency || 'medium';
+        room.autopilotEnabled = settings.autopilotEnabled !== undefined ? settings.autopilotEnabled : false; // Default: disabled
 
         // Initialize coins - only 1 coin at a time
         room.coins.push(spawnCoin(room));
@@ -907,6 +905,9 @@ function createAsteroid(room, size) {
 
 // Spawn asteroids based on frequency
 function spawnAsteroidIfNeeded(room) {
+    // Skip spawning if frequency is 'none' (training mode)
+    if (room.asteroidFrequency === 'none') return;
+
     const now = Date.now();
     const intervals = { low: 3000, medium: 2000, high: 1200 };
     const interval = intervals[room.asteroidFrequency] || 2000;
@@ -2944,24 +2945,25 @@ function updateShip(room) {
         }
     });
 
-    // 2. Auto-rotate unoccupied systems for each team
-    ['blue', 'pink'].forEach(teamColor => {
-        const systems = room.teamSystems[teamColor];
-        const ship = room.ships[teamColor];
+    // 2. Auto-rotate unoccupied systems for each team (only if autopilot enabled)
+    if (room.autopilotEnabled) {
+        ['blue', 'pink'].forEach(teamColor => {
+            const systems = room.teamSystems[teamColor];
+            const ship = room.ships[teamColor];
 
-        if (!ship.alive) return;
+            if (!ship.alive) return;
 
-        const teamPlayers = Array.from(room.players.values()).filter(p => p.team === teamColor);
-        const occupied = new Set(teamPlayers.map(p => p.systemRole).filter(r => r !== null));
+            const teamPlayers = Array.from(room.players.values()).filter(p => p.team === teamColor);
+            const occupied = new Set(teamPlayers.map(p => p.systemRole).filter(r => r !== null));
 
-        if (!occupied.has('rudder')) {
-            systems.rudder.rotation = (systems.rudder.rotation + 0.5) % 360;
-        }
-        if (!occupied.has('weaponDirection')) {
-            systems.weaponDirection.rotation = (systems.weaponDirection.rotation - 0.7 + 360) % 360;
-        }
-        if (!occupied.has('weapon')) {
-            // Auto-pilot: periodic auto-fire
+            if (!occupied.has('rudder')) {
+                systems.rudder.rotation = (systems.rudder.rotation + 0.5) % 360;
+            }
+            if (!occupied.has('weaponDirection')) {
+                systems.weaponDirection.rotation = (systems.weaponDirection.rotation - 0.7 + 360) % 360;
+            }
+            if (!occupied.has('weapon')) {
+                // Auto-pilot: periodic auto-fire
             if (!room[`lastAutoWeaponFire_${teamColor}`]) room[`lastAutoWeaponFire_${teamColor}`] = Date.now();
             const timeSinceLastFire = Date.now() - room[`lastAutoWeaponFire_${teamColor}`];
 
@@ -2996,13 +2998,14 @@ function updateShip(room) {
             systems.engine.hasPlayer = true;
         }
         // Shield always active
-        if (!occupied.has('shield')) {
-            systems.shield.active = true;
-            systems.shield.rotation = (systems.shield.rotation + 0.3) % 360;
-        } else {
-            systems.shield.active = true;
-        }
-    });
+            if (!occupied.has('shield')) {
+                systems.shield.active = true;
+                systems.shield.rotation = (systems.shield.rotation + 0.3) % 360;
+            } else {
+                systems.shield.active = true;
+            }
+        });
+    }
 
     // 3. Apply engine thrust and update positions for both ships
     ['blue', 'pink'].forEach(teamColor => {

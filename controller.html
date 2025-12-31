@@ -1116,6 +1116,15 @@
                             updateLobbyPlayers(data.gameState);
                             updateOverlayRoleButtons(); // Update overlay buttons if open
 
+                            // Ensure Ship game buttons are visible on controller screen
+                            const controllerScreen = document.getElementById('controllerScreen');
+                            if (controllerScreen && controllerScreen.classList.contains('active')) {
+                                const leavePostBtn = document.getElementById('leavePostBtn');
+                                const recalibrateBtn = document.getElementById('recalibrateBtn');
+                                if (leavePostBtn) leavePostBtn.style.display = 'block';
+                                if (recalibrateBtn) recalibrateBtn.style.display = 'block';
+                            }
+
                             // Update role display on controller screen
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);
                             if (myPlayer && myPlayer.systemRole) {

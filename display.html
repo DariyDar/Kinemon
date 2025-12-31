@@ -453,8 +453,8 @@
             position: fixed;
             bottom: 15px;
             left: 15px;
-            width: 80px;
-            height: 80px;
+            width: 120px;
+            height: 120px;
             background: white;
             padding: 5px;
             border-radius: 5px;
@@ -1973,10 +1973,21 @@
                 for (const bullet of gameState.bullets) {
                     ctx.save();
 
-                    // Color: red for max power (10), cyan for others
+                    // Color: red for max power (10), team color for others
                     const isMaxPower = bullet.powerLevel === 10;
-                    const baseColor = isMaxPower ? '#FF0000' : '#00FFFF';
-                    const baseColorRGB = isMaxPower ? '255, 0, 0' : '0, 255, 255';
+                    let baseColor, baseColorRGB;
+
+                    if (isMaxPower) {
+                        baseColor = '#FF0000';
+                        baseColorRGB = '255, 0, 0';
+                    } else if (bullet.team === 'pink') {
+                        baseColor = '#E91E63';
+                        baseColorRGB = '233, 30, 99';
+                    } else {
+                        // Blue team or legacy
+                        baseColor = '#2196F3';
+                        baseColorRGB = '33, 150, 243';
+                    }
 
                     // Size from bullet params (4-16px)
                     const outerRadius = bullet.size || 8;
@@ -2482,6 +2493,80 @@
                     ctx.fillStyle = '#666';
                     ctx.fillRect(8, -2, 8, 4);
                     ctx.restore();
+
+                    // Energy progress bar for pink ship (gradient system only)
+                    if (gameState.thrustSystem === 'gradient' && pinkSystems.engine) {
+                        const energy = pinkSystems.engine.energy || 0;
+
+                        if (energy > 0) {
+                            const colors = [
+                                { color: '#00BFFF', start: 0, end: 150 },
+                                { color: '#00FF00', start: 150, end: 300 },
+                                { color: '#FFFF00', start: 300, end: 450 },
+                                { color: '#FFA500', start: 450, end: 600 },
+                                { color: '#FF0000', start: 600, end: 750 }
+                            ];
+
+                            ctx.lineWidth = 8;
+                            const innerRadius = pinkShip.radius - 10;
+
+                            colors.forEach((level, index) => {
+                                if (energy > level.start) {
+                                    const levelEnergy = Math.min(energy, level.end) - level.start;
+                                    const levelProgress = levelEnergy / (level.end - level.start);
+                                    const segmentArc = (Math.PI * 2 / 5);
+                                    const arcLength = segmentArc * levelProgress;
+                                    const startAngle = -Math.PI / 2 + (index * segmentArc);
+                                    const endAngle = startAngle + arcLength;
+
+                                    ctx.strokeStyle = level.color;
+                                    ctx.shadowBlur = 10;
+                                    ctx.shadowColor = level.color;
+                                    ctx.beginPath();
+                                    ctx.arc(pinkShip.x, pinkShip.y, innerRadius, startAngle, endAngle);
+                                    ctx.stroke();
+                                }
+                            });
+
+                            ctx.shadowBlur = 0;
+                        }
+                    }
+
+                    // Weapon charging cone for pink ship
+                    if (pinkSystems.weapon && pinkSystems.weapon.energy > 0) {
+                        const energy = pinkSystems.weapon.energy;
+                        const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
+                        const futureSize = 4 + (powerLevel - 1) * (12 / 9);
+                        const coneLength = 80;
+                        const coneStartWidth = futureSize * 0.5;
+                        const coneEndWidth = futureSize * 1.5;
+
+                        ctx.save();
+                        ctx.translate(weaponPos.x, weaponPos.y);
+                        ctx.rotate(weaponAngle);
+
+                        const gradient = ctx.createLinearGradient(0, 0, coneLength, 0);
+                        const fillPercent = Math.min(energy / 10, 1);
+
+                        gradient.addColorStop(0, '#00FFFF');
+                        if (fillPercent > 0.2) gradient.addColorStop(0.2 / fillPercent, '#00FF00');
+                        if (fillPercent > 0.4) gradient.addColorStop(0.4 / fillPercent, '#FFFF00');
+                        if (fillPercent > 0.6) gradient.addColorStop(0.6 / fillPercent, '#FFA500');
+                        if (fillPercent > 0.8) gradient.addColorStop(0.8 / fillPercent, '#FF0000');
+                        gradient.addColorStop(1, '#FF0000');
+
+                        ctx.globalAlpha = 0.4;
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.moveTo(0, -coneStartWidth);
+                        ctx.lineTo(coneLength * fillPercent, -coneEndWidth);
+                        ctx.lineTo(coneLength * fillPercent, coneEndWidth);
+                        ctx.lineTo(0, coneStartWidth);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        ctx.restore();
+                    }
                 }
             }
 

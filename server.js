@@ -1004,11 +1004,12 @@ function checkShipCollisions(room) {
 
                 // Check if shield blocks
                 if (systems.shield.active && isAngleInShieldArc(angleToShip, systems.shield.rotation, systems.shield.arcSize || 72)) {
-                    // Shield deflects bullet
-                    const angle = systems.shield.rotation * Math.PI / 180;
-                    bullet.vx = Math.cos(angle) * 5;
-                    bullet.vy = Math.sin(angle) * 5;
-                    broadcastEffect(room.id, 'particle', { x: bullet.x, y: bullet.y, color: '#00FFFF', count: 8 });
+                    // Shield deflects and destroys bullet
+                    const deflectColor = teamColor === 'pink' ? '#E91E63' : '#2196F3';
+                    broadcastEffect(room.id, 'particle', { x: bullet.x, y: bullet.y, color: deflectColor, count: 12 });
+                    room.bullets.splice(i, 1);
+                    bulletHit = true;
+                    break;
                 } else {
                     // Bullet hits ship
                     if (!ship.invulnerable) {

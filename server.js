@@ -8,7 +8,16 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// Debug logging flag - set DEBUG=true environment variable to enable verbose logs
+const DEBUG = process.env.DEBUG === 'true' || false;
+const debugLog = (...args) => DEBUG && console.log(...args);
+
 const PORT = process.env.PORT || 8080;
+
+// Game constants
+const INVULNERABILITY_DURATION_MS = 5000;  // Ship respawn invulnerability (5 seconds)
+const DEFAULT_THRUST_SYSTEM = 'gradient';  // Ship game default (gradient or pump)
+const DEFAULT_ENGINE_FORMULA = 'linear';   // Thrust calculation formula (linear, quadratic, exponential)
 
 // Create HTTP server to serve static files
 const server = http.createServer((req, res) => {
@@ -198,7 +207,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
                 coins: 0,
                 lastDamageTime: 0,
                 invulnerable: true,
-                invulnerableUntil: Date.now() + 5000,
+                invulnerableUntil: Date.now() + INVULNERABILITY_DURATION_MS,
                 spawnTime: Date.now(),
                 alive: true,
                 boosters: {  // v3.17: Power-ups
@@ -221,7 +230,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
                 coins: 0,
                 lastDamageTime: 0,
                 invulnerable: true,
-                invulnerableUntil: Date.now() + 5000,
+                invulnerableUntil: Date.now() + INVULNERABILITY_DURATION_MS,
                 spawnTime: Date.now(),
                 alive: true,
                 boosters: {  // v3.17: Power-ups
@@ -267,8 +276,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.autopilotEnabled = settings.autopilotEnabled !== undefined ? settings.autopilotEnabled : false; // Default: disabled
 
         // Set default thrust system and engine formula (removed from UI in v3.17.3)
-        room.thrustSystem = 'gradient';  // gradient or pump
-        room.engineFormula = 'linear';   // linear, quadratic, exponential
+        room.thrustSystem = DEFAULT_THRUST_SYSTEM;
+        room.engineFormula = DEFAULT_ENGINE_FORMULA;
 
         // Initialize coins - only 1 coin at a time
         room.coins.push(spawnCoin(room));
@@ -421,7 +430,7 @@ function detectPump(player, currentTilt, room) {
         const pumpStrength = Math.min(delta, 0.5) * 2; // 0-1 (normalized)
         const pumpEnergyMult = (room.physics && room.physics.pumpEnergy) || 16;
         const energyBoost = pumpStrength * pumpEnergyMult;
-        console.log(`🚀 Pump! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)} (Δ${delta.toFixed(3)}), Energy: +${energyBoost.toFixed(2)}`);
+        debugLog(`🚀 Pump! Tilt: ${lastTilt.toFixed(2)} -> ${currentTilt.toFixed(2)} (Δ${delta.toFixed(3)}), Energy: +${energyBoost.toFixed(2)}`);
         return energyBoost;
     }
 
@@ -489,8 +498,25 @@ function updateWeaponCharge(player, currentTilt, room) {
     return { newEnergy, shouldFire: false, bulletCount: 0 };
 }
 
-// Calculate energy from tilt angle (gradient system)
-// Returns energy gained from upward phone movement based on degree ranges
+/**
+ * Gradient Energy System - Calculates energy from phone tilt angle
+ *
+ * Players hold their phone and tilt it upward to charge energy.
+ * Energy gain increases exponentially with tilt angle:
+ *
+ * - 0-70°:  1.0 energy/degree  (easy, rapid charging)
+ * - 70-85°: 1.5 energy/degree  (moderate difficulty)
+ * - 85-89°: 5.0 energy/degree  (high precision required)
+ * - 89-90°: 10.0 energy/degree (extreme difficulty, vertical hold)
+ *
+ * This creates engaging risk/reward gameplay - steep tilts yield more energy
+ * but are harder to maintain. Energy decays over time, so players must
+ * continuously pump to maintain thrust.
+ *
+ * @param {number} currentTilt - Current phone angle (0=horizontal, 1=vertical)
+ * @param {number} lastTilt - Previous phone angle (undefined on first call)
+ * @returns {number} Energy gained this frame (0 if tilting down or first call)
+ */
 function calculateGradientEnergy(currentTilt, lastTilt) {
     // Initialize on first call - no energy on first frame
     if (lastTilt === undefined) return 0;
@@ -586,7 +612,7 @@ function applyEngineThrust(room) {
         room.ship.vx += -Math.cos(angle) * thrust;
         room.ship.vy += -Math.sin(angle) * thrust;
 
-        console.log(`Thrust applied: ${thrust.toFixed(3)}, Energy: ${room.systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(room.ship.vx, room.ship.vy).toFixed(2)}`);
+        debugLog(`Thrust applied: ${thrust.toFixed(3)}, Energy: ${room.systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(room.ship.vx, room.ship.vy).toFixed(2)}`);
 
         // Speed boost for gradient system (+10% per energy level)
         let speedMultiplier = 1.0;
@@ -743,7 +769,7 @@ function applyEngineThrustForTeam(room, teamColor) {
         ship.vx += -Math.cos(angle) * thrust;
         ship.vy += -Math.sin(angle) * thrust;
 
-        console.log(`[${teamColor}] Thrust applied: ${thrust.toFixed(3)}, Energy: ${systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(ship.vx, ship.vy).toFixed(2)}`);
+        debugLog(`[${teamColor}] Thrust applied: ${thrust.toFixed(3)}, Energy: ${systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(ship.vx, ship.vy).toFixed(2)}`);
 
         // Speed boost for gradient system (+10% per energy level)
         let speedMultiplier = 1.0;
@@ -1442,7 +1468,7 @@ function checkShipDeathsAndRespawns(room) {
             ship.health = ship.maxHealth;
             ship.alive = true;
             ship.invulnerable = true;
-            ship.invulnerableUntil = Date.now() + 5000; // 5s invulnerability
+            ship.invulnerableUntil = Date.now() + INVULNERABILITY_DURATION_MS; // 5s invulnerability
             ship.spawnTime = Date.now();
             ship.respawnTime = null;
 
@@ -2195,7 +2221,6 @@ function serializeGameState(room) {
 
         state.thrustSystem = room.thrustSystem;
         state.engineFormula = room.engineFormula;
-        state.weaponFormula = room.weaponFormula;
         state.coinsToWin = room.coinsToWin;
         state.asteroidFrequency = room.asteroidFrequency;
         state.autopilotEnabled = room.autopilotEnabled;

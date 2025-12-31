@@ -333,135 +333,204 @@
             padding-bottom: 5px;
         }
 
-        /* Adaptive scaling for large screens (projectors, TVs) */
-        @media (min-width: 1920px) or (min-height: 1080px) {
-            /* Scale down UI elements for large screens */
+        /* Adaptive scaling for medium+ screens (tablets landscape, projectors) */
+        @media (min-width: 1024px) {
+            /* Scale down UI elements */
             h1 {
-                font-size: 20px;
+                font-size: 22px;
                 margin-bottom: 8px;
             }
 
             h2 {
-                font-size: 18px;
+                font-size: 20px;
                 margin-bottom: 10px;
             }
 
             p {
-                font-size: 14px;
-                margin-bottom: 15px;
+                font-size: 15px;
+                margin-bottom: 18px;
             }
 
             .btn {
-                padding: 10px 24px;
-                font-size: 14px;
+                padding: 11px 26px;
+                font-size: 16px;
                 margin: 8px;
             }
 
             input {
-                padding: 12px;
-                font-size: 14px;
-                margin-bottom: 15px;
-                max-width: 300px;
-            }
-
-            #scoreboard {
-                top: 15px;
-                right: 15px;
-                padding: 15px;
-                min-width: 160px;
-            }
-
-            .player-score {
-                font-size: 14px;
-                margin: 8px 0;
+                padding: 13px;
+                font-size: 16px;
+                margin-bottom: 18px;
+                max-width: 350px;
             }
 
             #persistentQRDisplay {
-                width: 100px !important;
-                height: 100px !important;
-                bottom: 12px !important;
-                left: 12px !important;
-                padding: 4px !important;
+                width: 95px !important;
+                height: 95px !important;
+                bottom: 10px !important;
+                left: 10px !important;
+                padding: 3px !important;
             }
 
-            #teamRosters {
-                top: 15px;
-                padding: 0 15px;
+            #waitingQRCode {
+                max-width: 380px;
+                max-height: 380px;
+                margin: 20px auto !important;
             }
 
-            #teamRosters > div {
-                padding: 6px !important;
-                min-width: 160px !important;
-                font-size: 12px !important;
-            }
-
-            #teamRosters h3 {
-                font-size: 14px !important;
-                margin-bottom: 6px !important;
-            }
-
-            #roomInfo {
-                font-size: 14px;
-            }
-
-            #roomCodeDisplay {
-                font-size: 20px;
+            #waitingQRCode img, #waitingQRCode canvas {
+                max-width: 100% !important;
+                max-height: 100% !important;
+                width: auto !important;
+                height: auto !important;
+                display: block !important;
+                margin: 0 auto !important;
             }
         }
 
-        /* Extra large screens (4K projectors, 2560x1440+) */
-        @media (min-width: 2560px) or (min-height: 1440px) {
+        /* Adaptive scaling for large screens (Full HD projectors) */
+        @media (min-width: 1920px), (min-height: 1080px) {
+            /* Scale down UI elements more aggressively */
             h1 {
-                font-size: 18px;
-                margin-bottom: 6px;
+                font-size: 16px;
+                margin-bottom: 5px;
             }
 
             h2 {
-                font-size: 16px;
-                margin-bottom: 8px;
+                font-size: 15px;
+                margin-bottom: 6px;
             }
 
             p {
                 font-size: 12px;
-                margin-bottom: 12px;
+                margin-bottom: 10px;
             }
 
             .btn {
                 padding: 8px 20px;
-                font-size: 12px;
-                margin: 6px;
+                font-size: 13px;
+                margin: 5px;
             }
 
             input {
-                padding: 10px;
-                font-size: 12px;
+                padding: 9px;
+                font-size: 13px;
+                margin-bottom: 10px;
                 max-width: 250px;
             }
 
             #scoreboard {
-                padding: 12px;
-                min-width: 140px;
+                top: 10px;
+                right: 10px;
+                padding: 10px;
+                min-width: 120px;
             }
 
             .player-score {
                 font-size: 12px;
+                margin: 5px 0;
             }
 
             #persistentQRDisplay {
                 width: 80px !important;
                 height: 80px !important;
-                bottom: 10px !important;
-                left: 10px !important;
+                bottom: 8px !important;
+                left: 8px !important;
+                padding: 3px !important;
+            }
+
+            #teamRosters {
+                top: 10px;
+                padding: 0 10px;
             }
 
             #teamRosters > div {
-                padding: 5px !important;
-                min-width: 140px !important;
-                font-size: 11px !important;
+                padding: 4px !important;
+                min-width: 120px !important;
+                font-size: 10px !important;
             }
 
             #teamRosters h3 {
                 font-size: 12px !important;
+                margin-bottom: 4px !important;
+            }
+
+            #roomInfo {
+                font-size: 12px;
+            }
+
+            #roomCodeDisplay {
+                font-size: 16px;
+            }
+
+            #waitingQRCode {
+                max-width: 300px;
+                max-height: 300px;
+                margin: 15px auto !important;
+            }
+        }
+
+        /* Extra large screens (4K projectors, 2560x1440+) */
+        @media (min-width: 2560px), (min-height: 1440px) {
+            h1 {
+                font-size: 14px;
+                margin-bottom: 4px;
+            }
+
+            h2 {
+                font-size: 13px;
+                margin-bottom: 5px;
+            }
+
+            p {
+                font-size: 11px;
+                margin-bottom: 8px;
+            }
+
+            .btn {
+                padding: 7px 18px;
+                font-size: 11px;
+                margin: 4px;
+            }
+
+            input {
+                padding: 8px;
+                font-size: 11px;
+                max-width: 220px;
+            }
+
+            #scoreboard {
+                padding: 8px;
+                min-width: 100px;
+            }
+
+            .player-score {
+                font-size: 10px;
+            }
+
+            #persistentQRDisplay {
+                width: 65px !important;
+                height: 65px !important;
+                bottom: 6px !important;
+                left: 6px !important;
+                padding: 2px !important;
+            }
+
+            #teamRosters > div {
+                padding: 4px !important;
+                min-width: 100px !important;
+                font-size: 9px !important;
+            }
+
+            #teamRosters h3 {
+                font-size: 10px !important;
+                margin-bottom: 3px !important;
+            }
+
+            #waitingQRCode {
+                max-width: 250px;
+                max-height: 250px;
+                margin: 10px auto !important;
             }
         }
     </style>
@@ -1287,12 +1356,14 @@
                         // Adaptive QR size based on screen resolution
                         const screenWidth = window.innerWidth;
                         const screenHeight = window.innerHeight;
-                        let qrSize = 500; // Default for small screens
+                        let qrSize = 500; // Default for small screens (phones)
 
                         if (screenWidth >= 2560 || screenHeight >= 1440) {
-                            qrSize = 300; // 4K projectors
+                            qrSize = 250; // 4K projectors - very small
                         } else if (screenWidth >= 1920 || screenHeight >= 1080) {
-                            qrSize = 350; // Full HD projectors
+                            qrSize = 300; // Full HD projectors - small
+                        } else if (screenWidth >= 1024 || screenHeight >= 768) {
+                            qrSize = 380; // Tablets/medium projectors
                         }
 
                         const waitingQR = document.getElementById('waitingQRCode');
@@ -1308,11 +1379,13 @@
 
                         // Generate persistent QR code in bottom-left corner
                         // Adaptive size to match CSS media queries
-                        let persistentQRSize = 110; // Default
+                        let persistentQRSize = 110; // Default (phones)
                         if (screenWidth >= 2560 || screenHeight >= 1440) {
-                            persistentQRSize = 70; // 4K
+                            persistentQRSize = 60; // 4K - very small
                         } else if (screenWidth >= 1920 || screenHeight >= 1080) {
-                            persistentQRSize = 90; // Full HD
+                            persistentQRSize = 75; // Full HD - small
+                        } else if (screenWidth >= 1024 || screenHeight >= 768) {
+                            persistentQRSize = 90; // Tablets/medium
                         }
 
                         const persistentQR = document.getElementById('persistentQRDisplay');

@@ -377,7 +377,8 @@
             <div class="room-code" id="lobbyRoomCode">------</div>
             <p style="font-size: 20px; margin-bottom: 40px;">Код комнаты</p>
 
-            <table style="width: 100%; max-width: 600px; margin: 0 auto; border-collapse: collapse; font-size: 20px;">
+            <!-- Single table for legacy games -->
+            <table id="singleTeamTable" style="width: 100%; max-width: 600px; margin: 0 auto; border-collapse: collapse; font-size: 20px; display: none;">
                 <thead>
                     <tr style="border-bottom: 2px solid #4CAF50;">
                         <th style="padding: 15px; text-align: left;">Роль</th>
@@ -389,6 +390,45 @@
                     <!-- Динамически заполняется -->
                 </tbody>
             </table>
+
+            <!-- Dual team tables for Ship game -->
+            <div id="dualTeamTables" style="display: none; width: 100%; max-width: 1200px; margin: 0 auto;">
+                <div style="display: flex; gap: 40px; justify-content: center; align-items: flex-start;">
+                    <!-- Blue Team Table -->
+                    <div style="flex: 1; max-width: 500px;">
+                        <h2 style="text-align: center; color: #2196F3; margin-bottom: 20px;">🔵 Голубая команда</h2>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 18px; border: 3px solid #2196F3; border-radius: 10px; overflow: hidden;">
+                            <thead>
+                                <tr style="background: rgba(33, 150, 243, 0.2); border-bottom: 2px solid #2196F3;">
+                                    <th style="padding: 12px; text-align: left;">Роль</th>
+                                    <th style="padding: 12px; text-align: left;">Игрок</th>
+                                    <th style="padding: 12px; text-align: center;">Готов</th>
+                                </tr>
+                            </thead>
+                            <tbody id="blueTeamTableBody">
+                                <!-- Динамически заполняется -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pink Team Table -->
+                    <div style="flex: 1; max-width: 500px;">
+                        <h2 style="text-align: center; color: #E91E63; margin-bottom: 20px;">🩷 Розовая команда</h2>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 18px; border: 3px solid #E91E63; border-radius: 10px; overflow: hidden;">
+                            <thead>
+                                <tr style="background: rgba(233, 30, 99, 0.2); border-bottom: 2px solid #E91E63;">
+                                    <th style="padding: 12px; text-align: left;">Роль</th>
+                                    <th style="padding: 12px; text-align: left;">Игрок</th>
+                                    <th style="padding: 12px; text-align: center;">Готов</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pinkTeamTableBody">
+                                <!-- Динамически заполняется -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
             <!-- Countdown Display -->
             <div id="lobbyCountdownDisplay" style="display: none; margin-top: 50px; text-align: center; padding: 30px; background: rgba(76, 175, 80, 0.2); border-radius: 20px; border: 4px solid #4CAF50; max-width: 400px; margin-left: auto; margin-right: auto;">
@@ -1200,8 +1240,7 @@
         }
 
         function updateLobbyTable(gameState) {
-            const lobbyTableBody = document.getElementById('lobbyTableBody');
-            if (!lobbyTableBody || !gameState || !gameState.players) return;
+            if (!gameState || !gameState.players) return;
 
             const roleNames = {
                 engine: '⚙️ Двигатель',
@@ -1212,38 +1251,127 @@
             };
 
             const roles = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
-            lobbyTableBody.innerHTML = '';
 
-            roles.forEach(role => {
-                const player = gameState.players.find(p => p.systemRole === role);
+            // Check if Ship game with dual ships (two-team mode)
+            const isDualShipMode = gameState.gameType === 'ship' && gameState.ships && gameState.ships.blue && gameState.ships.pink;
 
-                const row = document.createElement('tr');
-                row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+            if (isDualShipMode) {
+                // Show dual team tables, hide single table
+                document.getElementById('singleTeamTable').style.display = 'none';
+                document.getElementById('dualTeamTables').style.display = 'block';
 
-                // Role cell
-                const roleCell = document.createElement('td');
-                roleCell.style.padding = '12px';
-                roleCell.textContent = roleNames[role];
-                row.appendChild(roleCell);
+                // Update Blue Team Table
+                const blueTeamTableBody = document.getElementById('blueTeamTableBody');
+                if (blueTeamTableBody) {
+                    blueTeamTableBody.innerHTML = '';
+                    roles.forEach(role => {
+                        const player = gameState.players.find(p => p.team === 'blue' && p.systemRole === role);
 
-                // Player cell
-                const playerCell = document.createElement('td');
-                playerCell.style.padding = '12px';
-                playerCell.textContent = player ? player.name : '—';
-                playerCell.style.color = player ? player.color : '#666';
-                row.appendChild(playerCell);
+                        const row = document.createElement('tr');
+                        row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
 
-                // Status cell
-                const statusCell = document.createElement('td');
-                statusCell.style.padding = '12px';
-                statusCell.style.textAlign = 'center';
-                statusCell.style.fontSize = '24px';
-                statusCell.textContent = player && player.ready ? '✓' : '✗';
-                statusCell.style.color = player && player.ready ? '#4CAF50' : '#FF5252';
-                row.appendChild(statusCell);
+                        // Role cell
+                        const roleCell = document.createElement('td');
+                        roleCell.style.padding = '10px';
+                        roleCell.textContent = roleNames[role];
+                        row.appendChild(roleCell);
 
-                lobbyTableBody.appendChild(row);
-            });
+                        // Player cell
+                        const playerCell = document.createElement('td');
+                        playerCell.style.padding = '10px';
+                        playerCell.textContent = player ? player.name : '—';
+                        playerCell.style.color = player ? player.color : '#666';
+                        row.appendChild(playerCell);
+
+                        // Status cell
+                        const statusCell = document.createElement('td');
+                        statusCell.style.padding = '10px';
+                        statusCell.style.textAlign = 'center';
+                        statusCell.style.fontSize = '20px';
+                        statusCell.textContent = player && player.ready ? '✅' : '—';
+                        statusCell.style.color = player && player.ready ? '#4CAF50' : '#666';
+                        row.appendChild(statusCell);
+
+                        blueTeamTableBody.appendChild(row);
+                    });
+                }
+
+                // Update Pink Team Table
+                const pinkTeamTableBody = document.getElementById('pinkTeamTableBody');
+                if (pinkTeamTableBody) {
+                    pinkTeamTableBody.innerHTML = '';
+                    roles.forEach(role => {
+                        const player = gameState.players.find(p => p.team === 'pink' && p.systemRole === role);
+
+                        const row = document.createElement('tr');
+                        row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+
+                        // Role cell
+                        const roleCell = document.createElement('td');
+                        roleCell.style.padding = '10px';
+                        roleCell.textContent = roleNames[role];
+                        row.appendChild(roleCell);
+
+                        // Player cell
+                        const playerCell = document.createElement('td');
+                        playerCell.style.padding = '10px';
+                        playerCell.textContent = player ? player.name : '—';
+                        playerCell.style.color = player ? player.color : '#666';
+                        row.appendChild(playerCell);
+
+                        // Status cell
+                        const statusCell = document.createElement('td');
+                        statusCell.style.padding = '10px';
+                        statusCell.style.textAlign = 'center';
+                        statusCell.style.fontSize = '20px';
+                        statusCell.textContent = player && player.ready ? '✅' : '—';
+                        statusCell.style.color = player && player.ready ? '#4CAF50' : '#666';
+                        row.appendChild(statusCell);
+
+                        pinkTeamTableBody.appendChild(row);
+                    });
+                }
+            } else {
+                // Single table mode (legacy or non-dual-ship games)
+                document.getElementById('singleTeamTable').style.display = 'table';
+                document.getElementById('dualTeamTables').style.display = 'none';
+
+                const lobbyTableBody = document.getElementById('lobbyTableBody');
+                if (lobbyTableBody) {
+                    lobbyTableBody.innerHTML = '';
+
+                    roles.forEach(role => {
+                        const player = gameState.players.find(p => p.systemRole === role);
+
+                        const row = document.createElement('tr');
+                        row.style.borderBottom = '1px solid rgba(255, 255, 255, 0.1)';
+
+                        // Role cell
+                        const roleCell = document.createElement('td');
+                        roleCell.style.padding = '12px';
+                        roleCell.textContent = roleNames[role];
+                        row.appendChild(roleCell);
+
+                        // Player cell
+                        const playerCell = document.createElement('td');
+                        playerCell.style.padding = '12px';
+                        playerCell.textContent = player ? player.name : '—';
+                        playerCell.style.color = player ? player.color : '#666';
+                        row.appendChild(playerCell);
+
+                        // Status cell
+                        const statusCell = document.createElement('td');
+                        statusCell.style.padding = '12px';
+                        statusCell.style.textAlign = 'center';
+                        statusCell.style.fontSize = '24px';
+                        statusCell.textContent = player && player.ready ? '✓' : '✗';
+                        statusCell.style.color = player && player.ready ? '#4CAF50' : '#FF5252';
+                        row.appendChild(statusCell);
+
+                        lobbyTableBody.appendChild(row);
+                    });
+                }
+            }
         }
 
         // Visual effects handlers

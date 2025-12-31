@@ -344,16 +344,6 @@
             <label for="playerName" style="display: block; font-size: 16px; margin-bottom: 8px; opacity: 0.8;">Ваше имя:</label>
             <input type="text" id="playerName" placeholder="Введите имя" maxlength="20">
             <br>
-            <div id="teamSelector" style="display: none; margin: 10px 0;">
-                <select id="teamSelect" style="width: 100%; padding: 15px; font-size: 16px; border-radius: 10px; background: #222; color: white; border: 2px solid #444;">
-                    <option value="Blue">🔵 Синяя команда</option>
-                    <option value="Red">🔴 Красная команда</option>
-                    <option value="Yellow">🟡 Жёлтая команда</option>
-                    <option value="Green">🟢 Зелёная команда</option>
-                    <option value="White">⚪ Белая команда</option>
-                </select>
-            </div>
-
             <button class="btn btn-secondary" id="manualJoinBtn">Подключиться</button>
 
         </div>
@@ -619,9 +609,10 @@
             }
         }
 
-        // Show role selection panel for Ship game
+        // Show role selection panel and team selector for Ship game
         if (gameType === 'ship') {
             document.getElementById('roleSelectionPanel').style.display = 'block';
+            document.getElementById('teamSelector').style.display = 'block';
         }
 
         console.log('=== End Debug ===');

@@ -1244,13 +1244,6 @@
                             const recalibrateBtn = document.getElementById('recalibrateBtn');
                             if (leavePostBtn) leavePostBtn.style.display = 'block';
                             if (recalibrateBtn) recalibrateBtn.style.display = 'block';
-                        } else {
-                            // Hide buttons for non-Ship games
-                            const leavePostBtn = document.getElementById('leavePostBtn');
-                            const recalibrateBtn = document.getElementById('recalibrateBtn');
-                            if (leavePostBtn) leavePostBtn.style.display = 'none';
-                            if (recalibrateBtn) recalibrateBtn.style.display = 'none';
-                        }
 
                             // Update role display on controller screen
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);
@@ -1314,6 +1307,12 @@
                                     roleInfo.style.display = 'none';
                                 }
                             }
+                        } else {
+                            // Hide buttons for non-Ship games
+                            const leavePostBtn = document.getElementById('leavePostBtn');
+                            const recalibrateBtn = document.getElementById('recalibrateBtn');
+                            if (leavePostBtn) leavePostBtn.style.display = 'none';
+                            if (recalibrateBtn) recalibrateBtn.style.display = 'none';
                         }
 
                         // Check if this player died (only for Snake, not Pong)

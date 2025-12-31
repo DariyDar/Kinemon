@@ -266,6 +266,10 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.asteroidFrequency = settings.asteroidFrequency || 'medium';
         room.autopilotEnabled = settings.autopilotEnabled !== undefined ? settings.autopilotEnabled : false; // Default: disabled
 
+        // Set default thrust system and engine formula (removed from UI in v3.17.3)
+        room.thrustSystem = 'gradient';  // gradient or pump
+        room.engineFormula = 'linear';   // linear, quadratic, exponential
+
         // Initialize coins - only 1 coin at a time
         room.coins.push(spawnCoin(room));
 
@@ -2194,6 +2198,7 @@ function serializeGameState(room) {
         state.weaponFormula = room.weaponFormula;
         state.coinsToWin = room.coinsToWin;
         state.asteroidFrequency = room.asteroidFrequency;
+        state.autopilotEnabled = room.autopilotEnabled;
 
         // Send energy level for gradient system visualization
         state.energyLevel = room.thrustSystem === 'gradient' ? getEnergyLevel(room.systems.engine.energy) : 0;

@@ -1663,7 +1663,11 @@
                     roleDiv.style.padding = '4px 0';
                     roleDiv.style.fontSize = '14px';
                     roleDiv.style.whiteSpace = 'nowrap';
-                    roleDiv.innerHTML = `${roleNames[role]}: ${player ? player.name : '<span style="opacity: 0.6">🤖 Автопилот</span>'}`;
+                    // Show "Автопилот" only if autopilot is enabled
+                    const emptySlot = gameState.autopilotEnabled
+                        ? '<span style="opacity: 0.6">🤖 Автопилот</span>'
+                        : '<span style="opacity: 0.4">—</span>';
+                    roleDiv.innerHTML = `${roleNames[role]}: ${player ? player.name : emptySlot}`;
                     blueTeamRoster.appendChild(roleDiv);
                 });
 
@@ -1676,7 +1680,11 @@
                     roleDiv.style.padding = '4px 0';
                     roleDiv.style.fontSize = '14px';
                     roleDiv.style.whiteSpace = 'nowrap';
-                    roleDiv.innerHTML = `${roleNames[role]}: ${player ? player.name : '<span style="opacity: 0.6">🤖 Автопилот</span>'}`;
+                    // Show "Автопилот" only if autopilot is enabled
+                    const emptySlot = gameState.autopilotEnabled
+                        ? '<span style="opacity: 0.6">🤖 Автопилот</span>'
+                        : '<span style="opacity: 0.4">—</span>';
+                    roleDiv.innerHTML = `${roleNames[role]}: ${player ? player.name : emptySlot}`;
                     pinkTeamRoster.appendChild(roleDiv);
                 });
             } else {

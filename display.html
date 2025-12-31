@@ -463,6 +463,35 @@
             z-index: 1000;
         "></div>
 
+        <!-- Team Rosters (Ship game only, during gameplay) -->
+        <div id="teamRosters" style="
+            position: fixed;
+            top: 80px;
+            left: 0;
+            right: 0;
+            display: none;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 900;
+            pointer-events: none;
+        ">
+            <!-- Blue Team (Left) -->
+            <div style="background: rgba(33, 150, 243, 0.15); border: 2px solid #2196F3; border-radius: 8px; padding: 8px; min-width: 200px; backdrop-filter: blur(4px);">
+                <div style="font-size: 16px; font-weight: bold; color: #2196F3; margin-bottom: 5px; text-align: center;">
+                    🔵 <span id="blueCoinsDisplay">0</span>
+                </div>
+                <div id="blueTeamRoster" style="font-size: 11px; color: white; line-height: 1.4;"></div>
+            </div>
+
+            <!-- Pink Team (Right) -->
+            <div style="background: rgba(233, 30, 99, 0.15); border: 2px solid #E91E63; border-radius: 8px; padding: 8px; min-width: 200px; backdrop-filter: blur(4px);">
+                <div style="font-size: 16px; font-weight: bold; color: #E91E63; margin-bottom: 5px; text-align: center;">
+                    🩷 <span id="pinkCoinsDisplay">0</span>
+                </div>
+                <div id="pinkTeamRoster" style="font-size: 11px; color: white; line-height: 1.4;"></div>
+            </div>
+        </div>
+
         <div id="roomInfo" class="room-info" style="display: none;">
             <div class="room-label">Комната</div>
             <div class="room-id-display" id="roomIdInfo">------</div>
@@ -1171,6 +1200,8 @@
                                 if (lobbyScreen.classList.contains('active')) {
                                     showScreen('game');
                                 }
+                                // Update team rosters during game
+                                updateTeamRosters(gameState);
                             } else if (gameState.players.length === 0) {
                                 showScreen('waiting');
                             }
@@ -1371,6 +1402,64 @@
                         lobbyTableBody.appendChild(row);
                     });
                 }
+            }
+        }
+
+        // Update in-game team rosters
+        function updateTeamRosters(gameState) {
+            if (!gameState || gameState.gameType !== 'ship') return;
+
+            const teamRosters = document.getElementById('teamRosters');
+            if (!teamRosters) return;
+
+            // Show rosters only during game
+            if (gameState.gameStarted && gameState.players && gameState.players.length > 0) {
+                teamRosters.style.display = 'flex';
+
+                const roleNames = {
+                    engine: '⚙️ Двигатель',
+                    rudder: '🧭 Руль',
+                    weapon: '🔫 Оружие',
+                    weaponDirection: '🎯 Прицел',
+                    shield: '🛡️ Щит'
+                };
+
+                const roles = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
+
+                // Update coin counts
+                const blueCoins = gameState.ships && gameState.ships.blue ? (gameState.ships.blue.coinsCollected || 0) : 0;
+                const pinkCoins = gameState.ships && gameState.ships.pink ? (gameState.ships.pink.coinsCollected || 0) : 0;
+
+                document.getElementById('blueCoinsDisplay').textContent = blueCoins;
+                document.getElementById('pinkCoinsDisplay').textContent = pinkCoins;
+
+                // Update Blue team roster
+                const blueTeamRoster = document.getElementById('blueTeamRoster');
+                blueTeamRoster.innerHTML = '';
+                roles.forEach(role => {
+                    const player = gameState.players.find(p => p.team === 'blue' && p.systemRole === role);
+                    const roleDiv = document.createElement('div');
+                    roleDiv.style.padding = '4px 0';
+                    roleDiv.style.fontSize = '14px';
+                    roleDiv.style.whiteSpace = 'nowrap';
+                    roleDiv.innerHTML = `${roleNames[role]}: ${player ? player.name : '<span style="opacity: 0.6">🤖 Автопилот</span>'}`;
+                    blueTeamRoster.appendChild(roleDiv);
+                });
+
+                // Update Pink team roster
+                const pinkTeamRoster = document.getElementById('pinkTeamRoster');
+                pinkTeamRoster.innerHTML = '';
+                roles.forEach(role => {
+                    const player = gameState.players.find(p => p.team === 'pink' && p.systemRole === role);
+                    const roleDiv = document.createElement('div');
+                    roleDiv.style.padding = '4px 0';
+                    roleDiv.style.fontSize = '14px';
+                    roleDiv.style.whiteSpace = 'nowrap';
+                    roleDiv.innerHTML = `${roleNames[role]}: ${player ? player.name : '<span style="opacity: 0.6">🤖 Автопилот</span>'}`;
+                    pinkTeamRoster.appendChild(roleDiv);
+                });
+            } else {
+                teamRosters.style.display = 'none';
             }
         }
 

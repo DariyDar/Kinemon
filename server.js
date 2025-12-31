@@ -200,7 +200,13 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
                 invulnerable: true,
                 invulnerableUntil: Date.now() + 5000,
                 spawnTime: Date.now(),
-                alive: true
+                alive: true,
+                boosters: {  // v3.17: Power-ups
+                    extraBullets: 0,
+                    laserSight: false,
+                    attackShield: { active: false, sizeBonus: 0 },
+                    attackEngine: { active: false, level: 0 }
+                }
             },
             pink: {
                 team: 'pink',
@@ -217,7 +223,13 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
                 invulnerable: true,
                 invulnerableUntil: Date.now() + 5000,
                 spawnTime: Date.now(),
-                alive: true
+                alive: true,
+                boosters: {  // v3.17: Power-ups
+                    extraBullets: 0,
+                    laserSight: false,
+                    attackShield: { active: false, sizeBonus: 0 },
+                    attackEngine: { active: false, level: 0 }
+                }
             }
         };
 
@@ -247,6 +259,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.lastAsteroidSpawn = Date.now();
         room.coins = [];
         room.hearts = [];
+        room.loot = [];  // v3.17: Loot drops from asteroids
 
         // Settings
         room.thrustSystem = settings.thrustSystem || 'pump'; // 'pump' or 'gradient'
@@ -677,11 +690,13 @@ function fireBulletForTeam(room, teamColor) {
     if (weapon.energy < 0.1) return;
 
     const params = calculateBulletParams(weapon.energy);
+    // v3.17: Add extra bullets from booster
+    const totalBulletCount = params.bulletCount + (ship.boosters.extraBullets || 0);
     const angle = systems.weaponDirection.rotation * Math.PI / 180;
     const weaponPos = getSystemPosition(ship, systems.weaponDirection.rotation);
 
-    for (let i = 0; i < params.bulletCount; i++) {
-        const spread = params.bulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
+    for (let i = 0; i < totalBulletCount; i++) {
+        const spread = totalBulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
         const bulletAngle = angle + spread;
 
         room.bullets.push({
@@ -704,7 +719,7 @@ function fireBulletForTeam(room, teamColor) {
         x: weaponPos.x,
         y: weaponPos.y,
         color: effectColor,
-        count: Math.ceil(params.bulletCount / 2)
+        count: Math.ceil(totalBulletCount / 2)
     });
     broadcastEffect(room.id, 'shake', { intensity: params.powerLevel / 5 });
 
@@ -907,9 +922,43 @@ function spawnAsteroidIfNeeded(room) {
 
 // Handle asteroid destruction and splitting
 function handleAsteroidDestruction(room, asteroid, index) {
-    // 3% chance to drop heart (small asteroids only)
-    if (asteroid.size === 'small' && Math.random() < 0.03) {
-        room.hearts.push({ x: asteroid.x, y: asteroid.y, id: Date.now() + Math.random() });
+    // v3.17: 70% loot drop system for small asteroids
+    if (asteroid.size === 'small' && Math.random() < 0.70) {
+        const lootTypes = [
+            { type: 'coin', weight: 15 },
+            { type: 'heart', weight: 15 },
+            { type: 'bullet', weight: 15 },
+            { type: 'laser', weight: 5 },
+            { type: 'attackShield', weight: 10 },
+            { type: 'attackEngine', weight: 10 }
+        ];
+
+        // Weighted random selection
+        const totalWeight = lootTypes.reduce((sum, item) => sum + item.weight, 0);
+        let random = Math.random() * totalWeight;
+        let selectedType = 'coin';
+
+        for (const loot of lootTypes) {
+            random -= loot.weight;
+            if (random <= 0) {
+                selectedType = loot.type;
+                break;
+            }
+        }
+
+        // Spawn loot with scatter velocity (like coins)
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 1 + Math.random() * 2;
+
+        room.loot.push({
+            x: asteroid.x,
+            y: asteroid.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            type: selectedType,
+            id: Date.now() + Math.random(),
+            radius: 12
+        });
     }
 
     // Split into smaller asteroids
@@ -935,6 +984,93 @@ function handleAsteroidDestruction(room, asteroid, index) {
 
     broadcastEffect(room.id, 'particle', { x: asteroid.x, y: asteroid.y, color: '#888888', count: 25 });
     broadcastEffect(room.id, 'shake', { intensity: 3 });
+}
+
+// v3.17: Apply loot effect when ship collects loot
+function applyLootEffect(room, ship, loot, teamColor) {
+    const teamColorHex = teamColor === 'blue' ? '#2196F3' : '#E91E63';
+
+    switch (loot.type) {
+        case 'coin':
+            ship.coins = (ship.coins || 0) + 1;
+            const coinsRemaining = (room.coinsToWin || 10) - ship.coins;
+            broadcastEffect(room.id, 'particle', { x: loot.x, y: loot.y, color: '#FFD700', count: 10 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: ship.x,
+                y: ship.y - ship.radius - 20,
+                text: `ещё ${coinsRemaining} до победы!`,
+                color: teamColorHex
+            });
+            // Spawn new coin
+            room.coins.push(spawnCoin(room));
+            break;
+
+        case 'heart':
+            if (ship.health < ship.maxHealth) {
+                const actualHealing = Math.min(50, ship.maxHealth - ship.health);
+                ship.health = Math.min(ship.maxHealth, ship.health + 50);
+                broadcastEffect(room.id, 'particle', { x: loot.x, y: loot.y, color: '#FF1744', count: 15 });
+                broadcastEffect(room.id, 'scoreAnim', {
+                    x: ship.x,
+                    y: ship.y - ship.radius - 20,
+                    text: `${actualHealing}HP восстановлено!`,
+                    color: '#FF1744'
+                });
+            }
+            break;
+
+        case 'bullet':
+            ship.boosters.extraBullets = (ship.boosters.extraBullets || 0) + 1;
+            broadcastEffect(room.id, 'particle', { x: loot.x, y: loot.y, color: '#00FFFF', count: 15 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: ship.x,
+                y: ship.y - ship.radius - 20,
+                text: 'Дополнительный снаряд!',
+                color: '#00FFFF'
+            });
+            break;
+
+        case 'laser':
+            ship.boosters.laserSight = true;
+            broadcastEffect(room.id, 'particle', { x: loot.x, y: loot.y, color: '#FF0000', count: 15 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: ship.x,
+                y: ship.y - ship.radius - 20,
+                text: 'Лазерный прицел!',
+                color: '#FF0000'
+            });
+            break;
+
+        case 'attackShield':
+            const wasActive = ship.boosters.attackShield.active;
+            ship.boosters.attackShield.active = true;
+            if (!wasActive) {
+                ship.boosters.attackShield.sizeBonus = Math.min(50, (ship.boosters.attackShield.sizeBonus || 0) + 5);
+            } else {
+                ship.boosters.attackShield.sizeBonus = Math.min(50, ship.boosters.attackShield.sizeBonus + 5);
+            }
+            broadcastEffect(room.id, 'particle', { x: loot.x, y: loot.y, color: '#FF00FF', count: 15 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: ship.x,
+                y: ship.y - ship.radius - 20,
+                text: wasActive ? 'Атакующий щит УСИЛЕН!' : 'Атакующий щит!',
+                color: '#FF00FF'
+            });
+            break;
+
+        case 'attackEngine':
+            const wasEngineActive = ship.boosters.attackEngine.active;
+            ship.boosters.attackEngine.active = true;
+            ship.boosters.attackEngine.level = Math.min(10, (ship.boosters.attackEngine.level || 0) + 1);
+            broadcastEffect(room.id, 'particle', { x: loot.x, y: loot.y, color: '#FFA500', count: 15 });
+            broadcastEffect(room.id, 'scoreAnim', {
+                x: ship.x,
+                y: ship.y - ship.radius - 20,
+                text: wasEngineActive ? 'Атакующий двигатель УСИЛЕН!' : 'Атакующий двигатель!',
+                color: '#FFA500'
+            });
+            break;
+    }
 }
 
 // Check if angle is within shield arc
@@ -1063,10 +1199,27 @@ function checkShipCollisions(room) {
             if (dist < SHIP_SIZE) {
                 const blueShield = room.teamSystems.blue.shield.active;
                 const pinkShield = room.teamSystems.pink.shield.active;
+                const angle = Math.atan2(pinkShip.y - blueShip.y, pinkShip.x - blueShip.x);
+                const angleBlue = angle * 180 / Math.PI;
+                const anglePink = (angle + Math.PI) * 180 / Math.PI;
+
+                // v3.17: Check if attacking shield hits enemy ship
+                const blueAttackShieldHit = blueShield && blueShip.boosters.attackShield.active &&
+                    isAngleInShieldArc(angleBlue, room.teamSystems.blue.shield.rotation, 72);
+                const pinkAttackShieldHit = pinkShield && pinkShip.boosters.attackShield.active &&
+                    isAngleInShieldArc(anglePink, room.teamSystems.pink.shield.rotation, 72);
+
+                if (blueAttackShieldHit && !pinkShip.invulnerable) {
+                    pinkShip.health = Math.max(0, pinkShip.health - 2);
+                    broadcastEffect(room.id, 'particle', { x: pinkShip.x, y: pinkShip.y, color: '#FF00FF', count: 10 });
+                }
+                if (pinkAttackShieldHit && !blueShip.invulnerable) {
+                    blueShip.health = Math.max(0, blueShip.health - 2);
+                    broadcastEffect(room.id, 'particle', { x: blueShip.x, y: blueShip.y, color: '#FF00FF', count: 10 });
+                }
 
                 if (blueShield && pinkShield) {
                     // Both shields → repulsion, no damage
-                    const angle = Math.atan2(pinkShip.y - blueShip.y, pinkShip.x - blueShip.x);
                     const repelForce = 2.0;
                     blueShip.vx -= Math.cos(angle) * repelForce;
                     blueShip.vy -= Math.sin(angle) * repelForce;
@@ -1116,6 +1269,15 @@ function checkShipCollisions(room) {
                 // Check if shield blocks
                 if (systems.shield.active && isAngleInShieldArc(angleToAsteroid, systems.shield.rotation, 72)) {
                     deflectAsteroid(asteroid, ship, systems.shield.rotation, room);
+
+                    // v3.17: Attacking shield damages asteroids
+                    if (ship.boosters.attackShield.active) {
+                        asteroid.health = Math.max(0, asteroid.health - 2);
+                        if (asteroid.health <= 0) {
+                            handleAsteroidDestruction(room, asteroid, i);
+                        }
+                        broadcastEffect(room.id, 'particle', { x: asteroid.x, y: asteroid.y, color: '#FF00FF', count: 10 });
+                    }
                 } else {
                     // Impulse-based damage
                     const relativeSpeed = Math.hypot(asteroid.vx - ship.vx, asteroid.vy - ship.vy);
@@ -1208,6 +1370,23 @@ function checkShipCollisions(room) {
             }
         }
     }
+
+    // v3.17: 6. Ship-Loot collisions
+    for (const teamColor of teamColors) {
+        const ship = ships[teamColor];
+        if (!ship || !ship.alive) continue;
+
+        for (let i = room.loot.length - 1; i >= 0; i--) {
+            const loot = room.loot[i];
+            const dist = Math.hypot(loot.x - ship.x, loot.y - ship.y);
+
+            if (dist < (ship.radius || 20) + loot.radius) {
+                applyLootEffect(room, ship, loot, teamColor);
+                room.loot.splice(i, 1);
+                break; // Only one ship can collect this loot
+            }
+        }
+    }
 }
 
 // Check ship deaths and handle respawns
@@ -1261,6 +1440,14 @@ function checkShipDeathsAndRespawns(room) {
             ship.invulnerableUntil = Date.now() + 5000; // 5s invulnerability
             ship.spawnTime = Date.now();
             ship.respawnTime = null;
+
+            // v3.17: Reset boosters on respawn
+            ship.boosters = {
+                extraBullets: 0,
+                laserSight: false,
+                attackShield: { active: false, sizeBonus: 0 },
+                attackEngine: { active: false, level: 0 }
+            };
 
             console.log(`[${teamColor}] Ship respawned with 5s invulnerability`);
 
@@ -1952,7 +2139,8 @@ function serializeGameState(room) {
                 invulnerable: room.ships.blue.invulnerable,
                 invulnerableUntil: room.ships.blue.invulnerableUntil || 0,
                 spawnTime: room.ships.blue.spawnTime || 0,
-                alive: room.ships.blue.alive
+                alive: room.ships.blue.alive,
+                boosters: room.ships.blue.boosters  // v3.17: Send boosters state
             },
             pink: {
                 team: 'pink',
@@ -1969,7 +2157,8 @@ function serializeGameState(room) {
                 invulnerable: room.ships.pink.invulnerable,
                 invulnerableUntil: room.ships.pink.invulnerableUntil || 0,
                 spawnTime: room.ships.pink.spawnTime || 0,
-                alive: room.ships.pink.alive
+                alive: room.ships.pink.alive,
+                boosters: room.ships.pink.boosters  // v3.17: Send boosters state
             }
         };
 
@@ -1990,6 +2179,7 @@ function serializeGameState(room) {
 
         state.coins = room.coins;
         state.hearts = room.hearts;
+        state.loot = room.loot;  // v3.17: Send loot state
 
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id, name: p.name, color: p.color,
@@ -2861,6 +3051,29 @@ function updateShip(room) {
         }
     }
 
+    // v3.17: 6b. Update loot physics (same as coins)
+    for (const loot of room.loot) {
+        if (loot.vx !== undefined && loot.vy !== undefined) {
+            loot.x += loot.vx;
+            loot.y += loot.vy;
+
+            // Friction to slow down loot
+            const LOOT_FRICTION = 0.95;
+            loot.vx *= LOOT_FRICTION;
+            loot.vy *= LOOT_FRICTION;
+
+            // Stop at very low speeds
+            if (Math.abs(loot.vx) < 0.05) loot.vx = 0;
+            if (Math.abs(loot.vy) < 0.05) loot.vy = 0;
+
+            // Keep loot in bounds
+            if (loot.x < 0) loot.x = 0;
+            if (loot.x > room.canvas.width) loot.x = room.canvas.width;
+            if (loot.y < 0) loot.y = 0;
+            if (loot.y > room.canvas.height) loot.y = room.canvas.height;
+        }
+    }
+
     // 7. Spawn asteroids
     spawnAsteroidIfNeeded(room);
 
@@ -2870,6 +3083,58 @@ function updateShip(room) {
         asteroid.y += asteroid.vy;
         asteroid.rotation += asteroid.rotationSpeed;
     }
+
+    // v3.17: 8b. Attacking Engine auto-fire bullets
+    ['blue', 'pink'].forEach(teamColor => {
+        const ship = room.ships[teamColor];
+        const systems = room.teamSystems[teamColor];
+
+        if (ship.alive && ship.boosters.attackEngine.active && systems.engine.energy > 0) {
+            const now = Date.now();
+            const lastFire = ship.lastAttackEngineFire || 0;
+
+            // Fire rate: 100ms cooldown (10 shots/sec)
+            if (now - lastFire > 100) {
+                const level = ship.boosters.attackEngine.level;
+                const bulletCount = Math.min(level, 5);
+                const bulletSize = 6 + (level - 1) * 0.5;
+                const bulletSpeed = 4 + level * 0.3;
+
+                // Fire opposite to rudder direction
+                const engineAngle = (systems.rudder.rotation + 180) * Math.PI / 180;
+                const enginePos = getSystemPosition(ship, systems.rudder.rotation + 180);
+
+                for (let i = 0; i < bulletCount; i++) {
+                    const spread = bulletCount > 1 ? (Math.random() - 0.5) * 0.15 : 0;
+                    const bulletAngle = engineAngle + spread;
+
+                    room.bullets.push({
+                        x: enginePos.x,
+                        y: enginePos.y,
+                        vx: Math.cos(bulletAngle) * bulletSpeed,
+                        vy: Math.sin(bulletAngle) * bulletSpeed,
+                        damage: 3,
+                        size: bulletSize,
+                        powerLevel: 3,
+                        distanceTraveled: 0,
+                        maxDistance: 300,
+                        team: teamColor,
+                        id: Date.now() + Math.random() + i
+                    });
+                }
+
+                ship.lastAttackEngineFire = now;
+
+                const teamColorHex = teamColor === 'blue' ? '#2196F3' : '#E91E63';
+                broadcastEffect(room.id, 'particle', {
+                    x: enginePos.x,
+                    y: enginePos.y,
+                    color: '#FFA500',
+                    count: Math.ceil(bulletCount / 2)
+                });
+            }
+        }
+    });
 
     // 9. Collision detection
     checkShipCollisions(room);

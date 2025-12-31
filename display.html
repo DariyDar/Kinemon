@@ -1431,8 +1431,28 @@
                 const pinkCoins = gameState.ships && gameState.ships.pink ? (gameState.ships.pink.coins || 0) : 0;
                 const targetCoins = gameState.coinsToWin || 10;
 
-                document.getElementById('blueCoinsDisplay').textContent = `${blueCoins}/${targetCoins}`;
-                document.getElementById('pinkCoinsDisplay').textContent = `${pinkCoins}/${targetCoins}`;
+                // v3.17: Build booster indicators
+                let blueBoostersText = '';
+                let pinkBoostersText = '';
+
+                if (gameState.ships && gameState.ships.blue && gameState.ships.blue.boosters) {
+                    const boosters = gameState.ships.blue.boosters;
+                    if (boosters.extraBullets > 0) blueBoostersText += ` 🔹×${boosters.extraBullets}`;
+                    if (boosters.laserSight) blueBoostersText += ` 🔴🎯`;
+                    if (boosters.attackShield.active) blueBoostersText += ` 🛡️⚡${boosters.attackShield.sizeBonus}%`;
+                    if (boosters.attackEngine.active) blueBoostersText += ` 🔥Lv${boosters.attackEngine.level}`;
+                }
+
+                if (gameState.ships && gameState.ships.pink && gameState.ships.pink.boosters) {
+                    const boosters = gameState.ships.pink.boosters;
+                    if (boosters.extraBullets > 0) pinkBoostersText += ` 🔹×${boosters.extraBullets}`;
+                    if (boosters.laserSight) pinkBoostersText += ` 🔴🎯`;
+                    if (boosters.attackShield.active) pinkBoostersText += ` 🛡️⚡${boosters.attackShield.sizeBonus}%`;
+                    if (boosters.attackEngine.active) pinkBoostersText += ` 🔥Lv${boosters.attackEngine.level}`;
+                }
+
+                document.getElementById('blueCoinsDisplay').textContent = `${blueCoins}/${targetCoins}${blueBoostersText}`;
+                document.getElementById('pinkCoinsDisplay').textContent = `${pinkCoins}/${targetCoins}${pinkBoostersText}`;
 
                 // Update Blue team roster
                 const blueTeamRoster = document.getElementById('blueTeamRoster');
@@ -2058,6 +2078,101 @@
                 }
             }
 
+            // v3.17: Draw loot
+            if (gameState.loot) {
+                for (const loot of gameState.loot) {
+                    ctx.save();
+                    ctx.translate(loot.x, loot.y);
+
+                    switch (loot.type) {
+                        case 'coin':
+                            // Gold circle with $ symbol
+                            ctx.fillStyle = '#FFD700';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, loot.radius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.fillStyle = '#000';
+                            ctx.font = 'bold 16px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText('$', 0, 0);
+                            break;
+
+                        case 'heart':
+                            // Heart emoji
+                            ctx.font = '24px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText('❤️', 0, 0);
+                            break;
+
+                        case 'bullet':
+                            // Cyan circle with glow
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = '#00FFFF';
+                            ctx.fillStyle = '#00FFFF';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, loot.radius, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+                            break;
+
+                        case 'laser':
+                            // Red horizontal line with glow
+                            ctx.shadowBlur = 15;
+                            ctx.shadowColor = '#FF0000';
+                            ctx.strokeStyle = '#FF0000';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.moveTo(-loot.radius, 0);
+                            ctx.lineTo(loot.radius, 0);
+                            ctx.stroke();
+                            ctx.shadowBlur = 0;
+                            break;
+
+                        case 'attackShield':
+                            // Magenta arc with 3 small spikes
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = '#FF00FF';
+                            ctx.strokeStyle = '#FF00FF';
+                            ctx.lineWidth = 3;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, loot.radius, -Math.PI/3, Math.PI/3);
+                            ctx.stroke();
+                            // Draw 3 spikes
+                            for (let i = 0; i < 3; i++) {
+                                const angle = -Math.PI/3 + (i * Math.PI/3);
+                                const x1 = Math.cos(angle) * (loot.radius - 3);
+                                const y1 = Math.sin(angle) * (loot.radius - 3);
+                                const x2 = Math.cos(angle) * (loot.radius + 5);
+                                const y2 = Math.sin(angle) * (loot.radius + 5);
+                                ctx.beginPath();
+                                ctx.moveTo(x1, y1);
+                                ctx.lineTo(x2, y2);
+                                ctx.stroke();
+                            }
+                            ctx.shadowBlur = 0;
+                            break;
+
+                        case 'attackEngine':
+                            // Orange triangle flame
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = '#FFA500';
+                            ctx.fillStyle = '#FFA500';
+                            ctx.beginPath();
+                            ctx.moveTo(0, -loot.radius);
+                            ctx.lineTo(-loot.radius * 0.7, loot.radius * 0.7);
+                            ctx.lineTo(loot.radius * 0.7, loot.radius * 0.7);
+                            ctx.closePath();
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+                            break;
+                    }
+
+                    ctx.restore();
+                }
+            }
+
             // Draw bullets - size and color based on power
             if (gameState.bullets) {
                 for (const bullet of gameState.bullets) {
@@ -2252,7 +2367,13 @@
                 if (gameState.systems && gameState.systems.shield && gameState.systems.shield.active) {
                     ctx.save();
                     const shieldRot = gameState.systems.shield.rotation * Math.PI / 180;
-                    const arcSize = gameState.systems.shield.arcSize * Math.PI / 180;
+                    let arcSize = gameState.systems.shield.arcSize * Math.PI / 180;
+
+                    // v3.17: Increase arc size if attacking shield is active
+                    if (gameState.ships.blue.boosters && gameState.ships.blue.boosters.attackShield.active) {
+                        const sizeBonus = gameState.ships.blue.boosters.attackShield.sizeBonus || 0;
+                        arcSize *= (1 + sizeBonus / 100);
+                    }
 
                     // Shimmer effect (pulsing opacity)
                     const shimmer = 0.4 + Math.sin(Date.now() / 200) * 0.2;
@@ -2294,6 +2415,29 @@
                         ctx.beginPath();
                         ctx.arc(px, py, 3, 0, Math.PI * 2);
                         ctx.fill();
+                    }
+
+                    // v3.17: Draw attacking shield spikes
+                    if (gameState.ships.blue.boosters && gameState.ships.blue.boosters.attackShield.active) {
+                        ctx.strokeStyle = '#FF00FF';
+                        ctx.lineWidth = 3;
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = '#FF00FF';
+
+                        for (let i = 0; i < 5; i++) {
+                            const spikeAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
+                            const innerR = ship.radius + 2;
+                            const outerR = ship.radius + 14;
+                            const x1 = ship.x + Math.cos(spikeAngle) * innerR;
+                            const y1 = ship.y + Math.sin(spikeAngle) * innerR;
+                            const x2 = ship.x + Math.cos(spikeAngle) * outerR;
+                            const y2 = ship.y + Math.sin(spikeAngle) * outerR;
+
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            ctx.stroke();
+                        }
                     }
 
                     ctx.restore();
@@ -2348,6 +2492,50 @@
                             ctx.arc(x, y, radius, 0, Math.PI * 2);
                             ctx.fill();
                         }
+                    }
+
+                    // v3.17: Draw laser sight for blue ship
+                    if (gameState.ships.blue.boosters && gameState.ships.blue.boosters.laserSight) {
+                        const blueSystems = gameState.teamSystems.blue;
+                        const blueShip = gameState.ships.blue;
+                        const weaponPos = getSystemPosition(blueShip, blueSystems.weaponDirection.rotation);
+                        const weaponAngle = blueSystems.weaponDirection.rotation * Math.PI / 180;
+
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(weaponPos.x, weaponPos.y);
+                        ctx.lineTo(
+                            weaponPos.x + Math.cos(weaponAngle) * 5000,
+                            weaponPos.y + Math.sin(weaponAngle) * 5000
+                        );
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.restore();
+                    }
+
+                    // v3.17: Draw laser sight for pink ship
+                    if (gameState.ships.pink.boosters && gameState.ships.pink.boosters.laserSight) {
+                        const pinkSystems = gameState.teamSystems.pink;
+                        const pinkShip = gameState.ships.pink;
+                        const weaponPos = getSystemPosition(pinkShip, pinkSystems.weaponDirection.rotation);
+                        const weaponAngle = pinkSystems.weaponDirection.rotation * Math.PI / 180;
+
+                        ctx.save();
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([5, 5]);
+                        ctx.beginPath();
+                        ctx.moveTo(weaponPos.x, weaponPos.y);
+                        ctx.lineTo(
+                            weaponPos.x + Math.cos(weaponAngle) * 5000,
+                            weaponPos.y + Math.sin(weaponAngle) * 5000
+                        );
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        ctx.restore();
                     }
 
                     // Draw weapon charging cone (visible when energy > 0)
@@ -2510,7 +2698,14 @@
                     if (pinkSystems.shield && pinkSystems.shield.active) {
                         ctx.save();
                         const shieldRot = pinkSystems.shield.rotation * Math.PI / 180;
-                        const arcSize = pinkSystems.shield.arcSize * Math.PI / 180;
+                        let arcSize = pinkSystems.shield.arcSize * Math.PI / 180;
+
+                        // v3.17: Increase arc size if attacking shield is active
+                        if (gameState.ships.pink.boosters && gameState.ships.pink.boosters.attackShield.active) {
+                            const sizeBonus = gameState.ships.pink.boosters.attackShield.sizeBonus || 0;
+                            arcSize *= (1 + sizeBonus / 100);
+                        }
+
                         const shimmer = 0.4 + Math.sin(Date.now() / 200) * 0.2;
 
                         ctx.strokeStyle = `rgba(233, 30, 99, ${shimmer * 0.5})`;
@@ -2527,6 +2722,29 @@
                         ctx.beginPath();
                         ctx.arc(pinkShip.x, pinkShip.y, pinkShip.radius + 8, shieldRot - arcSize/2, shieldRot + arcSize/2);
                         ctx.stroke();
+
+                        // v3.17: Draw attacking shield spikes
+                        if (gameState.ships.pink.boosters && gameState.ships.pink.boosters.attackShield.active) {
+                            ctx.strokeStyle = '#FF00FF';
+                            ctx.lineWidth = 3;
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = '#FF00FF';
+
+                            for (let i = 0; i < 5; i++) {
+                                const spikeAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
+                                const innerR = pinkShip.radius + 2;
+                                const outerR = pinkShip.radius + 14;
+                                const x1 = pinkShip.x + Math.cos(spikeAngle) * innerR;
+                                const y1 = pinkShip.y + Math.sin(spikeAngle) * innerR;
+                                const x2 = pinkShip.x + Math.cos(spikeAngle) * outerR;
+                                const y2 = pinkShip.y + Math.sin(spikeAngle) * outerR;
+
+                                ctx.beginPath();
+                                ctx.moveTo(x1, y1);
+                                ctx.lineTo(x2, y2);
+                                ctx.stroke();
+                            }
+                        }
 
                         ctx.shadowBlur = 0;
                         ctx.restore();

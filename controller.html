@@ -519,7 +519,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.15.4 - Ship Lobby UX]', 'success');
+        addDebugLog('📱 Страница загружена [v3.15.5 - Gameplay Polish]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -729,6 +729,17 @@
                         if (window.isRecalibrating) {
                             addDebugLog('🔄 Рекалибровка завершена, возврат к игре', 'success');
                             window.isRecalibrating = false;
+
+                            // Restore role after recalibration
+                            if (window.roleBeforeRecalibration && ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    type: 'change_role',
+                                    role: window.roleBeforeRecalibration
+                                }));
+                                addDebugLog(`🎮 Возврат роли: ${window.roleBeforeRecalibration}`, 'success');
+                                window.roleBeforeRecalibration = null;
+                            }
+
                             showScreen('controller');
                             return;
                         }
@@ -1036,6 +1047,7 @@
                         if (data.gameState.gameType === 'ship') {
                             updateRoleButtons(data.gameState);
                             updateLobbyPlayers(data.gameState);
+                            updateOverlayRoleButtons(); // Update overlay buttons if open
 
                             // Update role display on controller screen
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);
@@ -1466,6 +1478,20 @@
             if (recalibrateBtn) {
                 recalibrateBtn.addEventListener('click', () => {
                     addDebugLog('📐 Начало перекалибровки', 'info');
+
+                    // Save current role before recalibration
+                    const myPlayer = window.currentGameState?.players?.find(p => p.id === playerId);
+                    window.roleBeforeRecalibration = myPlayer?.systemRole || null;
+
+                    // Temporarily release role to autopilot during recalibration
+                    if (window.roleBeforeRecalibration && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'change_role',
+                            role: null,
+                            recalibrating: true
+                        }));
+                        addDebugLog('🤖 Роль передана автопилоту на время калибровки', 'info');
+                    }
 
                     // Reset calibration
                     calibration.reset();

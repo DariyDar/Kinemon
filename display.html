@@ -520,7 +520,7 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
-        console.log('🖥️ Display loaded [v3.15.4 - Ship Lobby UX]');
+        console.log('🖥️ Display loaded [v3.15.5 - Gameplay Polish]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1929,8 +1929,16 @@
                 const timeSinceDamage = Date.now() - ship.lastDamageTime;
                 const isRedFlash = timeSinceDamage < 200;
 
-                // Invulnerable blink
-                if (ship.invulnerable) {
+                // Invulnerable smooth blink (fade in/out)
+                if (ship.invulnerable && ship.spawnTime) {
+                    const elapsed = Date.now() - ship.spawnTime;
+                    const blinkCycle = 500; // 500ms per blink cycle
+                    const phase = (elapsed % blinkCycle) / blinkCycle; // 0 to 1
+                    // Smooth sine wave: alpha oscillates between 0.3 and 1.0
+                    const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
+                    ctx.globalAlpha = alpha;
+                } else if (ship.invulnerable) {
+                    // Fallback for old invulnerability (without spawnTime)
                     const blinkVisible = Math.floor(Date.now() / 150) % 2 === 0;
                     if (!blinkVisible) {
                         ctx.globalAlpha = 0.5;

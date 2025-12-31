@@ -1032,6 +1032,14 @@ function startLobbyCountdown(room) {
         room.gameStarted = true;
         console.log(`[LOBBY] Game started in room ${room.id}`);
 
+        // Activate ship invulnerability for 5 seconds at round start
+        if (room.ship) {
+            room.ship.invulnerable = true;
+            room.ship.invulnerableUntil = Date.now() + 5000; // 5 seconds
+            room.ship.spawnTime = Date.now(); // Track spawn time for blinking animation
+            console.log(`[SHIP] Invulnerability activated for 5 seconds`);
+        }
+
         // Send start_calibration to all controllers
         room.players.forEach((player) => {
             if (player.ws && player.ws.readyState === 1) {
@@ -1518,7 +1526,9 @@ function serializeGameState(room) {
             hearts: room.ship.hearts,
             coins: room.ship.coins,
             lastDamageTime: room.ship.lastDamageTime,
-            invulnerable: room.ship.invulnerable
+            invulnerable: room.ship.invulnerable,
+            invulnerableUntil: room.ship.invulnerableUntil || 0,
+            spawnTime: room.ship.spawnTime || 0
         };
 
         state.systems = room.systems;

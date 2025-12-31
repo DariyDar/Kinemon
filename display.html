@@ -332,6 +332,138 @@
             border-bottom: 1px solid rgba(255,215,0,0.3);
             padding-bottom: 5px;
         }
+
+        /* Adaptive scaling for large screens (projectors, TVs) */
+        @media (min-width: 1920px) or (min-height: 1080px) {
+            /* Scale down UI elements for large screens */
+            h1 {
+                font-size: 20px;
+                margin-bottom: 8px;
+            }
+
+            h2 {
+                font-size: 18px;
+                margin-bottom: 10px;
+            }
+
+            p {
+                font-size: 14px;
+                margin-bottom: 15px;
+            }
+
+            .btn {
+                padding: 10px 24px;
+                font-size: 14px;
+                margin: 8px;
+            }
+
+            input {
+                padding: 12px;
+                font-size: 14px;
+                margin-bottom: 15px;
+                max-width: 300px;
+            }
+
+            #scoreboard {
+                top: 15px;
+                right: 15px;
+                padding: 15px;
+                min-width: 160px;
+            }
+
+            .player-score {
+                font-size: 14px;
+                margin: 8px 0;
+            }
+
+            #persistentQRDisplay {
+                width: 100px !important;
+                height: 100px !important;
+                bottom: 12px !important;
+                left: 12px !important;
+                padding: 4px !important;
+            }
+
+            #teamRosters {
+                top: 15px;
+                padding: 0 15px;
+            }
+
+            #teamRosters > div {
+                padding: 6px !important;
+                min-width: 160px !important;
+                font-size: 12px !important;
+            }
+
+            #teamRosters h3 {
+                font-size: 14px !important;
+                margin-bottom: 6px !important;
+            }
+
+            #roomInfo {
+                font-size: 14px;
+            }
+
+            #roomCodeDisplay {
+                font-size: 20px;
+            }
+        }
+
+        /* Extra large screens (4K projectors, 2560x1440+) */
+        @media (min-width: 2560px) or (min-height: 1440px) {
+            h1 {
+                font-size: 18px;
+                margin-bottom: 6px;
+            }
+
+            h2 {
+                font-size: 16px;
+                margin-bottom: 8px;
+            }
+
+            p {
+                font-size: 12px;
+                margin-bottom: 12px;
+            }
+
+            .btn {
+                padding: 8px 20px;
+                font-size: 12px;
+                margin: 6px;
+            }
+
+            input {
+                padding: 10px;
+                font-size: 12px;
+                max-width: 250px;
+            }
+
+            #scoreboard {
+                padding: 12px;
+                min-width: 140px;
+            }
+
+            .player-score {
+                font-size: 12px;
+            }
+
+            #persistentQRDisplay {
+                width: 80px !important;
+                height: 80px !important;
+                bottom: 10px !important;
+                left: 10px !important;
+            }
+
+            #teamRosters > div {
+                padding: 5px !important;
+                min-width: 140px !important;
+                font-size: 11px !important;
+            }
+
+            #teamRosters h3 {
+                font-size: 12px !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1152,24 +1284,43 @@
                         console.log('QR Code URL:', qrData);
 
                         // Generate large QR code for waiting screen
+                        // Adaptive QR size based on screen resolution
+                        const screenWidth = window.innerWidth;
+                        const screenHeight = window.innerHeight;
+                        let qrSize = 500; // Default for small screens
+
+                        if (screenWidth >= 2560 || screenHeight >= 1440) {
+                            qrSize = 300; // 4K projectors
+                        } else if (screenWidth >= 1920 || screenHeight >= 1080) {
+                            qrSize = 350; // Full HD projectors
+                        }
+
                         const waitingQR = document.getElementById('waitingQRCode');
                         waitingQR.innerHTML = '';
                         new QRCode(waitingQR, {
                             text: qrData,
-                            width: 500,
-                            height: 500,
+                            width: qrSize,
+                            height: qrSize,
                             colorDark: '#000000',
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M
                         });
 
                         // Generate persistent QR code in bottom-left corner
+                        // Adaptive size to match CSS media queries
+                        let persistentQRSize = 110; // Default
+                        if (screenWidth >= 2560 || screenHeight >= 1440) {
+                            persistentQRSize = 70; // 4K
+                        } else if (screenWidth >= 1920 || screenHeight >= 1080) {
+                            persistentQRSize = 90; // Full HD
+                        }
+
                         const persistentQR = document.getElementById('persistentQRDisplay');
                         persistentQR.innerHTML = '';
                         new QRCode(persistentQR, {
                             text: qrData,
-                            width: 110,
-                            height: 110,
+                            width: persistentQRSize,
+                            height: persistentQRSize,
                             colorDark: '#000000',
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M

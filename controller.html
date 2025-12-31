@@ -332,6 +332,129 @@
             margin-bottom: 10px;
             font-weight: bold;
         }
+
+        /* Adaptive styles for small screens */
+        @media (max-height: 700px) {
+            #container {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 32px;
+                margin-bottom: 10px;
+            }
+
+            h2 {
+                font-size: 24px;
+                margin-bottom: 10px;
+            }
+
+            h3 {
+                font-size: 18px;
+                margin-bottom: 8px;
+            }
+
+            p {
+                font-size: 14px;
+                margin-bottom: 15px;
+            }
+
+            .btn {
+                padding: 12px 24px;
+                font-size: 16px;
+                margin: 6px;
+                min-width: 150px;
+            }
+
+            .role-btn {
+                padding: 12px 20px;
+                font-size: 16px;
+                margin: 5px;
+            }
+
+            .team-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+
+            .calibration-indicator {
+                font-size: 48px;
+                margin: 10px 0;
+            }
+
+            .instruction {
+                font-size: 14px;
+            }
+
+            .tilt-display {
+                font-size: 36px;
+                margin: 10px 0;
+            }
+
+            .info p {
+                font-size: 14px;
+                margin-bottom: 8px;
+            }
+
+            .role-panel-title {
+                font-size: 16px;
+                margin-bottom: 8px;
+            }
+
+            #lobbyPlayers {
+                margin-top: 15px;
+                padding: 10px;
+            }
+
+            #leavePostBtn, #recalibrateBtn {
+                padding: 8px 16px;
+                font-size: 14px;
+            }
+
+            #leavePostBtn {
+                left: 8px;
+                top: 8px;
+            }
+
+            #recalibrateBtn {
+                left: 140px;
+                top: 8px;
+            }
+        }
+
+        @media (max-height: 600px) {
+            h1 {
+                font-size: 24px;
+                margin-bottom: 8px;
+            }
+
+            h2 {
+                font-size: 20px;
+                margin-bottom: 8px;
+            }
+
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                margin: 4px;
+            }
+
+            .role-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+                margin: 4px;
+            }
+
+            .calibration-indicator {
+                font-size: 36px;
+                margin: 8px 0;
+            }
+
+            .tilt-display {
+                font-size: 28px;
+                margin: 8px 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1116,14 +1239,18 @@
                             updateLobbyPlayers(data.gameState);
                             updateOverlayRoleButtons(); // Update overlay buttons if open
 
-                            // Ensure Ship game buttons are visible on controller screen
-                            const controllerScreen = document.getElementById('controllerScreen');
-                            if (controllerScreen && controllerScreen.classList.contains('active')) {
-                                const leavePostBtn = document.getElementById('leavePostBtn');
-                                const recalibrateBtn = document.getElementById('recalibrateBtn');
-                                if (leavePostBtn) leavePostBtn.style.display = 'block';
-                                if (recalibrateBtn) recalibrateBtn.style.display = 'block';
-                            }
+                            // Ensure Ship game buttons are always visible (regardless of active screen)
+                            const leavePostBtn = document.getElementById('leavePostBtn');
+                            const recalibrateBtn = document.getElementById('recalibrateBtn');
+                            if (leavePostBtn) leavePostBtn.style.display = 'block';
+                            if (recalibrateBtn) recalibrateBtn.style.display = 'block';
+                        } else {
+                            // Hide buttons for non-Ship games
+                            const leavePostBtn = document.getElementById('leavePostBtn');
+                            const recalibrateBtn = document.getElementById('recalibrateBtn');
+                            if (leavePostBtn) leavePostBtn.style.display = 'none';
+                            if (recalibrateBtn) recalibrateBtn.style.display = 'none';
+                        }
 
                             // Update role display on controller screen
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);

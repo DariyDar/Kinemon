@@ -90,11 +90,11 @@
             border: 2px solid #333;
             display: none;
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            object-fit: contain;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
         }
 
         #gameCanvas.active {
@@ -637,6 +637,27 @@
         const waitingScreen = document.getElementById('waitingScreen');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+
+        // Function to scale canvas to fit screen while maintaining aspect ratio
+        function scaleCanvasToScreen() {
+            if (!canvas.classList.contains('active')) return;
+
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+
+            const scaleX = windowWidth / canvasWidth;
+            const scaleY = windowHeight / canvasHeight;
+            const scale = Math.min(scaleX, scaleY);
+
+            canvas.style.width = `${canvasWidth * scale}px`;
+            canvas.style.height = `${canvasHeight * scale}px`;
+        }
+
+        // Scale canvas on resize and when it becomes active
+        window.addEventListener('resize', scaleCanvasToScreen);
+
         const playerList = document.getElementById('playerList');
         const roomCodeDisplay = document.getElementById('roomCodeDisplay');
         const roomIdInfo = document.getElementById('roomIdInfo');
@@ -991,6 +1012,7 @@
                 scoreboard.style.display = 'none';
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
+                scaleCanvasToScreen(); // Scale when canvas becomes visible
                 // Show persistent QR on game screen
                 const persistentQR = document.getElementById('persistentQRDisplay');
                 if (persistentQR) persistentQR.style.display = 'block';
@@ -1171,6 +1193,7 @@
                         if (gameState.canvas) {
                             canvas.width = gameState.canvas.width;
                             canvas.height = gameState.canvas.height;
+                            scaleCanvasToScreen(); // Scale after size update
                         }
 
                         updatePlayerCount();
@@ -1182,6 +1205,7 @@
                         if (gameState.canvas && (canvas.width !== gameState.canvas.width || canvas.height !== gameState.canvas.height)) {
                             canvas.width = gameState.canvas.width;
                             canvas.height = gameState.canvas.height;
+                            scaleCanvasToScreen(); // Scale after size update
                         }
 
                         updatePlayerCount();

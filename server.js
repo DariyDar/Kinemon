@@ -3096,32 +3096,27 @@ function updateShip(room) {
             // Fire rate: 100ms cooldown (10 shots/sec)
             if (now - lastFire > 100) {
                 const level = ship.boosters.attackEngine.level;
-                const bulletCount = Math.min(level, 5);
-                const bulletSize = 6 + (level - 1) * 0.5;
-                const bulletSpeed = 4 + level * 0.3;
+                const bulletCount = 1; // v3.17.1: Always fire single bullet
+                const bulletSize = 6 + (level - 1) * 0.5; // Size grows with level
+                const bulletSpeed = 4 + level * 0.3; // Speed grows with level
 
                 // Fire opposite to rudder direction
                 const engineAngle = (systems.rudder.rotation + 180) * Math.PI / 180;
                 const enginePos = getSystemPosition(ship, systems.rudder.rotation + 180);
 
-                for (let i = 0; i < bulletCount; i++) {
-                    const spread = bulletCount > 1 ? (Math.random() - 0.5) * 0.15 : 0;
-                    const bulletAngle = engineAngle + spread;
-
-                    room.bullets.push({
-                        x: enginePos.x,
-                        y: enginePos.y,
-                        vx: Math.cos(bulletAngle) * bulletSpeed,
-                        vy: Math.sin(bulletAngle) * bulletSpeed,
-                        damage: 3,
-                        size: bulletSize,
-                        powerLevel: 3,
-                        distanceTraveled: 0,
-                        maxDistance: 300,
-                        team: teamColor,
-                        id: Date.now() + Math.random() + i
-                    });
-                }
+                room.bullets.push({
+                    x: enginePos.x,
+                    y: enginePos.y,
+                    vx: Math.cos(engineAngle) * bulletSpeed,
+                    vy: Math.sin(engineAngle) * bulletSpeed,
+                    damage: 3,
+                    size: bulletSize,
+                    powerLevel: 3,
+                    distanceTraveled: 0,
+                    maxDistance: 300,
+                    team: teamColor,
+                    id: Date.now() + Math.random()
+                });
 
                 ship.lastAttackEngineFire = now;
 

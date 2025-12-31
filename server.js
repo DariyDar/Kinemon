@@ -2784,17 +2784,23 @@ function updateShip(room) {
             systems.weapon.hasPlayer = true;
         }
         if (!occupied.has('engine')) {
-            // Auto-pilot: random bursts
-            if (!room[`lastAutoPump_${teamColor}`]) room[`lastAutoPump_${teamColor}`] = Date.now();
-            const timeSinceLastPump = Date.now() - room[`lastAutoPump_${teamColor}`];
+            // Auto-pilot: constant minimal thrust
+            if (room.thrustSystem === 'gradient') {
+                // For gradient system: maintain energy around 150-300 (level 1-2)
+                const targetEnergy = 150 + Math.random() * 150;
+                if (systems.engine.energy < targetEnergy) {
+                    systems.engine.energy = Math.min(systems.engine.energy + 2, targetEnergy);
+                }
+            } else {
+                // For pump system: periodic small pumps
+                if (!room[`lastAutoPump_${teamColor}`]) room[`lastAutoPump_${teamColor}`] = Date.now();
+                const timeSinceLastPump = Date.now() - room[`lastAutoPump_${teamColor}`];
 
-            const randomInterval = room[`autoPumpInterval_${teamColor}`] || (1000 + Math.random() * 2000);
-
-            if (timeSinceLastPump > randomInterval) {
-                const burstEnergy = 1 + Math.random() * 2;
-                systems.engine.energy = Math.min(systems.engine.energy + burstEnergy, 750);
-                room[`lastAutoPump_${teamColor}`] = Date.now();
-                room[`autoPumpInterval_${teamColor}`] = 1000 + Math.random() * 2000;
+                if (timeSinceLastPump > 500) {
+                    const burstEnergy = 0.5 + Math.random() * 1.5;
+                    systems.engine.energy = Math.min(systems.engine.energy + burstEnergy, 10);
+                    room[`lastAutoPump_${teamColor}`] = Date.now();
+                }
             }
 
             systems.engine.hasPlayer = true;

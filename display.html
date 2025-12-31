@@ -1117,8 +1117,8 @@
                         persistentQR.innerHTML = '';
                         new QRCode(persistentQR, {
                             text: qrData,
-                            width: 70,
-                            height: 70,
+                            width: 110,
+                            height: 110,
                             colorDark: '#000000',
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M
@@ -2063,8 +2063,8 @@
                 }
             }
 
-            // Draw ship
-            if (ship) {
+            // Draw ship (only if alive)
+            if (ship && ship.alive !== false) {
                 // Ship body - flash red when damaged
                 const timeSinceDamage = Date.now() - ship.lastDamageTime;
                 const isRedFlash = timeSinceDamage < 200;
@@ -2365,8 +2365,8 @@
                 }
             }
 
-            // Draw second ship (pink team) if in two-team mode
-            if (ships && ships.pink) {
+            // Draw second ship (pink team) if in two-team mode and alive
+            if (ships && ships.pink && ships.pink.alive !== false) {
                 const pinkShip = ships.pink;
 
                 // Invulnerable smooth blink

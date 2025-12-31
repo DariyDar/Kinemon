@@ -1217,7 +1217,7 @@
                         // Reset button text
                         const readyBtn = document.getElementById('readyBtn');
                         if (readyBtn && isReady) {
-                            readyBtn.textContent = 'Ожидание других игроков...';
+                            readyBtn.textContent = 'Подключиться';
                             readyBtn.disabled = true;
                         }
                     }
@@ -1431,9 +1431,9 @@
                     if (readyHint) readyHint.style.display = 'block';
                 }
 
-                // If player is ready, show different text
+                // If player is ready, disable button
                 if (myPlayer && myPlayer.ready) {
-                    readyBtn.textContent = 'Ожидание других игроков...';
+                    readyBtn.textContent = 'Подключиться';
                     readyBtn.disabled = true;
                     isReady = true;
                 }

@@ -1252,8 +1252,8 @@
 
             const roles = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
 
-            // Check if Ship game with dual ships (two-team mode)
-            const isDualShipMode = gameState.gameType === 'ship' && gameState.ships && gameState.ships.blue && gameState.ships.pink;
+            // Check if Ship game (always show dual tables for Ship game in v3.16+)
+            const isDualShipMode = gameState.gameType === 'ship';
 
             if (isDualShipMode) {
                 // Show dual team tables, hide single table
@@ -2399,6 +2399,89 @@
                     ctx.font = '12px monospace';
                     ctx.textAlign = 'center';
                     ctx.fillText(`${Math.ceil(pinkShip.health)}`, pinkShip.x, pinkShip.y - 45);
+                }
+
+                // Draw pink ship systems (if teamSystems available)
+                if (gameState.teamSystems && gameState.teamSystems.pink) {
+                    const pinkSystems = gameState.teamSystems.pink;
+
+                    // Draw shield for pink ship
+                    if (pinkSystems.shield && pinkSystems.shield.active) {
+                        ctx.save();
+                        const shieldRot = pinkSystems.shield.rotation * Math.PI / 180;
+                        const arcSize = pinkSystems.shield.arcSize * Math.PI / 180;
+                        const shimmer = 0.4 + Math.sin(Date.now() / 200) * 0.2;
+
+                        ctx.strokeStyle = `rgba(233, 30, 99, ${shimmer * 0.5})`;
+                        ctx.lineWidth = 12;
+                        ctx.shadowBlur = 20;
+                        ctx.shadowColor = '#E91E63';
+                        ctx.beginPath();
+                        ctx.arc(pinkShip.x, pinkShip.y, pinkShip.radius + 8, shieldRot - arcSize/2, shieldRot + arcSize/2);
+                        ctx.stroke();
+
+                        ctx.strokeStyle = `rgba(233, 30, 99, ${shimmer})`;
+                        ctx.lineWidth = 6;
+                        ctx.shadowBlur = 15;
+                        ctx.beginPath();
+                        ctx.arc(pinkShip.x, pinkShip.y, pinkShip.radius + 8, shieldRot - arcSize/2, shieldRot + arcSize/2);
+                        ctx.stroke();
+
+                        ctx.shadowBlur = 0;
+                        ctx.restore();
+                    }
+
+                    // Draw engine for pink ship
+                    const enginePos = getSystemPosition(pinkShip, pinkSystems.rudder.rotation);
+                    const engineAngle = pinkSystems.rudder.rotation * Math.PI / 180;
+
+                    ctx.save();
+                    ctx.translate(enginePos.x, enginePos.y);
+                    ctx.rotate(engineAngle);
+                    ctx.fillStyle = '#666';
+                    ctx.fillRect(-10, -6, 20, 12);
+                    ctx.fillStyle = '#444';
+                    ctx.fillRect(-10, -4, 20, 8);
+                    ctx.restore();
+
+                    // Fire particles for pink ship
+                    const shipSpeed = Math.hypot(pinkShip.vx || 0, pinkShip.vy || 0);
+                    const maxSpeed = physicsSettings.maxSpeed;
+                    const speedRatio = Math.min(shipSpeed / maxSpeed, 1);
+
+                    if (speedRatio > physicsSettings.fireThreshold) {
+                        const movementAngle = Math.atan2(pinkShip.vy || 0, pinkShip.vx || 0);
+                        const thrustAngle = movementAngle + Math.PI;
+                        const thrustIntensity = speedRatio * physicsSettings.fireIntensity;
+                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * speedRatio));
+
+                        for (let i = 0; i < particleCount; i++) {
+                            const dist = 15 + i * 12 + Math.random() * 5;
+                            const spread = (Math.random() - 0.5) * 0.3;
+                            const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
+                            const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
+                            const alpha = (1 - i / particleCount) * 0.9 * Math.min(thrustIntensity, 1);
+                            const hue = 30 + Math.random() * 30;
+                            ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+                            ctx.beginPath();
+                            const radius = Math.max(1, 8 - i * 1.5);
+                            ctx.arc(x, y, radius, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+
+                    // Draw weapon for pink ship
+                    const weaponPos = getSystemPosition(pinkShip, pinkSystems.weaponDirection.rotation);
+                    const weaponAngle = pinkSystems.weaponDirection.rotation * Math.PI / 180;
+
+                    ctx.save();
+                    ctx.translate(weaponPos.x, weaponPos.y);
+                    ctx.rotate(weaponAngle);
+                    ctx.fillStyle = '#AAA';
+                    ctx.fillRect(-8, -4, 16, 8);
+                    ctx.fillStyle = '#666';
+                    ctx.fillRect(8, -2, 8, 4);
+                    ctx.restore();
                 }
             }
 

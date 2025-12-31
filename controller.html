@@ -432,7 +432,10 @@
             <p>Наклоняйте телефон для управления</p>
             <div class="info">
                 <p id="playerInfo">Игрок: <span id="playerNameDisplay"></span></p>
-                <p id="roleInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold; color: #4CAF50;">Ваша роль: <span id="roleDisplay"></span></p>
+                <p id="roleInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold; color: #4CAF50;">
+                    <span id="teamDisplay" style="display: none;"></span><br>
+                    Ваша роль: <span id="roleDisplay"></span>
+                </p>
                 <p id="axisInfo" style="display: none; margin-top: 10px; font-size: 18px; font-weight: bold;">Ваша ось: <span id="axisDisplay"></span></p>
             </div>
 
@@ -1125,9 +1128,18 @@
                                 };
                                 const roleInfo = document.getElementById('roleInfo');
                                 const roleDisplay = document.getElementById('roleDisplay');
+                                const teamDisplay = document.getElementById('teamDisplay');
                                 if (roleInfo && roleDisplay) {
                                     roleInfo.style.display = 'block';
                                     roleDisplay.textContent = roleNames[myPlayer.systemRole];
+
+                                    // Show team for Ship game
+                                    if (myPlayer.team && teamDisplay) {
+                                        const teamNames = { blue: '🔵 Голубая команда', pink: '🩷 Розовая команда' };
+                                        teamDisplay.textContent = teamNames[myPlayer.team] || myPlayer.team;
+                                        teamDisplay.style.display = 'inline';
+                                        teamDisplay.style.color = myPlayer.team === 'blue' ? '#2196F3' : '#E91E63';
+                                    }
                                 }
 
                                 // Close overlay only if role changed from what it was when overlay opened

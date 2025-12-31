@@ -1972,7 +1972,12 @@ function serializeGameState(room) {
             }
         };
 
-        state.systems = room.systems;
+        // Send both team systems for dual ship mode
+        state.teamSystems = {
+            blue: room.teamSystems.blue,
+            pink: room.teamSystems.pink
+        };
+        state.systems = room.systems; // Backward compatibility (points to blue)
 
         state.bullets = room.bullets.map(b => ({ x: b.x, y: b.y, id: b.id, team: b.team }));
 

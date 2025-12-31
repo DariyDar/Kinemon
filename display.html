@@ -1365,6 +1365,13 @@
                         window.persistentQRData = qrData;
                         window.persistentQRGenerated = false;
 
+                        // Ensure persistentQR is hidden and empty on waiting screen
+                        const persistentQR = document.getElementById('persistentQRDisplay');
+                        if (persistentQR) {
+                            persistentQR.innerHTML = '';
+                            persistentQR.style.display = 'none';
+                        }
+
                         showScreen('waiting');
 
                         // Join the room as display

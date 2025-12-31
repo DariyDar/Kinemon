@@ -85,7 +85,8 @@ class MotionController {
             // Calibrated mode
             const range = this.maxTilt - this.minTilt;
             const normalized = (rawValue - this.minTilt) / range;
-            this.currentTilt = Math.max(0, Math.min(1, normalized)); // Clamp to 0-1
+            // Allow 30% overflow beyond calibrated range (-0.3 to 1.3)
+            this.currentTilt = Math.max(-0.3, Math.min(1.3, normalized));
         } else {
             // Uncalibrated mode - just pass through raw value
             this.currentTilt = rawValue;

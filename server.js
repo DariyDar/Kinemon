@@ -2952,8 +2952,8 @@ function updateShip(room) {
                     systems.engine.hasPlayer = true;
                     break;
                 case 'rudder':
-                    // Extended range: -30% to 130% (-108° to 468°)
-                    systems.rudder.rotation = (tilt * 1.6 - 0.3) * 360;
+                    // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
+                    systems.rudder.rotation = tilt * 360;
                     break;
                 case 'weapon':
                     const weaponResult = updateWeaponCharge(player, tilt, room);
@@ -2967,12 +2967,12 @@ function updateShip(room) {
                     systems.weapon.hasPlayer = true;
                     break;
                 case 'weaponDirection':
-                    // Extended range: -30% to 130% (-108° to 468°)
-                    systems.weaponDirection.rotation = (tilt * 1.6 - 0.3) * 360;
+                    // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
+                    systems.weaponDirection.rotation = tilt * 360;
                     break;
                 case 'shield':
-                    // Extended range: -30% to 130% (-108° to 468°)
-                    systems.shield.rotation = (tilt * 1.6 - 0.3) * 360;
+                    // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
+                    systems.shield.rotation = tilt * 360;
                     systems.shield.active = true;
                     break;
             }

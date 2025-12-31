@@ -478,7 +478,7 @@
             <!-- Blue Team (Left) -->
             <div style="background: rgba(33, 150, 243, 0.15); border: 2px solid #2196F3; border-radius: 8px; padding: 8px; min-width: 200px; backdrop-filter: blur(4px);">
                 <div style="font-size: 16px; font-weight: bold; color: #2196F3; margin-bottom: 5px; text-align: center;">
-                    🔵 <span id="blueCoinsDisplay">0</span>
+                    💰 <span id="blueCoinsDisplay">0</span>
                 </div>
                 <div id="blueTeamRoster" style="font-size: 11px; color: white; line-height: 1.4;"></div>
             </div>
@@ -486,7 +486,7 @@
             <!-- Pink Team (Right) -->
             <div style="background: rgba(233, 30, 99, 0.15); border: 2px solid #E91E63; border-radius: 8px; padding: 8px; min-width: 200px; backdrop-filter: blur(4px);">
                 <div style="font-size: 16px; font-weight: bold; color: #E91E63; margin-bottom: 5px; text-align: center;">
-                    🩷 <span id="pinkCoinsDisplay">0</span>
+                    💰 <span id="pinkCoinsDisplay">0</span>
                 </div>
                 <div id="pinkTeamRoster" style="font-size: 11px; color: white; line-height: 1.4;"></div>
             </div>
@@ -1429,9 +1429,10 @@
                 // Update coin counts
                 const blueCoins = gameState.ships && gameState.ships.blue ? (gameState.ships.blue.coinsCollected || 0) : 0;
                 const pinkCoins = gameState.ships && gameState.ships.pink ? (gameState.ships.pink.coinsCollected || 0) : 0;
+                const targetCoins = gameState.coinsToWin || 10;
 
-                document.getElementById('blueCoinsDisplay').textContent = blueCoins;
-                document.getElementById('pinkCoinsDisplay').textContent = pinkCoins;
+                document.getElementById('blueCoinsDisplay').textContent = `${blueCoins}/${targetCoins}`;
+                document.getElementById('pinkCoinsDisplay').textContent = `${pinkCoins}/${targetCoins}`;
 
                 // Update Blue team roster
                 const blueTeamRoster = document.getElementById('blueTeamRoster');
@@ -2663,18 +2664,7 @@
 
             // Draw HUD (top)
             if (ships) {
-                // Two-team mode: dual coin counters
-                ctx.font = 'bold 32px Arial';
-
-                // Blue team (left)
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#2196F3';
-                ctx.fillText(`🔵 ${ships.blue.coins}/${gameState.coinsToWin || 10}`, 20, 40);
-
-                // Pink team (right)
-                ctx.textAlign = 'right';
-                ctx.fillStyle = '#E91E63';
-                ctx.fillText(`${ships.pink.coins}/${gameState.coinsToWin || 10} 🩷`, canvas.width - 20, 40);
+                // Two-team mode: coin counters shown in team rosters overlay (no canvas rendering)
             } else if (ship) {
                 // Old single-ship mode
                 ctx.font = '24px Arial';
@@ -2682,28 +2672,6 @@
                 ctx.fillStyle = '#FFF';
                 ctx.fillText(`❤️ ${ship.hearts}/10`, 20, 30);
                 ctx.fillText(`💰 ${ship.coins}/${gameState.coinsToWin || 10}`, 20, 60);
-            }
-
-            // Player list (right side)
-            if (gameState.players) {
-                ctx.font = 'bold 14px Arial';
-                ctx.textAlign = 'right';
-                ctx.fillStyle = '#FFF';
-                let y = 30;
-                const roleNames = {
-                    engine: 'Двигатель',
-                    rudder: 'Руль',
-                    weapon: 'Оружие',
-                    weaponDirection: 'Прицел',
-                    shield: 'Щит'
-                };
-
-                for (const player of gameState.players) {
-                    if (!player.systemRole) continue;
-                    ctx.fillStyle = player.color;
-                    ctx.fillText(`${player.name} - ${roleNames[player.systemRole]}`, canvas.width - 20, y);
-                    y += 25;
-                }
             }
 
             // Render visual effects

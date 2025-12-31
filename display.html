@@ -466,7 +466,7 @@
         <!-- Team Rosters (Ship game only, during gameplay) -->
         <div id="teamRosters" style="
             position: fixed;
-            top: 80px;
+            top: 20px;
             left: 0;
             right: 0;
             display: none;
@@ -1274,9 +1274,9 @@
             if (!gameState || !gameState.players) return;
 
             const roleNames = {
-                engine: '⚙️ Двигатель',
+                engine: '⚙️ Тяга',
                 rudder: '🧭 Руль',
-                weapon: '🔫 Оружие',
+                weapon: '🔫 Пушка',
                 weaponDirection: '🎯 Прицел',
                 shield: '🛡️ Щит'
             };
@@ -1417,9 +1417,9 @@
                 teamRosters.style.display = 'flex';
 
                 const roleNames = {
-                    engine: '⚙️ Двигатель',
+                    engine: '⚙️ Тяга',
                     rudder: '🧭 Руль',
-                    weapon: '🔫 Оружие',
+                    weapon: '🔫 Пушка',
                     weaponDirection: '🎯 Прицел',
                     shield: '🛡️ Щит'
                 };
@@ -1427,8 +1427,8 @@
                 const roles = ['engine', 'rudder', 'weapon', 'weaponDirection', 'shield'];
 
                 // Update coin counts
-                const blueCoins = gameState.ships && gameState.ships.blue ? (gameState.ships.blue.coinsCollected || 0) : 0;
-                const pinkCoins = gameState.ships && gameState.ships.pink ? (gameState.ships.pink.coinsCollected || 0) : 0;
+                const blueCoins = gameState.ships && gameState.ships.blue ? (gameState.ships.blue.coins || 0) : 0;
+                const pinkCoins = gameState.ships && gameState.ships.pink ? (gameState.ships.pink.coins || 0) : 0;
                 const targetCoins = gameState.coinsToWin || 10;
 
                 document.getElementById('blueCoinsDisplay').textContent = `${blueCoins}/${targetCoins}`;

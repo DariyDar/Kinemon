@@ -367,10 +367,10 @@
             <div id="roleSelectionPanel" style="display: block;">
                 <div class="role-panel-title">Выбор роли:</div>
                 <div class="role-buttons">
-                    <button class="role-btn" data-role="engine">⚙️ Двигатель Тяга</button>
-                    <button class="role-btn" data-role="rudder">🧭 Двигатель Руль</button>
-                    <button class="role-btn" data-role="weapon">🔫 Орудия Стрельба</button>
-                    <button class="role-btn" data-role="weaponDirection">🎯 Орудия Прицеливание</button>
+                    <button class="role-btn" data-role="engine">⚙️ Тяга</button>
+                    <button class="role-btn" data-role="rudder">🧭 Руль</button>
+                    <button class="role-btn" data-role="weapon">🔫 Пушка</button>
+                    <button class="role-btn" data-role="weaponDirection">🎯 Прицел</button>
                     <button class="role-btn" data-role="shield">🛡️ Щит</button>
                 </div>
 
@@ -450,10 +450,10 @@
                 <div id="roleSelectionInGame">
                     <div class="role-panel-title">Выберите новую роль:</div>
                     <div class="role-buttons">
-                        <button class="role-btn-overlay" data-role="engine">⚙️ Двигатель Тяга</button>
-                        <button class="role-btn-overlay" data-role="rudder">🧭 Двигатель Руль</button>
-                        <button class="role-btn-overlay" data-role="weapon">🔫 Орудия Стрельба</button>
-                        <button class="role-btn-overlay" data-role="weaponDirection">🎯 Орудия Прицеливание</button>
+                        <button class="role-btn-overlay" data-role="engine">⚙️ Тяга</button>
+                        <button class="role-btn-overlay" data-role="rudder">🧭 Руль</button>
+                        <button class="role-btn-overlay" data-role="weapon">🔫 Пушка</button>
+                        <button class="role-btn-overlay" data-role="weaponDirection">🎯 Прицел</button>
                         <button class="role-btn-overlay" data-role="shield">🛡️ Щит</button>
                     </div>
                 </div>
@@ -1129,10 +1129,10 @@
                             const myPlayer = data.gameState.players.find(p => p.id === playerId);
                             if (myPlayer && myPlayer.systemRole) {
                                 const roleNames = {
-                                    engine: '⚙️ Двигатель Тяга',
-                                    rudder: '🧭 Двигатель Руль',
-                                    weapon: '🔫 Орудия Стрельба',
-                                    weaponDirection: '🎯 Орудия Прицеливание',
+                                    engine: '⚙️ Тяга',
+                                    rudder: '🧭 Руль',
+                                    weapon: '🔫 Пушка',
+                                    weaponDirection: '🎯 Прицел',
                                     shield: '🛡️ Щит'
                                 };
                                 const roleInfo = document.getElementById('roleInfo');
@@ -1371,10 +1371,10 @@
                     btn.disabled = true;
                     btn.style.opacity = '0.5';
                     const roleNames = {
-                        engine: '⚙️ Двигатель Тяга',
-                        rudder: '🧭 Двигатель Руль',
-                        weapon: '🔫 Орудия Стрельба',
-                        weaponDirection: '🎯 Орудия Прицеливание',
+                        engine: '⚙️ Тяга',
+                        rudder: '🧭 Руль',
+                        weapon: '🔫 Пушка',
+                        weaponDirection: '🎯 Прицел',
                         shield: '🛡️ Щит'
                     };
                     btn.textContent = roleNames[btn.dataset.role];
@@ -1388,10 +1388,10 @@
                 const occupiedBy = teamPlayers.find(p => p.systemRole === role);
 
                 const roleNames = {
-                    engine: '⚙️ Двигатель Тяга',
-                    rudder: '🧭 Двигатель Руль',
-                    weapon: '🔫 Орудия Стрельба',
-                    weaponDirection: '🎯 Орудия Прицеливание',
+                    engine: '⚙️ Тяга',
+                    rudder: '🧭 Руль',
+                    weapon: '🔫 Пушка',
+                    weaponDirection: '🎯 Прицел',
                     shield: '🛡️ Щит'
                 };
                 btn.textContent = roleNames[role];
@@ -1399,7 +1399,7 @@
                 if (occupiedBy && occupiedBy.id !== playerId) {
                     // Роль занята другим игроком
                     btn.disabled = true;
-                    btn.textContent = `${roleNames[role].split(' ')[0]} ${occupiedBy.name}`;
+                    btn.textContent = `${roleNames[role]} ${occupiedBy.name}`;
                     btn.style.opacity = '0.5';
                     btn.classList.remove('selected', 'exit-role');
                 } else if (occupiedBy && occupiedBy.id === playerId) {
@@ -1461,10 +1461,10 @@
             }
 
             const roleNames = {
-                engine: '⚙️ Двигатель Тяга',
-                rudder: '🧭 Двигатель Руль',
-                weapon: '🔫 Орудия Стрельба',
-                weaponDirection: '🎯 Орудия Прицеливание',
+                engine: '⚙️ Тяга',
+                rudder: '🧭 Руль',
+                weapon: '🔫 Пушка',
+                weaponDirection: '🎯 Прицел',
                 shield: '🛡️ Щит'
             };
 
@@ -1490,10 +1490,10 @@
             const myPlayer = players.find(p => p.id === playerId);
 
             const roleNames = {
-                engine: '⚙️ Двигатель Тяга',
-                rudder: '🧭 Двигатель Руль',
-                weapon: '🔫 Орудия Стрельба',
-                weaponDirection: '🎯 Орудия Прицеливание',
+                engine: '⚙️ Тяга',
+                rudder: '🧭 Руль',
+                weapon: '🔫 Пушка',
+                weaponDirection: '🎯 Прицел',
                 shield: '🛡️ Щит'
             };
 

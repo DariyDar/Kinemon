@@ -520,7 +520,7 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
-        console.log('🖥️ Display loaded [v3.15.5 - Gameplay Polish]');
+        console.log('🖥️ Display loaded [v3.16.0 - Two-Team Ship Gameplay]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1811,7 +1811,8 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const ship = gameState.ship;
+            const ships = gameState.ships;
+            const ship = ships ? ships.blue : gameState.ship;  // Backward compatibility
 
             // Draw coins
             if (gameState.coins) {
@@ -1956,6 +1957,28 @@
                 ctx.strokeStyle = '#FFF';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+
+                // Health bar above ship (two-team mode)
+                if (ships && ship.health !== undefined) {
+                    const barWidth = 60;
+                    const barHeight = 8;
+                    const healthPercent = ship.health / ship.maxHealth;
+
+                    ctx.fillStyle = '#f44336';
+                    ctx.fillRect(ship.x - barWidth / 2, ship.y - 40, barWidth, barHeight);
+
+                    ctx.fillStyle = '#2196F3';
+                    ctx.fillRect(ship.x - barWidth / 2, ship.y - 40, barWidth * healthPercent, barHeight);
+
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(ship.x - barWidth / 2, ship.y - 40, barWidth, barHeight);
+
+                    ctx.fillStyle = 'white';
+                    ctx.font = '12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${Math.ceil(ship.health)}`, ship.x, ship.y - 45);
+                }
 
                 // Energy progress bar (gradient system only)
                 if (gameState.thrustSystem === 'gradient' && gameState.systems && gameState.systems.engine) {
@@ -2203,10 +2226,72 @@
                 }
             }
 
+            // Draw second ship (pink team) if in two-team mode
+            if (ships && ships.pink) {
+                const pinkShip = ships.pink;
+
+                // Invulnerable smooth blink
+                if (pinkShip.invulnerable && pinkShip.spawnTime) {
+                    const elapsed = Date.now() - pinkShip.spawnTime;
+                    const blinkCycle = 500;
+                    const phase = (elapsed % blinkCycle) / blinkCycle;
+                    const alpha = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(phase * Math.PI * 2));
+                    ctx.globalAlpha = alpha;
+                }
+
+                ctx.fillStyle = '#E91E63';  // Pink team color
+                ctx.beginPath();
+                ctx.arc(pinkShip.x, pinkShip.y, pinkShip.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.globalAlpha = 1.0;
+
+                // Pink ship outline
+                ctx.strokeStyle = '#FFF';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Health bar above pink ship
+                if (pinkShip.health < pinkShip.maxHealth) {
+                    const barWidth = 60;
+                    const barHeight = 8;
+                    const healthPercent = pinkShip.health / pinkShip.maxHealth;
+
+                    ctx.fillStyle = '#f44336';
+                    ctx.fillRect(pinkShip.x - barWidth / 2, pinkShip.y - 40, barWidth, barHeight);
+
+                    ctx.fillStyle = '#E91E63';
+                    ctx.fillRect(pinkShip.x - barWidth / 2, pinkShip.y - 40, barWidth * healthPercent, barHeight);
+
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(pinkShip.x - barWidth / 2, pinkShip.y - 40, barWidth, barHeight);
+
+                    ctx.fillStyle = 'white';
+                    ctx.font = '12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${Math.ceil(pinkShip.health)}`, pinkShip.x, pinkShip.y - 45);
+                }
+            }
+
             ctx.restore();
 
             // Draw HUD (top)
-            if (ship) {
+            if (ships) {
+                // Two-team mode: dual coin counters
+                ctx.font = 'bold 32px Arial';
+
+                // Blue team (left)
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#2196F3';
+                ctx.fillText(`🔵 ${ships.blue.coins}/${gameState.coinsToWin || 10}`, 20, 40);
+
+                // Pink team (right)
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#E91E63';
+                ctx.fillText(`${ships.pink.coins}/${gameState.coinsToWin || 10} 🩷`, canvas.width - 20, 40);
+            } else if (ship) {
+                // Old single-ship mode
                 ctx.font = '24px Arial';
                 ctx.textAlign = 'left';
                 ctx.fillStyle = '#FFF';

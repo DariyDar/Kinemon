@@ -277,6 +277,36 @@
             background: #da190b;
         }
 
+        /* Team selector buttons */
+        .team-btn {
+            flex: 1;
+            background: #555;
+            color: white;
+            border: none;
+            padding: 20px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .team-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .team-btn.selected {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        }
+
+        #blueTeamBtn.selected {
+            background: #2196F3;
+        }
+
+        #pinkTeamBtn.selected {
+            background: #E91E63;
+        }
+
         #releaseRoleBtn {
             background: #f44336;
             width: 100%;
@@ -332,6 +362,16 @@
         <div id="lobbyScreen" class="screen">
             <h2>🚀 Лобби</h2>
             <h3 id="lobbyRoomName" style="font-size: 24px; color: #4CAF50; margin-bottom: 20px;">ROOM NAME</h3>
+
+            <!-- Team Selection (Ship only) -->
+            <div id="teamSelector" style="display: none; margin-bottom: 20px;">
+                <div class="role-panel-title">Выберите команду:</div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button id="blueTeamBtn" class="team-btn" data-team="blue">🔵 Голубая команда</button>
+                    <button id="pinkTeamBtn" class="team-btn" data-team="pink">🩷 Розовая команда</button>
+                </div>
+                <div id="teamHint" style="font-size: 14px; opacity: 0.7;">Выберите команду перед выбором роли</div>
+            </div>
 
             <!-- Role Selection Panel -->
             <div id="roleSelectionPanel" style="display: block;">
@@ -519,7 +559,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.15.5 - Gameplay Polish]', 'success');
+        addDebugLog('📱 Страница загружена [v3.16.0 - Two-Team Ship Gameplay]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -984,6 +1024,39 @@
                                 console.log(`Added handler for role button ${index}: ${btn.dataset.role}`);
                             });
 
+                            // Team button click handlers
+                            const teamButtons = document.querySelectorAll('.team-btn');
+                            const blueTeamBtn = document.getElementById('blueTeamBtn');
+                            const pinkTeamBtn = document.getElementById('pinkTeamBtn');
+                            let selectedTeam = null;
+
+                            teamButtons.forEach(btn => {
+                                btn.addEventListener('click', () => {
+                                    const team = btn.dataset.team;
+
+                                    addDebugLog(`🎨 Выбрана команда: ${team}`, 'success');
+
+                                    // Update selection state
+                                    teamButtons.forEach(b => b.classList.remove('selected'));
+                                    btn.classList.add('selected');
+                                    selectedTeam = team;
+
+                                    // Send to server
+                                    if (ws && ws.readyState === WebSocket.OPEN) {
+                                        ws.send(JSON.stringify({
+                                            type: 'select_team',
+                                            team: team
+                                        }));
+                                    }
+
+                                    // Update hint
+                                    document.getElementById('teamHint').textContent = `Команда ${team === 'blue' ? 'Голубая' : 'Розовая'} выбрана. Выберите роль.`;
+                                });
+                            });
+
+                            // Show team selector for Ship game
+                            document.getElementById('teamSelector').style.display = 'block';
+
                             // Ready button click handler (toggle ready/unready)
                             const readyBtn = document.getElementById('readyBtn');
                             if (readyBtn) {
@@ -1256,9 +1329,51 @@
             const players = gameState.players || [];
             const myPlayer = players.find(p => p.id === playerId);
 
+            // Update team selector state
+            if (myPlayer && myPlayer.team) {
+                const blueTeamBtn = document.getElementById('blueTeamBtn');
+                const pinkTeamBtn = document.getElementById('pinkTeamBtn');
+
+                if (blueTeamBtn && pinkTeamBtn) {
+                    const teamButtons = document.querySelectorAll('.team-btn');
+                    teamButtons.forEach(b => b.classList.remove('selected'));
+
+                    if (myPlayer.team === 'blue') {
+                        blueTeamBtn.classList.add('selected');
+                    } else if (myPlayer.team === 'pink') {
+                        pinkTeamBtn.classList.add('selected');
+                    }
+
+                    document.getElementById('teamHint').textContent = `Команда ${myPlayer.team === 'blue' ? 'Голубая' : 'Розовая'} выбрана. Выберите роль.`;
+                }
+            }
+
+            // Filter players to only same team
+            const teamPlayers = myPlayer && myPlayer.team
+                ? players.filter(p => p.team === myPlayer.team)
+                : [];
+
+            // If no team selected, disable all role buttons
+            if (!myPlayer || !myPlayer.team) {
+                roleButtons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    const roleNames = {
+                        engine: '⚙️ Двигатель Тяга',
+                        rudder: '🧭 Двигатель Руль',
+                        weapon: '🔫 Орудия Стрельба',
+                        weaponDirection: '🎯 Орудия Прицеливание',
+                        shield: '🛡️ Щит'
+                    };
+                    btn.textContent = roleNames[btn.dataset.role];
+                    btn.classList.remove('selected', 'exit-role');
+                });
+                return;
+            }
+
             roleButtons.forEach(btn => {
                 const role = btn.dataset.role;
-                const occupiedBy = players.find(p => p.systemRole === role);
+                const occupiedBy = teamPlayers.find(p => p.systemRole === role);
 
                 const roleNames = {
                     engine: '⚙️ Двигатель Тяга',

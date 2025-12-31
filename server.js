@@ -183,18 +183,42 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
             console.log(`Ship canvas: ${width}x${height}`);
         }
 
-        room.ship = {
-            x: room.canvas.width / 2,
-            y: room.canvas.height / 2,
-            radius: 30, // Increased from 15 to 30 (2x larger)
-            vx: 0,
-            vy: 0,
-            rotation: 0,
-            hearts: 10,
-            coins: 0,
-            lastDamageTime: 0,
-            invulnerable: false,
-            invulnerableUntil: 0
+        // Initialize two ships for team-based gameplay
+        room.ships = {
+            blue: {
+                team: 'blue',
+                x: room.canvas.width * 0.25,  // Left-center spawn
+                y: room.canvas.height / 2,
+                radius: 30,
+                vx: 0,
+                vy: 0,
+                rotation: 0,
+                health: 100,
+                maxHealth: 100,
+                coins: 0,
+                lastDamageTime: 0,
+                invulnerable: true,
+                invulnerableUntil: Date.now() + 5000,
+                spawnTime: Date.now(),
+                alive: true
+            },
+            pink: {
+                team: 'pink',
+                x: room.canvas.width * 0.75,  // Right-center spawn
+                y: room.canvas.height / 2,
+                radius: 30,
+                vx: 0,
+                vy: 0,
+                rotation: 0,
+                health: 100,
+                maxHealth: 100,
+                coins: 0,
+                lastDamageTime: 0,
+                invulnerable: true,
+                invulnerableUntil: Date.now() + 5000,
+                spawnTime: Date.now(),
+                alive: true
+            }
         };
 
         room.systems = {
@@ -1172,7 +1196,8 @@ wss.on('connection', (ws) => {
                     player.y = spawnPos.y;
                     player.alive = true;
                 } else if (room.gameType === 'ship') {
-                    // Ship: player starts as observer (no role assigned)
+                    // Ship: player starts as observer (no role or team assigned)
+                    player.team = null;           // Team selection required before role selection
                     player.systemRole = null;
                     player.systemIndex = null;
                     player.lastTilt = undefined;  // Previous tilt value (undefined allows proper first pump detection)
@@ -1331,6 +1356,15 @@ wss.on('connection', (ws) => {
                     const requestedRole = data.role; // 'engine' | 'rudder' | 'weapon' | 'weaponDirection' | 'shield' | null
                     console.log(`[CHANGE_ROLE] Player ${player.name} requesting role: ${requestedRole}`);
 
+                    // Player must have team selected before choosing role
+                    if (!player.team) {
+                        ws.send(JSON.stringify({
+                            type: 'error',
+                            message: 'Выберите команду перед выбором роли'
+                        }));
+                        return;
+                    }
+
                     // If player wants to release role
                     if (requestedRole === null) {
                         player.systemRole = null;
@@ -1340,15 +1374,17 @@ wss.on('connection', (ws) => {
                         return;
                     }
 
-                    // Check if role is already taken
+                    // Check if role is already taken BY SOMEONE ON THE SAME TEAM
                     const roleTaken = Array.from(room.players.values()).some(p =>
-                        p.id !== player.id && p.systemRole === requestedRole
+                        p.id !== player.id &&
+                        p.team === player.team &&
+                        p.systemRole === requestedRole
                     );
 
                     if (roleTaken) {
                         ws.send(JSON.stringify({
                             type: 'error',
-                            message: 'Эта роль уже занята другим игроком'
+                            message: 'Эта роль уже занята другим игроком в вашей команде'
                         }));
                         return;
                     }
@@ -1360,6 +1396,44 @@ wss.on('connection', (ws) => {
                     player.systemIndex = systems.indexOf(requestedRole) + 1; // 1-5
 
                     console.log(`Player ${player.name} assigned to system: ${player.systemRole}`);
+                    broadcastGameState(room);
+                }
+            } else if (data.type === 'select_team' && ws.playerId && ws.roomId) {
+                // Handle team selection for Ship game
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'ship') {
+                    const player = room.players.get(ws.playerId);
+                    if (!player) return;
+
+                    const requestedTeam = data.team; // 'blue' | 'pink'
+
+                    // Validate team choice
+                    if (requestedTeam !== 'blue' && requestedTeam !== 'pink') {
+                        console.log(`[TEAM] Invalid team selection: ${requestedTeam}`);
+                        return;
+                    }
+
+                    // Cannot change team during active game
+                    if (room.gameState === 'playing') {
+                        console.log(`[TEAM] ${player.name} tried to change team during game`);
+                        ws.send(JSON.stringify({
+                            type: 'error',
+                            message: 'Нельзя менять команду во время игры'
+                        }));
+                        return;
+                    }
+
+                    // Update player team
+                    player.team = requestedTeam;
+                    console.log(`[TEAM] ${player.name} selected team: ${requestedTeam}`);
+
+                    // Reset ready status on team change
+                    if (player.ready) {
+                        player.ready = false;
+                        console.log(`[TEAM] ${player.name} ready status reset due to team change`);
+                    }
+
+                    // Broadcast updated game state
                     broadcastGameState(room);
                 }
             } else if (data.type === 'player_ready' && ws.playerId && ws.roomId) {
@@ -1515,25 +1589,47 @@ function serializeGameState(room) {
             score: room.winner.score
         } : null;
     } else if (room.gameType === 'ship') {
-        // Ship state
-        state.ship = {
-            x: room.ship.x,
-            y: room.ship.y,
-            radius: room.ship.radius,
-            vx: room.ship.vx,
-            vy: room.ship.vy,
-            rotation: room.ship.rotation,
-            hearts: room.ship.hearts,
-            coins: room.ship.coins,
-            lastDamageTime: room.ship.lastDamageTime,
-            invulnerable: room.ship.invulnerable,
-            invulnerableUntil: room.ship.invulnerableUntil || 0,
-            spawnTime: room.ship.spawnTime || 0
+        // Ship state - two team ships
+        state.ships = {
+            blue: {
+                team: 'blue',
+                x: room.ships.blue.x,
+                y: room.ships.blue.y,
+                radius: room.ships.blue.radius,
+                vx: room.ships.blue.vx,
+                vy: room.ships.blue.vy,
+                rotation: room.ships.blue.rotation,
+                health: room.ships.blue.health,
+                maxHealth: room.ships.blue.maxHealth,
+                coins: room.ships.blue.coins,
+                lastDamageTime: room.ships.blue.lastDamageTime,
+                invulnerable: room.ships.blue.invulnerable,
+                invulnerableUntil: room.ships.blue.invulnerableUntil || 0,
+                spawnTime: room.ships.blue.spawnTime || 0,
+                alive: room.ships.blue.alive
+            },
+            pink: {
+                team: 'pink',
+                x: room.ships.pink.x,
+                y: room.ships.pink.y,
+                radius: room.ships.pink.radius,
+                vx: room.ships.pink.vx,
+                vy: room.ships.pink.vy,
+                rotation: room.ships.pink.rotation,
+                health: room.ships.pink.health,
+                maxHealth: room.ships.pink.maxHealth,
+                coins: room.ships.pink.coins,
+                lastDamageTime: room.ships.pink.lastDamageTime,
+                invulnerable: room.ships.pink.invulnerable,
+                invulnerableUntil: room.ships.pink.invulnerableUntil || 0,
+                spawnTime: room.ships.pink.spawnTime || 0,
+                alive: room.ships.pink.alive
+            }
         };
 
         state.systems = room.systems;
 
-        state.bullets = room.bullets.map(b => ({ x: b.x, y: b.y, id: b.id }));
+        state.bullets = room.bullets.map(b => ({ x: b.x, y: b.y, id: b.id, team: b.team }));
 
         state.asteroids = room.asteroids.map(a => ({
             x: a.x, y: a.y, size: a.size, radius: a.radius,
@@ -1546,6 +1642,7 @@ function serializeGameState(room) {
 
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id, name: p.name, color: p.color,
+            team: p.team,  // NEW: team selection
             systemRole: p.systemRole, systemIndex: p.systemIndex, alive: p.alive,
             ready: p.ready
         }));

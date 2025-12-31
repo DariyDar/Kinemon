@@ -221,30 +221,26 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
             }
         };
 
-        room.systems = {
-            engine: {
-                amplitude: 0,
-                energy: 0         // Accumulated energy from pumps
+        // Separate systems for each team
+        room.teamSystems = {
+            blue: {
+                engine: { amplitude: 0, energy: 0, hasPlayer: false },
+                rudder: { rotation: 0, autoRotateSpeed: 0.5 },
+                weapon: { energy: 0, lastWeaponTilt: undefined, isCharging: false, hasPlayer: false },
+                weaponDirection: { rotation: 0, autoRotateSpeed: 0.7 },
+                shield: { rotation: 0, arcSize: 72, active: false }
             },
-            rudder: {
-                rotation: 0,
-                autoRotateSpeed: 0.5
-            },
-            weapon: {
-                energy: 0,                    // Накопленная энергия зарядки (0-10)
-                lastWeaponTilt: undefined,    // Для detectWeaponPump()
-                isCharging: false             // Флаг активной зарядки
-            },
-            weaponDirection: {
-                rotation: 0,
-                autoRotateSpeed: 0.7
-            },
-            shield: {
-                rotation: 0,
-                arcSize: 72,
-                active: false
+            pink: {
+                engine: { amplitude: 0, energy: 0, hasPlayer: false },
+                rudder: { rotation: 0, autoRotateSpeed: 0.5 },
+                weapon: { energy: 0, lastWeaponTilt: undefined, isCharging: false, hasPlayer: false },
+                weaponDirection: { rotation: 0, autoRotateSpeed: 0.7 },
+                shield: { rotation: 0, arcSize: 72, active: false }
             }
         };
+
+        // Keep old room.systems for backward compatibility (points to blue team)
+        room.systems = room.teamSystems.blue;
 
         room.bullets = [];
         room.asteroids = [];
@@ -672,6 +668,131 @@ function calculateBulletParams(energy) {
 }
 
 // Fire bullets from weapon using accumulated energy
+// Fire bullet for specific team
+function fireBulletForTeam(room, teamColor) {
+    const systems = room.teamSystems[teamColor];
+    const ship = room.ships[teamColor];
+    const weapon = systems.weapon;
+
+    if (weapon.energy < 0.1) return;
+
+    const params = calculateBulletParams(weapon.energy);
+    const angle = systems.weaponDirection.rotation * Math.PI / 180;
+    const weaponPos = getSystemPosition(ship, systems.weaponDirection.rotation);
+
+    for (let i = 0; i < params.bulletCount; i++) {
+        const spread = params.bulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
+        const bulletAngle = angle + spread;
+
+        room.bullets.push({
+            x: weaponPos.x,
+            y: weaponPos.y,
+            vx: Math.cos(bulletAngle) * params.speed,
+            vy: Math.sin(bulletAngle) * params.speed,
+            damage: params.damage,
+            size: params.size,
+            powerLevel: params.powerLevel,
+            distanceTraveled: 0,
+            maxDistance: params.distance,
+            team: teamColor,  // NEW: bullets have team identity
+            id: Date.now() + Math.random() + i
+        });
+    }
+
+    const effectColor = (params.powerLevel === 10) ? '#FF0000' : (teamColor === 'blue' ? '#2196F3' : '#E91E63');
+    broadcastEffect(room.id, 'particle', {
+        x: weaponPos.x,
+        y: weaponPos.y,
+        color: effectColor,
+        count: Math.ceil(params.bulletCount / 2)
+    });
+    broadcastEffect(room.id, 'shake', { intensity: params.powerLevel / 5 });
+
+    weapon.energy = 0;
+    weapon.isCharging = false;
+}
+
+// Apply engine thrust for specific team
+function applyEngineThrustForTeam(room, teamColor) {
+    const systems = room.teamSystems[teamColor];
+    const ship = room.ships[teamColor];
+
+    const thrust = calculateEngineThrust(systems.engine.energy, room.engineFormula, room);
+
+    if (thrust > 0) {
+        const angle = systems.rudder.rotation * Math.PI / 180;
+
+        // Reactive thrust - ship moves OPPOSITE to engine direction
+        ship.vx += -Math.cos(angle) * thrust;
+        ship.vy += -Math.sin(angle) * thrust;
+
+        console.log(`[${teamColor}] Thrust applied: ${thrust.toFixed(3)}, Energy: ${systems.engine.energy.toFixed(2)}, Speed: ${Math.hypot(ship.vx, ship.vy).toFixed(2)}`);
+
+        // Speed boost for gradient system (+10% per energy level)
+        let speedMultiplier = 1.0;
+        if (room.thrustSystem === 'gradient') {
+            const level = getEnergyLevel(systems.engine.energy);
+            speedMultiplier = 1.0 + (level * 0.10); // +10% per level (max +50% at level 5)
+        }
+
+        // Clamp velocity with speed multiplier (use physics settings)
+        const baseMaxSpeed = (room.physics && room.physics.maxSpeed) || 3.0;
+        const MAX_SPEED = baseMaxSpeed * speedMultiplier;
+        const speed = Math.hypot(ship.vx, ship.vy);
+        if (speed > MAX_SPEED) {
+            ship.vx = (ship.vx / speed) * MAX_SPEED;
+            ship.vy = (ship.vy / speed) * MAX_SPEED;
+        }
+    }
+
+    // Energy decay (depends on thrust system)
+    if (room.thrustSystem === 'gradient') {
+        // Progressive decay based on energy level
+        const level = getEnergyLevel(systems.engine.energy);
+        const baseDecay = (room.physics && room.physics.gradientBaseDecay) || 50;
+        const decayMultiplier = 1.0 + (level - 1) * 0.5; // +50% per level above 1
+        const decayRate = baseDecay * decayMultiplier; // units/second
+        const decayPerFrame = decayRate / 60; // Convert to per-frame (60 FPS)
+        systems.engine.energy = Math.max(0, systems.engine.energy - decayPerFrame);
+    } else {
+        // Pump system - constant decay
+        const energyDecay = (room.physics && room.physics.energyDecay) || 50;
+        systems.engine.energy = Math.max(0, systems.engine.energy - energyDecay);
+    }
+}
+
+// Update ship position with physics for specific team
+function updateShipPositionForTeam(room, teamColor) {
+    const ship = room.ships[teamColor];
+
+    ship.x += ship.vx;
+    ship.y += ship.vy;
+
+    // Inertia controls how quickly ship slows down (0=instant stop, 100=no friction)
+    // Convert inertia (0-100) to friction multiplier (0.90-0.995)
+    const inertia = (room.physics && room.physics.inertia !== undefined) ? room.physics.inertia : 50;
+    const FRICTION = 0.90 + (inertia / 100) * 0.095; // Maps 0→0.90, 50→0.9475, 100→0.995
+    ship.vx *= FRICTION;
+    ship.vy *= FRICTION;
+
+    // Full stop at very low speeds to prevent infinite drift (use physics settings)
+    const stopThreshold = (room.physics && room.physics.stopThreshold) || 0.05;
+    if (Math.abs(ship.vx) < stopThreshold) ship.vx = 0;
+    if (Math.abs(ship.vy) < stopThreshold) ship.vy = 0;
+
+    // Wrap around edges
+    if (ship.x < 0) ship.x = room.canvas.width;
+    if (ship.x > room.canvas.width) ship.x = 0;
+    if (ship.y < 0) ship.y = room.canvas.height;
+    if (ship.y > room.canvas.height) ship.y = 0;
+
+    // Aesthetic rotation toward velocity direction
+    if (Math.hypot(ship.vx, ship.vy) > 0.5) {
+        ship.rotation = Math.atan2(ship.vy, ship.vx);
+    }
+}
+
+// Legacy single-ship fireBullet (backward compatibility)
 function fireBullet(room) {
     const weapon = room.systems.weapon;
 
@@ -860,12 +981,55 @@ function deflectAsteroid(asteroid, ship, shieldRotation, room) {
 
 // Check all Ship collisions
 function checkShipCollisions(room) {
-    const ship = room.ship;
+    // Support both legacy single ship and new dual ship modes
+    const ships = room.ships || { legacy: room.ship };
+    const teamColors = room.ships ? ['blue', 'pink'] : ['legacy'];
 
-    // Bullet-Asteroid collisions
+    // 1. Bullet-Ship collisions (TEAM-AWARE)
     for (let i = room.bullets.length - 1; i >= 0; i--) {
         const bullet = room.bullets[i];
+        let bulletHit = false;
 
+        for (const teamColor of teamColors) {
+            const ship = ships[teamColor];
+            if (!ship || !ship.alive) continue;
+
+            // Friendly fire prevention: bullets skip own team ship
+            if (bullet.team && bullet.team === teamColor) continue;
+
+            const dist = Math.hypot(bullet.x - ship.x, bullet.y - ship.y);
+            if (dist < (ship.radius || 20) + 5) {
+                const systems = room.teamSystems ? room.teamSystems[teamColor] : room.systems;
+                const angleToShip = Math.atan2(ship.y - bullet.y, ship.x - bullet.x) * 180 / Math.PI;
+
+                // Check if shield blocks
+                if (systems.shield.active && isAngleInShieldArc(angleToShip, systems.shield.rotation, systems.shield.arcSize || 72)) {
+                    // Shield deflects bullet
+                    const angle = systems.shield.rotation * Math.PI / 180;
+                    bullet.vx = Math.cos(angle) * 5;
+                    bullet.vy = Math.sin(angle) * 5;
+                    broadcastEffect(room.id, 'particle', { x: bullet.x, y: bullet.y, color: '#00FFFF', count: 8 });
+                } else {
+                    // Bullet hits ship
+                    if (!ship.invulnerable) {
+                        ship.health = Math.max(0, ship.health - 10); // 10 damage per bullet
+                        ship.lastDamageTime = Date.now();
+
+                        const teamColor = bullet.team === 'blue' ? '#2196F3' : (bullet.team === 'pink' ? '#E91E63' : '#FFFFFF');
+                        broadcastEffect(room.id, 'particle', { x: ship.x, y: ship.y, color: '#FF0000', count: 12 });
+                        broadcastEffect(room.id, 'flash', { color: '#FF0000', intensity: 0.3 });
+                    }
+
+                    room.bullets.splice(i, 1);
+                    bulletHit = true;
+                    break;
+                }
+            }
+        }
+
+        if (bulletHit) continue;
+
+        // Bullet-Asteroid collisions
         for (let j = room.asteroids.length - 1; j >= 0; j--) {
             const asteroid = room.asteroids[j];
             const dist = Math.hypot(bullet.x - asteroid.x, bullet.y - asteroid.y);
@@ -886,82 +1050,263 @@ function checkShipCollisions(room) {
         }
     }
 
-    // Ship-Asteroid collisions
-    for (let i = room.asteroids.length - 1; i >= 0; i--) {
-        const asteroid = room.asteroids[i];
-        const dist = Math.hypot(asteroid.x - ship.x, asteroid.y - ship.y);
+    // 2. Ship-to-Ship collisions (NEW for dual ship mode)
+    if (room.ships && room.ships.blue && room.ships.pink) {
+        const blueShip = room.ships.blue;
+        const pinkShip = room.ships.pink;
 
-        if (dist < ship.radius + asteroid.radius) {
-            const angleToAsteroid = Math.atan2(asteroid.y - ship.y, asteroid.x - ship.x) * 180 / Math.PI;
+        if (blueShip.alive && pinkShip.alive) {
+            const dist = Math.hypot(blueShip.x - pinkShip.x, blueShip.y - pinkShip.y);
+            const SHIP_SIZE = (blueShip.radius || 20) + (pinkShip.radius || 20);
 
-            // Check if shield blocks
-            if (room.systems.shield.active && isAngleInShieldArc(angleToAsteroid, room.systems.shield.rotation, 72)) {
-                deflectAsteroid(asteroid, ship, room.systems.shield.rotation, room);
-            } else {
-                // Impulse-based damage
-                const relativeSpeed = Math.hypot(asteroid.vx - ship.vx, asteroid.vy - ship.vy);
-                const sizeMultiplier = { large: 1.5, medium: 1.0, small: 0.5 }[asteroid.size];
-                const impulseDamage = Math.ceil(relativeSpeed * sizeMultiplier * 0.3);
-                const damage = Math.max(1, impulseDamage);
+            if (dist < SHIP_SIZE) {
+                const blueShield = room.teamSystems.blue.shield.active;
+                const pinkShield = room.teamSystems.pink.shield.active;
 
-                if (!ship.invulnerable) {
-                    ship.hearts = Math.max(0, ship.hearts - damage);
-                    ship.lastDamageTime = Date.now();
-                    ship.invulnerable = true;
-                    ship.invulnerableUntil = Date.now() + 1000;
+                if (blueShield && pinkShield) {
+                    // Both shields → repulsion, no damage
+                    const angle = Math.atan2(pinkShip.y - blueShip.y, pinkShip.x - blueShip.x);
+                    const repelForce = 2.0;
+                    blueShip.vx -= Math.cos(angle) * repelForce;
+                    blueShip.vy -= Math.sin(angle) * repelForce;
+                    pinkShip.vx += Math.cos(angle) * repelForce;
+                    pinkShip.vy += Math.sin(angle) * repelForce;
 
-                    // Bounce asteroid
-                    const angle = Math.atan2(asteroid.y - ship.y, asteroid.x - ship.x);
-                    asteroid.vx = Math.cos(angle) * 3;
-                    asteroid.vy = Math.sin(angle) * 3;
+                    broadcastEffect(room.id, 'particle', { x: (blueShip.x + pinkShip.x) / 2, y: (blueShip.y + pinkShip.y) / 2, color: '#00FFFF', count: 20 });
+                } else {
+                    // At least one unshielded → both take damage
+                    if (!blueShip.invulnerable && !blueShield) {
+                        blueShip.health = Math.max(0, blueShip.health - 20);
+                        broadcastEffect(room.id, 'particle', { x: blueShip.x, y: blueShip.y, color: '#FF0000', count: 15 });
+                    }
+                    if (!pinkShip.invulnerable && !pinkShield) {
+                        pinkShip.health = Math.max(0, pinkShip.health - 20);
+                        broadcastEffect(room.id, 'particle', { x: pinkShip.x, y: pinkShip.y, color: '#FF0000', count: 15 });
+                    }
 
-                    broadcastEffect(room.id, 'particle', { x: ship.x, y: ship.y, color: '#FF0000', count: 20 });
-                    broadcastEffect(room.id, 'flash', { color: '#FF0000', intensity: 0.4 });
-                    broadcastEffect(room.id, 'shake', { intensity: 6 });
+                    // Bounce apart
+                    const angle = Math.atan2(pinkShip.y - blueShip.y, pinkShip.x - blueShip.x);
+                    const bounceForce = 1.5;
+                    blueShip.vx -= Math.cos(angle) * bounceForce;
+                    blueShip.vy -= Math.sin(angle) * bounceForce;
+                    pinkShip.vx += Math.cos(angle) * bounceForce;
+                    pinkShip.vy += Math.sin(angle) * bounceForce;
 
-                    if (ship.hearts <= 0) {
-                        room.gameOver = true;
-                        room.winner = null;
+                    broadcastEffect(room.id, 'shake', { intensity: 5 });
+                }
+            }
+        }
+    }
+
+    // 3. Ship-Asteroid collisions
+    for (const teamColor of teamColors) {
+        const ship = ships[teamColor];
+        if (!ship || !ship.alive) continue;
+
+        const systems = room.teamSystems ? room.teamSystems[teamColor] : room.systems;
+
+        for (let i = room.asteroids.length - 1; i >= 0; i--) {
+            const asteroid = room.asteroids[i];
+            const dist = Math.hypot(asteroid.x - ship.x, asteroid.y - ship.y);
+
+            if (dist < (ship.radius || 20) + asteroid.radius) {
+                const angleToAsteroid = Math.atan2(asteroid.y - ship.y, asteroid.x - ship.x) * 180 / Math.PI;
+
+                // Check if shield blocks
+                if (systems.shield.active && isAngleInShieldArc(angleToAsteroid, systems.shield.rotation, 72)) {
+                    deflectAsteroid(asteroid, ship, systems.shield.rotation, room);
+                } else {
+                    // Impulse-based damage
+                    const relativeSpeed = Math.hypot(asteroid.vx - ship.vx, asteroid.vy - ship.vy);
+                    const sizeMultiplier = { large: 1.5, medium: 1.0, small: 0.5 }[asteroid.size];
+                    const impulseDamage = Math.ceil(relativeSpeed * sizeMultiplier * 0.3);
+                    const damage = Math.max(1, impulseDamage);
+
+                    if (!ship.invulnerable) {
+                        if (ship.hearts !== undefined) {
+                            ship.hearts = Math.max(0, ship.hearts - damage);
+                        }
+                        if (ship.health !== undefined) {
+                            ship.health = Math.max(0, ship.health - damage);
+                        }
+                        ship.lastDamageTime = Date.now();
+                        ship.invulnerable = true;
+                        ship.invulnerableUntil = Date.now() + 1000;
+
+                        // Bounce asteroid
+                        const angle = Math.atan2(asteroid.y - ship.y, asteroid.x - ship.x);
+                        asteroid.vx = Math.cos(angle) * 3;
+                        asteroid.vy = Math.sin(angle) * 3;
+
+                        broadcastEffect(room.id, 'particle', { x: ship.x, y: ship.y, color: '#FF0000', count: 20 });
+                        broadcastEffect(room.id, 'flash', { color: '#FF0000', intensity: 0.4 });
+                        broadcastEffect(room.id, 'shake', { intensity: 6 });
+
+                        // Check death (for legacy hearts system)
+                        if (ship.hearts !== undefined && ship.hearts <= 0) {
+                            room.gameOver = true;
+                            room.winner = null;
+                        }
                     }
                 }
             }
         }
     }
 
-    // Ship-Coin collisions
-    for (let i = room.coins.length - 1; i >= 0; i--) {
-        const coin = room.coins[i];
-        const dist = Math.hypot(coin.x - ship.x, coin.y - ship.y);
+    // 4. Ship-Coin collisions (both teams can collect)
+    for (const teamColor of teamColors) {
+        const ship = ships[teamColor];
+        if (!ship || !ship.alive) continue;
 
-        if (dist < ship.radius + 10) {
-            ship.coins++;
-            room.coins.splice(i, 1);
-            room.coins.push(spawnCoin(room));
+        for (let i = room.coins.length - 1; i >= 0; i--) {
+            const coin = room.coins[i];
+            const dist = Math.hypot(coin.x - ship.x, coin.y - ship.y);
 
-            broadcastEffect(room.id, 'particle', { x: coin.x, y: coin.y, color: '#FFD700', count: 10 });
-            broadcastEffect(room.id, 'scoreAnim', { x: ship.x, y: ship.y - ship.radius - 20, text: '+1', color: '#FFD700' });
+            if (dist < (ship.radius || 20) + 10) {
+                ship.coins = (ship.coins || 0) + 1;
+                room.coins.splice(i, 1);
+                room.coins.push(spawnCoin(room));
 
-            if (ship.coins >= room.coinsToWin) {
-                room.winner = { team: 'Ship Crew', score: ship.coins };
-                room.gameOver = true;
+                const teamColorHex = teamColor === 'blue' ? '#2196F3' : (teamColor === 'pink' ? '#E91E63' : '#FFD700');
+                broadcastEffect(room.id, 'particle', { x: coin.x, y: coin.y, color: '#FFD700', count: 10 });
+                broadcastEffect(room.id, 'scoreAnim', { x: ship.x, y: ship.y - (ship.radius || 20) - 20, text: '+1', color: teamColorHex });
+
+                // Victory check moved to separate function
+                break; // Only one ship can collect this coin
             }
         }
     }
 
-    // Ship-Heart collisions
-    for (let i = room.hearts.length - 1; i >= 0; i--) {
-        const heart = room.hearts[i];
-        const dist = Math.hypot(heart.x - ship.x, heart.y - ship.y);
+    // 5. Ship-Heart collisions
+    for (const teamColor of teamColors) {
+        const ship = ships[teamColor];
+        if (!ship || !ship.alive) continue;
 
-        if (dist < ship.radius + 12) {
-            if (ship.hearts < 10) {
-                ship.hearts = Math.min(10, ship.hearts + 1);
-                room.hearts.splice(i, 1);
+        for (let i = room.hearts.length - 1; i >= 0; i--) {
+            const heart = room.hearts[i];
+            const dist = Math.hypot(heart.x - ship.x, heart.y - ship.y);
 
-                broadcastEffect(room.id, 'particle', { x: heart.x, y: heart.y, color: '#FF1744', count: 15 });
-                broadcastEffect(room.id, 'flash', { color: '#FF1744', intensity: 0.2 });
+            if (dist < (ship.radius || 20) + 12) {
+                if (ship.hearts !== undefined && ship.hearts < 10) {
+                    ship.hearts = Math.min(10, ship.hearts + 1);
+                    room.hearts.splice(i, 1);
+
+                    broadcastEffect(room.id, 'particle', { x: heart.x, y: heart.y, color: '#FF1744', count: 15 });
+                    broadcastEffect(room.id, 'flash', { color: '#FF1744', intensity: 0.2 });
+                    break;
+                }
+                // Health restoration for dual ship mode
+                if (ship.health !== undefined && ship.health < ship.maxHealth) {
+                    ship.health = Math.min(ship.maxHealth, ship.health + 25);
+                    room.hearts.splice(i, 1);
+
+                    broadcastEffect(room.id, 'particle', { x: heart.x, y: heart.y, color: '#FF1744', count: 15 });
+                    broadcastEffect(room.id, 'flash', { color: '#FF1744', intensity: 0.2 });
+                    break;
+                }
             }
         }
+    }
+}
+
+// Check ship deaths and handle respawns
+function checkShipDeathsAndRespawns(room) {
+    if (!room.ships) return; // Only for dual ship mode
+
+    ['blue', 'pink'].forEach(teamColor => {
+        const ship = room.ships[teamColor];
+
+        // Check if ship died
+        if (ship.alive && ship.health <= 0) {
+            ship.alive = false;
+            const coinsToDrop = ship.coins || 0;
+            ship.coins = 0;
+
+            console.log(`[${teamColor}] Ship destroyed! Dropping ${coinsToDrop} coins`);
+
+            // Drop all coins with scatter animation
+            for (let i = 0; i < coinsToDrop; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 3;
+                const distance = 30 + Math.random() * 50;
+
+                room.coins.push({
+                    x: ship.x + Math.cos(angle) * distance,
+                    y: ship.y + Math.sin(angle) * distance,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: 10
+                });
+            }
+
+            broadcastEffect(room.id, 'particle', { x: ship.x, y: ship.y, color: '#FFD700', count: coinsToDrop * 5 });
+            broadcastEffect(room.id, 'flash', { color: '#FF0000', intensity: 0.8 });
+            broadcastEffect(room.id, 'shake', { intensity: 10 });
+
+            // Schedule respawn after 3 seconds
+            ship.respawnTime = Date.now() + 3000;
+        }
+
+        // Check if it's time to respawn
+        if (!ship.alive && ship.respawnTime && Date.now() >= ship.respawnTime) {
+            // Respawn at fixed position
+            ship.x = teamColor === 'blue' ? room.canvas.width * 0.25 : room.canvas.width * 0.75;
+            ship.y = room.canvas.height / 2;
+            ship.vx = 0;
+            ship.vy = 0;
+            ship.health = ship.maxHealth;
+            ship.alive = true;
+            ship.invulnerable = true;
+            ship.invulnerableUntil = Date.now() + 5000; // 5s invulnerability
+            ship.spawnTime = Date.now();
+            ship.respawnTime = null;
+
+            console.log(`[${teamColor}] Ship respawned with 5s invulnerability`);
+
+            const teamColorHex = teamColor === 'blue' ? '#2196F3' : '#E91E63';
+            broadcastEffect(room.id, 'particle', { x: ship.x, y: ship.y, color: teamColorHex, count: 30 });
+            broadcastEffect(room.id, 'flash', { color: teamColorHex, intensity: 0.5 });
+        }
+
+        // Clear invulnerability after timeout
+        if (ship.invulnerable && Date.now() >= ship.invulnerableUntil) {
+            ship.invulnerable = false;
+            console.log(`[${teamColor}] Invulnerability ended`);
+        }
+    });
+}
+
+// Check team victory condition
+function checkTeamVictory(room) {
+    if (!room.ships) return; // Only for dual ship mode
+
+    const blueCoins = room.ships.blue.coins || 0;
+    const pinkCoins = room.ships.pink.coins || 0;
+    const targetCoins = room.coinsToWin || 10;
+
+    if (blueCoins >= targetCoins || pinkCoins >= targetCoins) {
+        const winningTeam = blueCoins >= targetCoins ? 'blue' : 'pink';
+        const winningTeamName = winningTeam === 'blue' ? 'Голубая команда' : 'Розовая команда';
+
+        room.gameOver = true;
+        room.winner = {
+            team: winningTeamName,
+            teamColor: winningTeam,
+            blueScore: blueCoins,
+            pinkScore: pinkCoins
+        };
+
+        console.log(`Victory! ${winningTeamName} wins with ${winningTeam === 'blue' ? blueCoins : pinkCoins} coins!`);
+
+        // Broadcast game over
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN && client.roomId === room.id) {
+                client.send(JSON.stringify({
+                    type: 'game_over',
+                    winner: room.winner
+                }));
+            }
+        });
     }
 }
 
@@ -2345,116 +2690,126 @@ function updatePushers(room) {
 
 // Update Ship game (60 FPS)
 function updateShip(room) {
-    // Reset hasPlayer flags for all systems
-    room.systems.engine.hasPlayer = false;
-    room.systems.weapon.hasPlayer = false;
+    // Process both teams independently
+    ['blue', 'pink'].forEach(teamColor => {
+        const systems = room.teamSystems[teamColor];
+        const ship = room.ships[teamColor];
 
-    // 1. Update system states from players
-    for (const player of room.players.values()) {
-        if (!player.systemRole) continue;
+        if (!ship.alive) return;
 
-        const tilt = player.tilt;
+        // Reset hasPlayer flags
+        systems.engine.hasPlayer = false;
+        systems.weapon.hasPlayer = false;
 
-        switch (player.systemRole) {
-            case 'engine':
-                // Energy accumulation depends on thrust system
-                let energyAdded;
-                if (room.thrustSystem === 'gradient') {
-                    // Gradient system: progressive energy from degree-based tilt
-                    energyAdded = calculateGradientEnergy(tilt, player.lastTilt);
-                    room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 750); // Cap at 750 (5 levels × 150)
-                    player.lastTilt = tilt; // Update for next frame
-                } else {
-                    // Pump system: delta-based upward jerks
-                    energyAdded = detectPump(player, tilt, room);
-                    room.systems.engine.energy = Math.min(room.systems.engine.energy + energyAdded, 10); // Cap at 10
-                }
-                room.systems.engine.hasPlayer = true;
-                break;
-            case 'rudder':
-                room.systems.rudder.rotation = tilt * 360;
-                break;
-            case 'weapon':
-                // Position-based weapon charging system
-                const weaponResult = updateWeaponCharge(player, tilt, room);
+        // 1. Update system states from team players
+        const teamPlayers = Array.from(room.players.values()).filter(p => p.team === teamColor);
 
-                // Fire on downward movement (BEFORE updating energy)
-                if (weaponResult.shouldFire && weaponResult.bulletCount > 0) {
-                    fireBullet(room);
-                    // Energy reset to 0 in fireBullet, don't update it
-                } else {
-                    // Only update energy if not firing
-                    room.systems.weapon.energy = weaponResult.newEnergy;
-                }
+        for (const player of teamPlayers) {
+            if (!player.systemRole) continue;
 
-                room.systems.weapon.hasPlayer = true;
-                break;
-            case 'weaponDirection':
-                room.systems.weaponDirection.rotation = tilt * 360;
-                break;
-            case 'shield':
-                room.systems.shield.rotation = tilt * 360;
-                room.systems.shield.active = true;
-                break;
+            const tilt = player.tilt;
+
+            switch (player.systemRole) {
+                case 'engine':
+                    // Energy accumulation depends on thrust system
+                    let energyAdded;
+                    if (room.thrustSystem === 'gradient') {
+                        energyAdded = calculateGradientEnergy(tilt, player.lastTilt);
+                        systems.engine.energy = Math.min(systems.engine.energy + energyAdded, 750);
+                        player.lastTilt = tilt;
+                    } else {
+                        energyAdded = detectPump(player, tilt, room);
+                        systems.engine.energy = Math.min(systems.engine.energy + energyAdded, 10);
+                    }
+                    systems.engine.hasPlayer = true;
+                    break;
+                case 'rudder':
+                    systems.rudder.rotation = tilt * 360;
+                    break;
+                case 'weapon':
+                    const weaponResult = updateWeaponCharge(player, tilt, room);
+
+                    if (weaponResult.shouldFire && weaponResult.bulletCount > 0) {
+                        fireBulletForTeam(room, teamColor);
+                    } else {
+                        systems.weapon.energy = weaponResult.newEnergy;
+                    }
+
+                    systems.weapon.hasPlayer = true;
+                    break;
+                case 'weaponDirection':
+                    systems.weaponDirection.rotation = tilt * 360;
+                    break;
+                case 'shield':
+                    systems.shield.rotation = tilt * 360;
+                    systems.shield.active = true;
+                    break;
+            }
         }
-    }
+    });
 
-    // 2. Auto-rotate unoccupied systems
-    const occupied = new Set(Array.from(room.players.values()).map(p => p.systemRole).filter(r => r !== null));
+    // 2. Auto-rotate unoccupied systems for each team
+    ['blue', 'pink'].forEach(teamColor => {
+        const systems = room.teamSystems[teamColor];
+        const ship = room.ships[teamColor];
 
-    if (!occupied.has('rudder')) {
-        room.systems.rudder.rotation = (room.systems.rudder.rotation + 0.5) % 360;
-    }
-    if (!occupied.has('weaponDirection')) {
-        room.systems.weaponDirection.rotation = (room.systems.weaponDirection.rotation - 0.7 + 360) % 360; // Opposite direction, normalized
-    }
-    if (!occupied.has('weapon')) {
-        // Auto-pilot: periodic auto-fire with medium power
-        if (!room.lastAutoWeaponFire) room.lastAutoWeaponFire = Date.now();
-        const timeSinceLastFire = Date.now() - room.lastAutoWeaponFire;
+        if (!ship.alive) return;
 
-        // Fire every 1500ms
-        if (timeSinceLastFire > 1500) {
-            // Energy 3.5 → Level 4 → distance ~500px (-44% от макс)
-            room.systems.weapon.energy = 3.5;
-            fireBullet(room);
-            room.lastAutoWeaponFire = Date.now();
+        const teamPlayers = Array.from(room.players.values()).filter(p => p.team === teamColor);
+        const occupied = new Set(teamPlayers.map(p => p.systemRole).filter(r => r !== null));
+
+        if (!occupied.has('rudder')) {
+            systems.rudder.rotation = (systems.rudder.rotation + 0.5) % 360;
         }
-
-        room.systems.weapon.hasPlayer = true;
-    }
-    if (!occupied.has('engine')) {
-        // Auto-pilot: random bursts at minimum speed
-        if (!room.lastAutoPump) room.lastAutoPump = Date.now();
-        const timeSinceLastPump = Date.now() - room.lastAutoPump;
-
-        // Random interval between bursts (1000-3000ms)
-        const randomInterval = room.autoPumpInterval || (1000 + Math.random() * 2000);
-
-        if (timeSinceLastPump > randomInterval) {
-            // Add small random energy (1-3 units for minimal thrust)
-            const burstEnergy = 1 + Math.random() * 2;
-            room.systems.engine.energy = Math.min(room.systems.engine.energy + burstEnergy, 750);
-            room.lastAutoPump = Date.now();
-            // Set next random interval
-            room.autoPumpInterval = 1000 + Math.random() * 2000;
+        if (!occupied.has('weaponDirection')) {
+            systems.weaponDirection.rotation = (systems.weaponDirection.rotation - 0.7 + 360) % 360;
         }
+        if (!occupied.has('weapon')) {
+            // Auto-pilot: periodic auto-fire
+            if (!room[`lastAutoWeaponFire_${teamColor}`]) room[`lastAutoWeaponFire_${teamColor}`] = Date.now();
+            const timeSinceLastFire = Date.now() - room[`lastAutoWeaponFire_${teamColor}`];
 
-        room.systems.engine.hasPlayer = true; // Enable auto-thrust
-    }
-    // Shield always active, rotates slowly when no player
-    if (!occupied.has('shield')) {
-        room.systems.shield.active = true; // Always on
-        room.systems.shield.rotation = (room.systems.shield.rotation + 0.3) % 360; // Slow rotation
-    } else {
-        room.systems.shield.active = true;
-    }
+            if (timeSinceLastFire > 1500) {
+                systems.weapon.energy = 3.5;
+                fireBulletForTeam(room, teamColor);
+                room[`lastAutoWeaponFire_${teamColor}`] = Date.now();
+            }
 
-    // 3. Apply engine thrust
-    applyEngineThrust(room);
+            systems.weapon.hasPlayer = true;
+        }
+        if (!occupied.has('engine')) {
+            // Auto-pilot: random bursts
+            if (!room[`lastAutoPump_${teamColor}`]) room[`lastAutoPump_${teamColor}`] = Date.now();
+            const timeSinceLastPump = Date.now() - room[`lastAutoPump_${teamColor}`];
 
-    // 4. Update ship position
-    updateShipPosition(room);
+            const randomInterval = room[`autoPumpInterval_${teamColor}`] || (1000 + Math.random() * 2000);
+
+            if (timeSinceLastPump > randomInterval) {
+                const burstEnergy = 1 + Math.random() * 2;
+                systems.engine.energy = Math.min(systems.engine.energy + burstEnergy, 750);
+                room[`lastAutoPump_${teamColor}`] = Date.now();
+                room[`autoPumpInterval_${teamColor}`] = 1000 + Math.random() * 2000;
+            }
+
+            systems.engine.hasPlayer = true;
+        }
+        // Shield always active
+        if (!occupied.has('shield')) {
+            systems.shield.active = true;
+            systems.shield.rotation = (systems.shield.rotation + 0.3) % 360;
+        } else {
+            systems.shield.active = true;
+        }
+    });
+
+    // 3. Apply engine thrust and update positions for both ships
+    ['blue', 'pink'].forEach(teamColor => {
+        const ship = room.ships[teamColor];
+        if (!ship.alive) return;
+
+        applyEngineThrustForTeam(room, teamColor);
+        updateShipPositionForTeam(room, teamColor);
+    });
 
     // 5. Update bullets
     for (let i = room.bullets.length - 1; i >= 0; i--) {
@@ -2471,6 +2826,29 @@ function updateShip(room) {
         }
     }
 
+    // 6. Update coins physics (for dropped coins with velocity)
+    for (const coin of room.coins) {
+        if (coin.vx !== undefined && coin.vy !== undefined) {
+            coin.x += coin.vx;
+            coin.y += coin.vy;
+
+            // Friction to slow down dropped coins
+            const COIN_FRICTION = 0.95;
+            coin.vx *= COIN_FRICTION;
+            coin.vy *= COIN_FRICTION;
+
+            // Stop at very low speeds
+            if (Math.abs(coin.vx) < 0.05) coin.vx = 0;
+            if (Math.abs(coin.vy) < 0.05) coin.vy = 0;
+
+            // Keep coins in bounds
+            if (coin.x < 0) coin.x = 0;
+            if (coin.x > room.canvas.width) coin.x = room.canvas.width;
+            if (coin.y < 0) coin.y = 0;
+            if (coin.y > room.canvas.height) coin.y = room.canvas.height;
+        }
+    }
+
     // 7. Spawn asteroids
     spawnAsteroidIfNeeded(room);
 
@@ -2484,8 +2862,14 @@ function updateShip(room) {
     // 9. Collision detection
     checkShipCollisions(room);
 
-    // 10. Clear invulnerability
-    if (room.ship.invulnerable && Date.now() >= room.ship.invulnerableUntil) {
+    // 10. Check ship deaths and respawns (dual ship mode)
+    checkShipDeathsAndRespawns(room);
+
+    // 10.5. Check team victory condition
+    checkTeamVictory(room);
+
+    // 11. Clear invulnerability (legacy single ship mode)
+    if (room.ship && room.ship.invulnerable && Date.now() >= room.ship.invulnerableUntil) {
         room.ship.invulnerable = false;
     }
 

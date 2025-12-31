@@ -2924,9 +2924,10 @@ function updateShip(room) {
 
         if (!ship.alive) return;
 
-        // Reset hasPlayer flags
+        // Reset hasPlayer flags and shield active state
         systems.engine.hasPlayer = false;
         systems.weapon.hasPlayer = false;
+        systems.shield.active = false;  // Shield only active when player controls it
 
         // 1. Update system states from team players
         const teamPlayers = Array.from(room.players.values()).filter(p => p.team === teamColor);
@@ -2951,7 +2952,8 @@ function updateShip(room) {
                     systems.engine.hasPlayer = true;
                     break;
                 case 'rudder':
-                    systems.rudder.rotation = tilt * 360;
+                    // Extended range: -30% to 130% (-108° to 468°)
+                    systems.rudder.rotation = (tilt * 1.6 - 0.3) * 360;
                     break;
                 case 'weapon':
                     const weaponResult = updateWeaponCharge(player, tilt, room);
@@ -2965,10 +2967,12 @@ function updateShip(room) {
                     systems.weapon.hasPlayer = true;
                     break;
                 case 'weaponDirection':
-                    systems.weaponDirection.rotation = tilt * 360;
+                    // Extended range: -30% to 130% (-108° to 468°)
+                    systems.weaponDirection.rotation = (tilt * 1.6 - 0.3) * 360;
                     break;
                 case 'shield':
-                    systems.shield.rotation = tilt * 360;
+                    // Extended range: -30% to 130% (-108° to 468°)
+                    systems.shield.rotation = (tilt * 1.6 - 0.3) * 360;
                     systems.shield.active = true;
                     break;
             }
@@ -3126,14 +3130,14 @@ function updateShip(room) {
             const now = Date.now();
             const lastFire = ship.lastAttackEngineFire || 0;
 
-            // Fire rate: 100ms cooldown (10 shots/sec)
-            if (now - lastFire > 100) {
+            // Fire rate: 1000ms cooldown (1 shot/sec) - only when thrust active
+            if (now - lastFire > 1000) {
                 const level = ship.boosters.attackEngine.level;
-                const bulletCount = 1; // v3.17.1: Always fire single bullet
                 const bulletSize = 6 + (level - 1) * 0.5; // Size grows with level
-                const bulletSpeed = 4 + level * 0.3; // Speed grows with level
+                const bulletSpeed = 6 + level * 0.5; // Speed grows with level, faster than flame
 
-                // Fire opposite to rudder direction
+                // Fire in SAME direction as engine thrust (opposite to rudder rotation)
+                // Engine points one way, ship moves opposite, particles fly with engine
                 const engineAngle = (systems.rudder.rotation + 180) * Math.PI / 180;
                 const enginePos = getSystemPosition(ship, systems.rudder.rotation + 180);
 
@@ -3146,19 +3150,19 @@ function updateShip(room) {
                     size: bulletSize,
                     powerLevel: 3,
                     distanceTraveled: 0,
-                    maxDistance: 300,
+                    maxDistance: 500,  // Fly farther than regular bullets
                     team: teamColor,
+                    color: '#FFA500',  // Orange color like engine flame
                     id: Date.now() + Math.random()
                 });
 
                 ship.lastAttackEngineFire = now;
 
-                const teamColorHex = teamColor === 'blue' ? '#2196F3' : '#E91E63';
                 broadcastEffect(room.id, 'particle', {
                     x: enginePos.x,
                     y: enginePos.y,
-                    color: '#FFA500',
-                    count: Math.ceil(bulletCount / 2)
+                    color: '#FFA500',  // Orange particles
+                    count: 5
                 });
             }
         }

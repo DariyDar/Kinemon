@@ -54,8 +54,12 @@ const server = http.createServer((req, res) => {
     });
 });
 
-// Create WebSocket server
-const wss = new WebSocket.Server({ server });
+// Create WebSocket server with increased buffer limits
+const wss = new WebSocket.Server({
+    server,
+    maxPayload: 100 * 1024 * 1024, // 100MB max message size
+    perMessageDeflate: false // Disable compression for better performance with many clients
+});
 
 // Game rooms: roomId -> room data
 const rooms = new Map();
@@ -2275,17 +2279,23 @@ function gameLoop(roomId) {
         updateSnake(room);
     }
 
-    // Broadcast game state to all clients in this room
-    const state = JSON.stringify({
-        type: 'update',
-        gameState: serializeGameState(room)
-    });
+    // Throttle broadcasts to 30 FPS (every 33ms) to reduce network load
+    const now = Date.now();
+    if (!room.lastBroadcast || now - room.lastBroadcast >= 33) {
+        room.lastBroadcast = now;
 
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
-            client.send(state);
-        }
-    });
+        // Broadcast game state to all clients in this room
+        const state = JSON.stringify({
+            type: 'update',
+            gameState: serializeGameState(room)
+        });
+
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
+                client.send(state);
+            }
+        });
+    }
 }
 
 // Update Snake game

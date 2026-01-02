@@ -473,42 +473,36 @@
 
         <!-- Lobby Screen (Ship only) -->
         <div id="lobbyScreen" class="screen">
-            <h2>🚀 Лобби</h2>
-            <h3 id="lobbyRoomName" style="font-size: 24px; color: #4CAF50; margin-bottom: 20px;">ROOM NAME</h3>
+            <h2 style="font-size: 28px; margin-bottom: 8px;">🚀 Лобби</h2>
+            <h3 id="lobbyRoomName" style="font-size: 20px; color: #4CAF50; margin-bottom: 15px;">ROOM NAME</h3>
 
             <!-- Team Selection (Ship only) -->
-            <div id="teamSelector" style="display: none; margin-bottom: 20px;">
-                <div class="role-panel-title">Выберите команду:</div>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <button id="blueTeamBtn" class="team-btn" data-team="blue">🔵 Голубая команда</button>
-                    <button id="pinkTeamBtn" class="team-btn" data-team="pink">🩷 Розовая команда</button>
+            <div id="teamSelector" style="display: none; margin-bottom: 15px;">
+                <div class="role-panel-title" style="font-size: 16px; margin-bottom: 8px;">Выберите команду:</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <button id="blueTeamBtn" class="team-btn" data-team="blue" style="padding: 12px 16px; font-size: 15px;">🔵 Голубая</button>
+                    <button id="pinkTeamBtn" class="team-btn" data-team="pink" style="padding: 12px 16px; font-size: 15px;">🩷 Розовая</button>
                 </div>
-                <div id="teamHint" style="font-size: 14px; opacity: 0.7;">Выберите команду перед выбором роли</div>
+                <div id="teamHint" style="font-size: 12px; opacity: 0.7;">Выберите команду перед выбором роли</div>
             </div>
 
             <!-- Role Selection Panel -->
             <div id="roleSelectionPanel" style="display: block;">
-                <div class="role-panel-title">Выбор роли:</div>
-                <div class="role-buttons">
-                    <button class="role-btn" data-role="engine">⚙️ Тяга</button>
-                    <button class="role-btn" data-role="rudder">🧭 Руль</button>
-                    <button class="role-btn" data-role="weapon">🔫 Пушка</button>
-                    <button class="role-btn" data-role="weaponDirection">🎯 Прицел</button>
-                    <button class="role-btn" data-role="shield">🛡️ Щит</button>
+                <div class="role-panel-title" style="font-size: 16px; margin-bottom: 8px;">Выбор роли:</div>
+                <div class="role-buttons" style="gap: 8px;">
+                    <button class="role-btn" data-role="engine" style="padding: 12px; font-size: 15px;">⚙️ Тяга</button>
+                    <button class="role-btn" data-role="rudder" style="padding: 12px; font-size: 15px;">🧭 Руль</button>
+                    <button class="role-btn" data-role="weapon" style="padding: 12px; font-size: 15px;">🔫 Пушка</button>
+                    <button class="role-btn" data-role="weaponDirection" style="padding: 12px; font-size: 15px;">🎯 Прицел</button>
+                    <button class="role-btn" data-role="shield" style="padding: 12px; font-size: 15px;">🛡️ Щит</button>
                 </div>
 
                 <!-- Ready button (disabled until role is selected) -->
-                <button id="readyBtn" class="btn" style="margin-top: 15px; width: 100%;" disabled>😊 Готов</button>
-                <div id="readyHint" style="margin-top: 10px; font-size: 14px; opacity: 0.7;">Выберите роль, чтобы начать</div>
+                <button id="readyBtn" class="btn" style="margin-top: 12px; width: 100%; padding: 14px; font-size: 16px;" disabled>😊 Готов</button>
+                <div id="readyHint" style="margin-top: 8px; font-size: 12px; opacity: 0.7;">Выберите роль, чтобы начать</div>
             </div>
 
-            <!-- Other Players in Lobby -->
-            <div id="lobbyPlayers" style="margin-top: 30px; padding: 15px; background: rgba(255, 255, 255, 0.05); border-radius: 10px;">
-                <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">Другие игроки:</div>
-                <div id="lobbyPlayersList" style="font-size: 14px; line-height: 1.8;">
-                    <!-- Динамически заполняется -->
-                </div>
-            </div>
+            <!-- Player table removed - visible only on Display-Lobby screen -->
         </div>
 
         <!-- QR Scanner Screen removed - now using native camera app -->
@@ -1307,13 +1301,9 @@
                                     roleInfo.style.display = 'none';
                                 }
                             }
-                        } else {
-                            // Hide buttons for non-Ship games
-                            const leavePostBtn = document.getElementById('leavePostBtn');
-                            const recalibrateBtn = document.getElementById('recalibrateBtn');
-                            if (leavePostBtn) leavePostBtn.style.display = 'none';
-                            if (recalibrateBtn) recalibrateBtn.style.display = 'none';
                         }
+                        // Note: Buttons are NOT hidden for non-Ship games to prevent race conditions
+                        // They start as display:none in HTML and are shown only for Ship games
 
                         // Check if this player died (only for Snake, not Pong)
                         if (data.gameState.gameType === 'snake') {

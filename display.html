@@ -1336,36 +1336,45 @@
 
                         console.log('QR Code URL:', qrData);
 
-                        // Generate large QR code for waiting screen (only once!)
-                        if (!window.waitingQRGenerated) {
-                            // Adaptive QR size based on screen resolution
-                            const screenWidth = window.innerWidth;
-                            const screenHeight = window.innerHeight;
-                            let qrSize = 500; // Default for small screens (phones)
+                        // Generate large QR code for waiting screen
+                        const waitingQR = document.getElementById('waitingQRCode');
 
-                            if (screenWidth >= 2560 || screenHeight >= 1440) {
-                                qrSize = 250; // 4K projectors - very small
-                            } else if (screenWidth >= 1920 || screenHeight >= 1080) {
-                                qrSize = 300; // Full HD projectors - small
-                            } else if (screenWidth >= 1024 || screenHeight >= 768) {
-                                qrSize = 380; // Tablets/medium projectors
-                            }
+                        console.log('🔍 Before cleanup - child count:', waitingQR.children.length);
 
-                            const waitingQR = document.getElementById('waitingQRCode');
-                            waitingQR.innerHTML = '';
-                            new QRCode(waitingQR, {
-                                text: qrData,
-                                width: qrSize,
-                                height: qrSize,
-                                colorDark: '#000000',
-                                colorLight: '#ffffff',
-                                correctLevel: QRCode.CorrectLevel.M
-                            });
-                            window.waitingQRGenerated = true;
-                            console.log('✅ Waiting QR code generated');
-                        } else {
-                            console.log('⚠️ Waiting QR already generated, skipping');
+                        // Aggressive cleanup - remove all child nodes
+                        while (waitingQR.firstChild) {
+                            waitingQR.removeChild(waitingQR.firstChild);
                         }
+
+                        console.log('🧹 After cleanup - child count:', waitingQR.children.length);
+
+                        // Adaptive QR size based on screen resolution
+                        const screenWidth = window.innerWidth;
+                        const screenHeight = window.innerHeight;
+                        let qrSize = 500; // Default for small screens (phones)
+
+                        if (screenWidth >= 2560 || screenHeight >= 1440) {
+                            qrSize = 250; // 4K projectors - very small
+                        } else if (screenWidth >= 1920 || screenHeight >= 1080) {
+                            qrSize = 300; // Full HD projectors - small
+                        } else if (screenWidth >= 1024 || screenHeight >= 768) {
+                            qrSize = 380; // Tablets/medium projectors
+                        }
+
+                        new QRCode(waitingQR, {
+                            text: qrData,
+                            width: qrSize,
+                            height: qrSize,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M
+                        });
+
+                        // Wait for QR to be created
+                        setTimeout(() => {
+                            console.log('✅ QR generated - child count:', waitingQR.children.length);
+                            console.log('📊 Children types:', Array.from(waitingQR.children).map(c => c.tagName).join(', '));
+                        }, 100);
 
                         // Store QR data globally for later use (lobby/game screens)
                         window.persistentQRData = qrData;

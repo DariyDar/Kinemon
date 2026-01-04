@@ -1814,6 +1814,34 @@ wss.on('connection', (ws) => {
 
                 console.log(`[JOIN] Player ${playerId} joined room ${roomId} as ${player.name} (${room.gameType})`);
 
+            } else if (data.type === 'join_room') {
+                // Display wants to join existing room as spectator
+                const roomId = data.roomId;
+
+                // Check if room exists
+                if (!rooms.has(roomId)) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: `Комната ${roomId} не найдена`
+                    }));
+                    console.log(`[JOIN_ROOM] Room ${roomId} not found`);
+                    return;
+                }
+
+                const room = rooms.get(roomId);
+                ws.roomId = roomId;
+                ws.isDisplay = true;
+
+                // Send current game state to the joining display
+                ws.send(JSON.stringify({
+                    type: 'room_joined',
+                    roomId: roomId,
+                    gameType: room.gameType,
+                    gameState: serializeGameState(room)
+                }));
+
+                console.log(`[JOIN_ROOM] Display joined room ${roomId} as spectator`);
+
             } else if (data.type === 'join_display') {
                 const roomId = data.roomId;
                 const gameType = data.gameType || 'snake';

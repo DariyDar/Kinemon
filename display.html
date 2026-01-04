@@ -544,13 +544,33 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.17.10</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.18.0</div>
         </div>
 
         <!-- Connection Screen -->
         <div id="connectionScreen" class="screen">
             <h1>🖥️ Экран отображения</h1>
-            <p>Подключение к серверу...</p>
+            <div id="connectionModeSelect" style="display: none; margin: 30px auto; max-width: 500px;">
+                <h2 style="font-size: 24px; margin-bottom: 20px;">Выберите режим</h2>
+                <button class="btn" id="createRoomBtn" style="width: 100%; margin-bottom: 15px;">
+                    🎮 Создать новую игру
+                </button>
+                <button class="btn btn-secondary" id="joinRoomBtn" style="width: 100%; background: #607D8B;">
+                    📺 Подключиться к существующей игре
+                </button>
+            </div>
+            <div id="joinRoomInput" style="display: none; margin: 30px auto; max-width: 400px;">
+                <h2 style="font-size: 24px; margin-bottom: 20px;">Введите код комнаты</h2>
+                <input type="text" id="roomCodeInput" placeholder="Код комнаты (например: ABC123)"
+                    style="width: 100%; padding: 15px; font-size: 18px; text-align: center; border: 2px solid #4CAF50; border-radius: 8px; margin-bottom: 15px; text-transform: uppercase;">
+                <button class="btn" id="confirmJoinBtn" style="width: 100%; margin-bottom: 10px;">
+                    ✅ Подключиться
+                </button>
+                <button class="btn btn-secondary" id="backToModeBtn" style="width: 100%; background: #607D8B;">
+                    ← Назад
+                </button>
+            </div>
+            <p id="connectionStatus">Подключение к серверу...</p>
             <p style="font-size: 14px; opacity: 0.6; margin-top: 20px;">
                 ⏱️ Первое подключение может занять 30-60 сек<br>
                 (бесплатный сервер просыпается)
@@ -791,6 +811,8 @@
         let gameState = null;
         let roomId = null;
         let gameType = null; // 'pong' or 'snake'
+        let isJoinMode = false; // false = create room, true = join existing room
+        let joinRoomCode = null; // room code to join
         console.log('🖥️ Display loaded [v3.16.1 - Two-Team Ship Gameplay]');
 
         let gameSettings = {}; // Store game settings
@@ -1118,7 +1140,67 @@
 
             // Show connection screen and connect
             showScreen('connection');
+
+            // Show mode selection after connection is established
+            isJoinMode = false; // Default to create mode
             connectToServer();
+        });
+
+        // Handle mode selection buttons
+        document.getElementById('createRoomBtn').addEventListener('click', () => {
+            isJoinMode = false;
+            document.getElementById('connectionModeSelect').style.display = 'none';
+            document.getElementById('connectionStatus').textContent = 'Создание комнаты...';
+
+            // Send create_room message
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const dimensions = getAvailableCanvasDimensions();
+                if (gameType === 'snake' || gameType === 'ship') {
+                    gameSettings.canvasWidth = dimensions.width;
+                    gameSettings.canvasHeight = dimensions.height;
+                }
+
+                ws.send(JSON.stringify({
+                    type: 'create_room',
+                    gameType: gameType,
+                    settings: gameSettings
+                }));
+            }
+        });
+
+        document.getElementById('joinRoomBtn').addEventListener('click', () => {
+            document.getElementById('connectionModeSelect').style.display = 'none';
+            document.getElementById('joinRoomInput').style.display = 'block';
+            document.getElementById('connectionStatus').style.display = 'none';
+        });
+
+        document.getElementById('backToModeBtn').addEventListener('click', () => {
+            document.getElementById('joinRoomInput').style.display = 'none';
+            document.getElementById('connectionModeSelect').style.display = 'block';
+            document.getElementById('connectionStatus').style.display = 'block';
+        });
+
+        document.getElementById('confirmJoinBtn').addEventListener('click', () => {
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!roomCode) {
+                alert('Введите код комнаты');
+                return;
+            }
+
+            isJoinMode = true;
+            joinRoomCode = roomCode;
+            document.getElementById('joinRoomInput').style.display = 'none';
+            document.getElementById('connectionStatus').style.display = 'block';
+            document.getElementById('connectionStatus').textContent = `Подключение к комнате ${roomCode}...`;
+
+            // Send join message
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'join_room',
+                    roomId: roomCode,
+                    clientType: 'display'
+                }));
+            }
         });
 
         // Wake up Render server on page load (free tier spins down after inactivity)
@@ -1294,19 +1376,9 @@
                     clearTimeout(connectionTimeout);
                     console.log('✅ Connected to server');
 
-                    // Get viewport dimensions for Snake and Ship
-                    const dimensions = getAvailableCanvasDimensions();
-                    if (gameType === 'snake' || gameType === 'ship') {
-                        gameSettings.canvasWidth = dimensions.width;
-                        gameSettings.canvasHeight = dimensions.height;
-                    }
-
-                    // Request room creation with game type and settings
-                    ws.send(JSON.stringify({
-                        type: 'create_room',
-                        gameType: gameType,
-                        settings: gameSettings
-                    }));
+                    // Show mode selection UI
+                    document.getElementById('connectionStatus').style.display = 'none';
+                    document.getElementById('connectionModeSelect').style.display = 'block';
                 };
 
                 ws.onerror = (error) => {
@@ -1410,6 +1482,46 @@
                             gameType: gameType,
                             settings: gameSettings
                         }));
+
+                    } else if (data.type === 'room_joined') {
+                        // Joined existing room as spectator display
+                        roomId = data.roomId;
+                        gameType = data.gameType;
+                        console.log('Joined room:', roomId, 'Game type:', gameType);
+
+                        roomCodeDisplay.textContent = roomId;
+                        roomIdInfo.textContent = roomId;
+
+                        // Don't generate QR code for spectator display
+                        // Just show the current game state
+
+                        // Determine which screen to show based on game state
+                        if (data.gameState) {
+                            gameState = data.gameState;
+
+                            // Update canvas size if needed
+                            if (gameState.canvas) {
+                                canvas.width = gameState.canvas.width;
+                                canvas.height = gameState.canvas.height;
+                                scaleCanvasToScreen();
+                            }
+
+                            // Show appropriate screen based on game state
+                            if (gameState.gameStarted) {
+                                showScreen('game');
+                            } else if (gameType === 'ship' && gameState.players && gameState.players.size > 0) {
+                                showScreen('lobby');
+                            } else {
+                                showScreen('waiting');
+                            }
+                        } else {
+                            showScreen('waiting');
+                        }
+
+                    } else if (data.type === 'error') {
+                        console.error('Server error:', data.message);
+                        alert('Ошибка: ' + data.message);
+                        showScreen('settings');
 
                     } else if (data.type === 'init') {
                         gameState = data.gameState;

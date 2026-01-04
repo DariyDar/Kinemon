@@ -544,7 +544,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.18.0</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.18.1</div>
         </div>
 
         <!-- Connection Screen -->
@@ -1492,8 +1492,11 @@
                         roomCodeDisplay.textContent = roomId;
                         roomIdInfo.textContent = roomId;
 
-                        // Don't generate QR code for spectator display
-                        // Just show the current game state
+                        // Generate persistent QR data for spectator display (bottom-left QR)
+                        const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
+                        const qrData = `${baseUrl}?room=${roomId}&game=${gameType}&server=${encodeURIComponent(serverUrl)}`;
+                        window.persistentQRData = qrData;
+                        window.persistentQRGenerated = false;
 
                         // Determine which screen to show based on game state
                         if (data.gameState) {

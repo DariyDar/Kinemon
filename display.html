@@ -2217,10 +2217,10 @@
                 if ((player.controlScheme === 'arrow_steering' || player.controlScheme === 'arrow_instant') && player.targetAngle !== undefined) {
                     const head = player.segments[0];
 
-                    // Параметры стрелки (увеличены для лучшей видимости)
+                    // Параметры стрелки (сильно увеличены для видимости)
                     const arrowDistance = segmentSize * 2.5;  // Дистанция от головы
-                    const arrowLength = segmentSize * 2.0;    // Длина стрелки (увеличено)
-                    const arrowHeadSize = segmentSize * 0.8;  // Размер наконечника (увеличено)
+                    const arrowLength = segmentSize * 3.0;    // Длина стрелки (ещё длиннее!)
+                    const arrowHeadSize = segmentSize * 1.2;  // Размер наконечника (больше!)
 
                     // Позиция основания стрелки
                     const arrowBaseX = head.x + Math.cos(player.targetAngle) * arrowDistance;
@@ -2231,10 +2231,10 @@
                     const arrowTipY = arrowBaseY + Math.sin(player.targetAngle) * arrowLength;
 
                     ctx.save();
-                    ctx.globalAlpha = 0.6;  // Чуть менее прозрачная
-                    ctx.strokeStyle = player.color;
-                    ctx.fillStyle = player.color;
-                    ctx.lineWidth = 4;  // Толще для видимости
+                    ctx.globalAlpha = 1.0;  // ПОЛНОСТЬЮ НЕПРОЗРАЧНАЯ для отладки
+                    ctx.strokeStyle = '#FF0000';  // КРАСНАЯ для видимости
+                    ctx.fillStyle = '#FF0000';
+                    ctx.lineWidth = 8;  // ОЧЕНЬ ТОЛСТАЯ
                     ctx.lineCap = 'round';
 
                     // Линия стрелки
@@ -2257,6 +2257,10 @@
 
                     ctx.restore();
                     ctx.restore();
+
+                    console.log('🎯 Arrow drawn for', player.name, 'targetAngle:', player.targetAngle, 'controlScheme:', player.controlScheme);
+                } else if (player.controlScheme === 'arrow_steering' || player.controlScheme === 'arrow_instant') {
+                    console.log('⚠️ Arrow NOT drawn for', player.name, 'targetAngle:', player.targetAngle, 'controlScheme:', player.controlScheme);
                 }
 
                 // Draw player name above head

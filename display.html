@@ -544,7 +544,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.19.0</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.19.1</div>
         </div>
 
         <!-- Connection Screen -->
@@ -1036,6 +1036,7 @@
                             <option value="nonlinear_a">Нелинейный A (старый)</option>
                             <option value="nonlinear_b">Нелинейный B (старый)</option>
                             <option value="arrow_steering">Стрелка</option>
+                            <option value="arrow_instant">Послушная стрелка</option>
                         </select>
                         <div class="setting-info">Как наклон влияет на поворот змейки</div>
                     </div>
@@ -2212,14 +2213,14 @@
 
                 ctx.restore();
 
-                // Стрелка направления для режима arrow_steering
-                if (player.controlScheme === 'arrow_steering' && player.targetAngle !== undefined) {
+                // Стрелка направления для режимов arrow_steering и arrow_instant
+                if ((player.controlScheme === 'arrow_steering' || player.controlScheme === 'arrow_instant') && player.targetAngle !== undefined) {
                     const head = player.segments[0];
 
-                    // Параметры стрелки
+                    // Параметры стрелки (увеличены для лучшей видимости)
                     const arrowDistance = segmentSize * 2.5;  // Дистанция от головы
-                    const arrowLength = segmentSize * 1.5;    // Длина стрелки
-                    const arrowHeadSize = segmentSize * 0.6;  // Размер наконечника
+                    const arrowLength = segmentSize * 2.0;    // Длина стрелки (увеличено)
+                    const arrowHeadSize = segmentSize * 0.8;  // Размер наконечника (увеличено)
 
                     // Позиция основания стрелки
                     const arrowBaseX = head.x + Math.cos(player.targetAngle) * arrowDistance;
@@ -2230,10 +2231,10 @@
                     const arrowTipY = arrowBaseY + Math.sin(player.targetAngle) * arrowLength;
 
                     ctx.save();
-                    ctx.globalAlpha = 0.5;  // Полупрозрачность
+                    ctx.globalAlpha = 0.6;  // Чуть менее прозрачная
                     ctx.strokeStyle = player.color;
                     ctx.fillStyle = player.color;
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = 4;  // Толще для видимости
                     ctx.lineCap = 'round';
 
                     // Линия стрелки

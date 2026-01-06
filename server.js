@@ -2430,7 +2430,7 @@ function updateSnake(room) {
             }
 
             case 'arrow_steering': {
-                // Абсолютное управление направлением (как руль корабля)
+                // Абсолютное управление направлением (как руль корабля) с плавным поворотом
                 const clampedTilt = Math.max(0, Math.min(1, player.tilt));
                 player.targetAngle = clampedTilt * 2 * Math.PI;
 
@@ -2446,6 +2446,18 @@ function updateSnake(room) {
 
                 // Нормализация угла к [0, 2π]
                 player.angle = ((player.angle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+
+                mappedDeviation = 0;
+                break;
+            }
+
+            case 'arrow_instant': {
+                // Послушная стрелка: мгновенный поворот по направлению наклона
+                const clampedTilt = Math.max(0, Math.min(1, player.tilt));
+                player.targetAngle = clampedTilt * 2 * Math.PI;
+
+                // Мгновенный поворот (змейка сразу смотрит туда куда указывает телефон)
+                player.angle = player.targetAngle;
 
                 mappedDeviation = 0;
                 break;

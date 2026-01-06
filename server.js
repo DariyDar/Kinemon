@@ -1778,6 +1778,7 @@ wss.on('connection', (ws) => {
                     player.alive = true;
                     player.segments = [];
                     player.angle = 0;
+                    player.targetAngle = 0;  // For arrow_steering control scheme
                     player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
                     player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
                     player.controlScheme = data.controlScheme || 'rotation_smooth';  // Store per-player control
@@ -1908,6 +1909,7 @@ wss.on('connection', (ws) => {
                         player.alive = true;
                         player.score = 0;
                         player.angle = 0;
+                        player.targetAngle = 0;  // Reset target angle for arrow_steering
                         player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
                         player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
 
@@ -2276,7 +2278,9 @@ function serializeGameState(room) {
             score: p.score,
             alive: p.alive,
             segments: p.segments,
-            angle: p.angle
+            angle: p.angle,
+            targetAngle: p.targetAngle || p.angle,  // For arrow_steering visualization
+            controlScheme: p.controlScheme  // For client-side rendering decisions
         }));
         state.pizzas = room.pizzas;
         state.segmentSize = room.segmentSize;
@@ -2422,6 +2426,28 @@ function updateSnake(room) {
                     mappedDeviation = -tiltDeviation * normalizedTilt;
                 }
 
+                break;
+            }
+
+            case 'arrow_steering': {
+                // Абсолютное управление направлением (как руль корабля)
+                const clampedTilt = Math.max(0, Math.min(1, player.tilt));
+                player.targetAngle = clampedTilt * 2 * Math.PI;
+
+                // Плавная интерполяция к целевому углу
+                let angleDiff = player.targetAngle - player.angle;
+
+                // Нормализация к [-π, π] (кратчайший путь)
+                while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+                // Интерполяция (15% за кадр)
+                player.angle += angleDiff * 0.15;
+
+                // Нормализация угла к [0, 2π]
+                player.angle = ((player.angle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
+
+                mappedDeviation = 0;
                 break;
             }
 

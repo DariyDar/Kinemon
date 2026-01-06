@@ -544,7 +544,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.18.1</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.19.0</div>
         </div>
 
         <!-- Connection Screen -->
@@ -1035,6 +1035,7 @@
                             <option value="rotation_linear">Поворот (чувствительный)</option>
                             <option value="nonlinear_a">Нелинейный A (старый)</option>
                             <option value="nonlinear_b">Нелинейный B (старый)</option>
+                            <option value="arrow_steering">Стрелка</option>
                         </select>
                         <div class="setting-info">Как наклон влияет на поворот змейки</div>
                     </div>
@@ -2210,6 +2211,52 @@
                 ctx.fill();
 
                 ctx.restore();
+
+                // Стрелка направления для режима arrow_steering
+                if (player.controlScheme === 'arrow_steering' && player.targetAngle !== undefined) {
+                    const head = player.segments[0];
+
+                    // Параметры стрелки
+                    const arrowDistance = segmentSize * 2.5;  // Дистанция от головы
+                    const arrowLength = segmentSize * 1.5;    // Длина стрелки
+                    const arrowHeadSize = segmentSize * 0.6;  // Размер наконечника
+
+                    // Позиция основания стрелки
+                    const arrowBaseX = head.x + Math.cos(player.targetAngle) * arrowDistance;
+                    const arrowBaseY = head.y + Math.sin(player.targetAngle) * arrowDistance;
+
+                    // Позиция кончика стрелки
+                    const arrowTipX = arrowBaseX + Math.cos(player.targetAngle) * arrowLength;
+                    const arrowTipY = arrowBaseY + Math.sin(player.targetAngle) * arrowLength;
+
+                    ctx.save();
+                    ctx.globalAlpha = 0.5;  // Полупрозрачность
+                    ctx.strokeStyle = player.color;
+                    ctx.fillStyle = player.color;
+                    ctx.lineWidth = 3;
+                    ctx.lineCap = 'round';
+
+                    // Линия стрелки
+                    ctx.beginPath();
+                    ctx.moveTo(arrowBaseX, arrowBaseY);
+                    ctx.lineTo(arrowTipX, arrowTipY);
+                    ctx.stroke();
+
+                    // Наконечник (треугольник)
+                    ctx.save();
+                    ctx.translate(arrowTipX, arrowTipY);
+                    ctx.rotate(player.targetAngle);
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-arrowHeadSize, -arrowHeadSize / 2);
+                    ctx.lineTo(-arrowHeadSize, arrowHeadSize / 2);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.restore();
+                    ctx.restore();
+                }
 
                 // Draw player name above head
                 ctx.fillStyle = player.color;

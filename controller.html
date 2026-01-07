@@ -1509,6 +1509,19 @@
                             // Return to controller screen
                             showScreen('controller');
 
+                            // Hide/show Ship-specific buttons based on game type
+                            const leavePostBtn = document.getElementById('leavePostBtn');
+                            const recalibrateBtn = document.getElementById('recalibrateBtn');
+                            if (data.gameType === 'ship') {
+                                // Show Ship buttons
+                                if (leavePostBtn) leavePostBtn.style.display = 'block';
+                                if (recalibrateBtn) recalibrateBtn.style.display = 'block';
+                            } else {
+                                // Hide Ship buttons for other games
+                                if (leavePostBtn) leavePostBtn.style.display = 'none';
+                                if (recalibrateBtn) recalibrateBtn.style.display = 'none';
+                            }
+
                             // For Snake: ensure motion data sending is enabled
                             if (motionController && motionController.onTiltChange === null) {
                                 motionController.onTiltChange = (normalized) => {

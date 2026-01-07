@@ -1738,6 +1738,12 @@
                         // Game has been restarted
                         console.log('🔄 Game restarted');
 
+                        // Hide Ship-specific UI elements
+                        const teamRosters = document.getElementById('teamRosters');
+                        if (teamRosters) {
+                            teamRosters.style.display = 'none';
+                        }
+
                         // Return to appropriate screen
                         if (data.gameType === 'ship' && !data.preserveRoles) {
                             // Ship returned to lobby
@@ -1746,8 +1752,18 @@
                             // All other cases: go to game screen
                             showScreen('game');
                             canvas.classList.add('active');
-                            roomInfo.style.display = 'block';
-                            scoreboard.style.display = 'block';
+                            canvas.style.display = 'block';
+
+                            // Show/hide UI based on game type
+                            if (data.gameType === 'ship' || data.gameType === 'pushers') {
+                                // Team games use canvas scoreboard
+                                roomInfo.style.display = 'none';
+                                scoreboard.style.display = 'none';
+                            } else {
+                                // Individual games use right panel
+                                roomInfo.style.display = 'block';
+                                scoreboard.style.display = 'block';
+                            }
                         }
                     } else if (data.type === 'show_game_selection') {
                         // Hide and clear canvas
@@ -2178,9 +2194,15 @@
         function render() {
             if (!gameState) return;
 
-            // Check for game over
+            // Check for game over (only if we're on the game screen)
             if (gameState.gameOver && gameState.winner) {
-                showWinScreen(gameState.winner, gameState.gameType);
+                const winScreen = document.getElementById('winScreen');
+                const gameSelectionScreen = document.getElementById('gameSelectionScreen');
+
+                // Only show win screen if not already on win/selection screens
+                if (!winScreen.classList.contains('active') && !gameSelectionScreen.classList.contains('active')) {
+                    showWinScreen(gameState.winner, gameState.gameType);
+                }
                 return;
             }
 

@@ -6,8 +6,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="version" content="3.19.5-arrow-control">
-    <title>Kinemon - Controller v3.19.5</title>
+    <meta name="version" content="3.19.6-arrow-control">
+    <title>Kinemon - Controller v3.19.6</title>
     <style>
         * {
             margin: 0;
@@ -130,11 +130,21 @@
 
         #controlSchemeSelect {
             cursor: pointer;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="black" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 20px;
+            padding-right: 35px;
         }
 
         #controlSchemeSelect:focus {
             outline: 2px solid #4CAF50;
             outline-offset: 2px;
+        }
+
+        #controlSchemeSelect option {
+            background-color: #ffffff;
+            color: #000000;
         }
 
         #controlSelector {
@@ -505,15 +515,15 @@
             <!-- Control Scheme Selection (Snake only) -->
             <div id="controlSchemePanel" style="display: none; margin-top: 15px;">
                 <div class="role-panel-title" style="font-size: 16px; margin-bottom: 8px;">Режим управления:</div>
-                <select id="controlSchemeSelect" style="width: 100%; padding: 12px; font-size: 15px; border-radius: 8px; border: 2px solid #4CAF50; background: white; color: #333;">
-                    <option value="arrow_instant" selected>➡️ Послушная стрелка</option>
-                    <option value="arrow_steering">➡️ Стрелка</option>
-                    <option value="rotation_smooth">🔄 Плавный поворот</option>
-                    <option value="rotation_aggressive">⚡ Агрессивный поворот</option>
-                    <option value="tilt_smooth">📱 Наклон (плавный)</option>
-                    <option value="tilt_aggressive">📱 Наклон (резкий)</option>
-                    <option value="direct_smooth">🎯 Прямое управление (плавное)</option>
-                    <option value="direct_aggressive">🎯 Прямое управление (резкое)</option>
+                <select id="controlSchemeSelect" style="width: 100%; padding: 12px; font-size: 15px; border-radius: 8px; border: 2px solid #4CAF50; background-color: #ffffff; color: #000000; -webkit-appearance: none; appearance: none;">
+                    <option value="arrow_instant" selected style="background-color: #ffffff; color: #000000;">➡️ Послушная стрелка</option>
+                    <option value="arrow_steering" style="background-color: #ffffff; color: #000000;">➡️ Стрелка</option>
+                    <option value="rotation_smooth" style="background-color: #ffffff; color: #000000;">🔄 Плавный поворот</option>
+                    <option value="rotation_aggressive" style="background-color: #ffffff; color: #000000;">⚡ Агрессивный поворот</option>
+                    <option value="tilt_smooth" style="background-color: #ffffff; color: #000000;">📱 Наклон (плавный)</option>
+                    <option value="tilt_aggressive" style="background-color: #ffffff; color: #000000;">📱 Наклон (резкий)</option>
+                    <option value="direct_smooth" style="background-color: #ffffff; color: #000000;">🎯 Прямое управление (плавное)</option>
+                    <option value="direct_aggressive" style="background-color: #ffffff; color: #000000;">🎯 Прямое управление (резкое)</option>
                 </select>
             </div>
 
@@ -684,7 +694,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.19.5 - Arrow Control for Snake]', 'success');
+        addDebugLog('📱 Страница загружена [v3.19.6 - Arrow Control for Snake]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');

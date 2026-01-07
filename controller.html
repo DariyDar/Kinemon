@@ -1544,6 +1544,12 @@
                         } else {
                             // Other games: go to controller (calibration already done)
                             showScreen('controller');
+
+                            // Hide Ship-specific buttons for other games
+                            const leavePostBtn = document.getElementById('leavePostBtn');
+                            const recalibrateBtn = document.getElementById('recalibrateBtn');
+                            if (leavePostBtn) leavePostBtn.style.display = 'none';
+                            if (recalibrateBtn) recalibrateBtn.style.display = 'none';
                         }
                     }
                 };

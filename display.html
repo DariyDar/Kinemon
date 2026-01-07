@@ -1789,6 +1789,12 @@
                         roomCodeDisplay.textContent = roomId;
                         roomIdInfo.textContent = roomId;
 
+                        // Hide Ship game-specific UI elements
+                        const teamRosters = document.getElementById('teamRosters');
+                        if (teamRosters) {
+                            teamRosters.style.display = 'none';
+                        }
+
                         // Clear canvas immediately
                         ctx.fillStyle = '#000';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);

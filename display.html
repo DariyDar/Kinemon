@@ -980,6 +980,15 @@
                         <div class="setting-info">Влияет на размер ракеток игроков</div>
                     </div>
                     <div class="setting-group">
+                        <label for="pongSpeedIncrease">Прирост скорости мяча</label>
+                        <select id="pongSpeedIncrease">
+                            <option value="1">Медленный (+5%)</option>
+                            <option value="2" selected>Средний (+15%)</option>
+                            <option value="3">Быстрый (+30%)</option>
+                        </select>
+                        <div class="setting-info">Ускорение мяча после каждого удара</div>
+                    </div>
+                    <div class="setting-group">
                         <label for="pongWinScore">Победный счет</label>
                         <select id="pongWinScore">
                             <option value="5">5 очков</option>
@@ -992,10 +1001,12 @@
                 // Load saved settings
                 gameSettings.ballSpeed = parseInt(localStorage.getItem('pongBallSpeed')) || 3;
                 gameSettings.paddleSize = parseInt(localStorage.getItem('pongPaddleSize')) || 2;
+                gameSettings.speedIncrease = parseInt(localStorage.getItem('pongSpeedIncrease')) || 2;
                 gameSettings.winScore = parseInt(localStorage.getItem('pongWinScore')) || 11;
 
                 document.getElementById('pongBallSpeed').value = gameSettings.ballSpeed;
                 document.getElementById('pongPaddleSize').value = gameSettings.paddleSize;
+                document.getElementById('pongSpeedIncrease').value = gameSettings.speedIncrease;
                 document.getElementById('pongWinScore').value = gameSettings.winScore;
 
             } else if (gameType === 'pushers') {
@@ -1175,9 +1186,11 @@
             if (gameType === 'pong') {
                 gameSettings.ballSpeed = parseInt(document.getElementById('pongBallSpeed').value);
                 gameSettings.paddleSize = parseInt(document.getElementById('pongPaddleSize').value);
+                gameSettings.speedIncrease = parseInt(document.getElementById('pongSpeedIncrease').value);
                 gameSettings.winScore = parseInt(document.getElementById('pongWinScore').value);
                 localStorage.setItem('pongBallSpeed', gameSettings.ballSpeed);
                 localStorage.setItem('pongPaddleSize', gameSettings.paddleSize);
+                localStorage.setItem('pongSpeedIncrease', gameSettings.speedIncrease);
                 localStorage.setItem('pongWinScore', gameSettings.winScore);
             } else if (gameType === 'pushers') {
                 gameSettings.winScore = parseInt(document.getElementById('pushersWinScore').value);
@@ -1314,14 +1327,15 @@
                 return {
                     ballSpeed: parseInt(localStorage.getItem('pongBallSpeed')) || 3,
                     paddleSize: parseInt(localStorage.getItem('pongPaddleSize')) || 2,
-                    winScore: parseInt(localStorage.getItem('pongWinScore')) || 11
+                    winScore: parseInt(localStorage.getItem('pongWinScore')) || 11,
+                    speedIncrease: parseInt(localStorage.getItem('pongSpeedIncrease')) || 2 // 1=5%, 2=15% (default), 3=30%
                 };
             } else if (gameType === 'snake') {
                 return {
                     moveSpeed: parseInt(localStorage.getItem('snakeMoveSpeed')) || 3,
                     turnSpeed: parseInt(localStorage.getItem('snakeTurnSpeed')) || 2,
-                    snakeSize: parseInt(localStorage.getItem('snakeSize')) || 1,
-                    growthSpeed: parseInt(localStorage.getItem('snakeGrowthSpeed')) || 1,
+                    snakeSize: parseInt(localStorage.getItem('snakeSize')) || 2, // Changed: 1 → 2 (Средний)
+                    growthSpeed: parseInt(localStorage.getItem('snakeGrowthSpeed')) || 4, // Changed: 1 → 4 (Быстро)
                     winScore: parseInt(localStorage.getItem('snakeWinScore')) || 50,
                     initialPizzas: parseInt(localStorage.getItem('snakeInitialPizzas')) || 100,
                     controlMapping: localStorage.getItem('snakeControlMapping') || 'rotation_smooth',

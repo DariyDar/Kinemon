@@ -183,6 +183,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         };
         room.paddleSize = (settings.paddleSize || 2) * 50; // 50, 100, 150
         room.winScore = settings.winScore || 11;
+        room.speedIncrease = settings.speedIncrease || 2; // 1=5%, 2=15%, 3=30% per hit
         room.gameStarted = false; // Game starts when 2 players join
     } else if (gameType === 'pushers') {
         // Pushers: team-based square pushing game
@@ -2982,8 +2983,9 @@ function updatePong(room) {
                 room.ball.y > player.paddleY &&
                 room.ball.y < player.paddleY + room.paddleSize &&
                 room.ball.speedX < 0) {
-                // Accelerate ball by 5% on each paddle hit
-                const accelerated = Math.abs(room.ball.speedX) * 1.05;
+                // Accelerate ball based on speedIncrease setting (1=5%, 2=15%, 3=30%)
+                const increaseMultiplier = room.speedIncrease === 1 ? 1.05 : room.speedIncrease === 2 ? 1.15 : 1.30;
+                const accelerated = Math.abs(room.ball.speedX) * increaseMultiplier;
                 room.ball.speedX = Math.min(accelerated, room.ball.maxSpeedX);
 
                 // Add angle based on hit position
@@ -3001,8 +3003,9 @@ function updatePong(room) {
                 room.ball.y > player.paddleY &&
                 room.ball.y < player.paddleY + room.paddleSize &&
                 room.ball.speedX > 0) {
-                // Accelerate ball by 5% on each paddle hit
-                const accelerated = Math.abs(room.ball.speedX) * 1.05;
+                // Accelerate ball based on speedIncrease setting (1=5%, 2=15%, 3=30%)
+                const increaseMultiplier = room.speedIncrease === 1 ? 1.05 : room.speedIncrease === 2 ? 1.15 : 1.30;
+                const accelerated = Math.abs(room.ball.speedX) * increaseMultiplier;
                 room.ball.speedX = -Math.min(accelerated, room.ball.maxSpeedX);
 
                 const hitPos = (room.ball.y - player.paddleY) / room.paddleSize;

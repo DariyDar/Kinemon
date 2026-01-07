@@ -297,6 +297,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.sizeMultiplier = settings.snakeSize || 1;
         room.segmentSize = BASE_SEGMENT_SIZE * room.sizeMultiplier;
         room.pizzaSize = BASE_PIZZA_SIZE * room.sizeMultiplier;
+        room.growthSpeed = settings.growthSpeed || 1; // Growth multiplier: 1=slow, 2=medium, 4=fast, 8=super fast
 
         room.pizzas = [];
         const initialCount = room.settings.initialPizzas || 100;
@@ -2431,8 +2432,8 @@ function updateSnake(room) {
 
             case 'arrow_steering': {
                 // Абсолютное управление направлением (как руль корабля) с плавным поворотом
-                const clampedTilt = Math.max(0, Math.min(1, player.tilt));
-                player.targetAngle = clampedTilt * 2 * Math.PI;
+                // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
+                player.targetAngle = player.tilt * 2 * Math.PI;
 
                 // Плавная интерполяция к целевому углу
                 let angleDiff = player.targetAngle - player.angle;
@@ -2453,8 +2454,8 @@ function updateSnake(room) {
 
             case 'arrow_instant': {
                 // Послушная стрелка: мгновенный поворот по направлению наклона
-                const clampedTilt = Math.max(0, Math.min(1, player.tilt));
-                player.targetAngle = clampedTilt * 2 * Math.PI;
+                // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
+                player.targetAngle = player.tilt * 2 * Math.PI;
 
                 // Мгновенный поворот (змейка сразу смотрит туда куда указывает телефон)
                 player.angle = player.targetAngle;
@@ -2494,8 +2495,9 @@ function updateSnake(room) {
             y: player.headY
         });
 
-        // Remove tail segment (3x growth per pizza)
-        if (player.segments.length > INITIAL_LENGTH + player.score * 3) {
+        // Remove tail segment (growth based on settings: 1x/2x/4x/8x growth per pizza)
+        const growthPerPizza = 3 * room.growthSpeed; // Base 3 segments × multiplier
+        if (player.segments.length > INITIAL_LENGTH + player.score * growthPerPizza) {
             player.segments.pop();
         }
     }

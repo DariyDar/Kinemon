@@ -813,7 +813,7 @@
         let gameType = null; // 'pong' or 'snake'
         let isJoinMode = false; // false = create room, true = join existing room
         let joinRoomCode = null; // room code to join
-        console.log('🖥️ Display loaded [v3.19.6 - Arrow Control Debug]');
+        console.log('🖥️ Display loaded [v3.20.0 - Arrow Control Debug]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1080,6 +1080,16 @@
                         </select>
                         <div class="setting-info">Количество звёздной пыли на старте</div>
                     </div>
+                    <div class="setting-group">
+                        <label for="snakeGrowthSpeed">Скорость роста змейки</label>
+                        <select id="snakeGrowthSpeed">
+                            <option value="1" selected>Медленно</option>
+                            <option value="2">Средне (x2)</option>
+                            <option value="4">Быстро (x4)</option>
+                            <option value="8">Супер быстро (x8)</option>
+                        </select>
+                        <div class="setting-info">Как быстро растёт змейка после поедания пиццы</div>
+                    </div>
                 `;
                 // Load saved settings
                 gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
@@ -1088,6 +1098,7 @@
                 gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
                 gameSettings.winScore = parseInt(localStorage.getItem('snakeWinScore')) || 50;
                 gameSettings.initialPizzas = parseInt(localStorage.getItem('snakeInitialPizzas')) || 100;
+                gameSettings.growthSpeed = parseInt(localStorage.getItem('snakeGrowthSpeed')) || 1;
 
                 document.getElementById('snakeTurnSpeed').value = gameSettings.turnSpeed;
                 document.getElementById('snakeControlMapping').value = gameSettings.controlMapping;
@@ -1095,6 +1106,7 @@
                 document.getElementById('snakeSize').value = gameSettings.snakeSize;
                 document.getElementById('snakeWinScore').value = gameSettings.winScore;
                 document.getElementById('snakeInitialPizzas').value = gameSettings.initialPizzas;
+                document.getElementById('snakeGrowthSpeed').value = gameSettings.growthSpeed;
             }
         }
 
@@ -1130,12 +1142,14 @@
                 gameSettings.snakeSize = parseInt(document.getElementById('snakeSize').value);
                 gameSettings.winScore = parseInt(document.getElementById('snakeWinScore').value);
                 gameSettings.initialPizzas = parseInt(document.getElementById('snakeInitialPizzas').value);
+                gameSettings.growthSpeed = parseInt(document.getElementById('snakeGrowthSpeed').value);
                 localStorage.setItem('snakeTurnSpeed', gameSettings.turnSpeed);
                 localStorage.setItem('snakeControlMapping', gameSettings.controlMapping);
                 localStorage.setItem('snakeMoveSpeed', gameSettings.moveSpeed);
                 localStorage.setItem('snakeSize', gameSettings.snakeSize);
                 localStorage.setItem('snakeWinScore', gameSettings.winScore);
                 localStorage.setItem('snakeInitialPizzas', gameSettings.initialPizzas);
+                localStorage.setItem('snakeGrowthSpeed', gameSettings.growthSpeed);
             }
 
             console.log('Game settings:', gameSettings);
@@ -1412,8 +1426,10 @@
                         roomIdInfo.textContent = roomId;
 
                         // Build controller URL with room, server, and game type parameters
+                        // Add timestamp to bust browser cache on mobile devices
                         const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
-                        const qrData = `${baseUrl}?room=${roomId}&game=${gameType}&server=${encodeURIComponent(serverUrl)}`;
+                        const timestamp = Date.now();
+                        const qrData = `${baseUrl}?room=${roomId}&game=${gameType}&server=${encodeURIComponent(serverUrl)}&t=${timestamp}`;
 
                         console.log('QR Code URL:', qrData);
 
@@ -2217,10 +2233,10 @@
                 if ((player.controlScheme === 'arrow_steering' || player.controlScheme === 'arrow_instant') && player.targetAngle !== undefined) {
                     const head = player.segments[0];
 
-                    // Параметры стрелки (сильно увеличены для видимости)
-                    const arrowDistance = segmentSize * 2.5;  // Дистанция от головы
-                    const arrowLength = segmentSize * 3.0;    // Длина стрелки (ещё длиннее!)
-                    const arrowHeadSize = segmentSize * 1.2;  // Размер наконечника (больше!)
+                    // Параметры стрелки
+                    const arrowDistance = segmentSize * 2.0;  // Дистанция от головы
+                    const arrowLength = segmentSize * 1.5;    // Длина стрелки
+                    const arrowHeadSize = segmentSize * 0.7;  // Размер наконечника
 
                     // Позиция основания стрелки
                     const arrowBaseX = head.x + Math.cos(player.targetAngle) * arrowDistance;
@@ -2231,10 +2247,10 @@
                     const arrowTipY = arrowBaseY + Math.sin(player.targetAngle) * arrowLength;
 
                     ctx.save();
-                    ctx.globalAlpha = 1.0;  // ПОЛНОСТЬЮ НЕПРОЗРАЧНАЯ для отладки
-                    ctx.strokeStyle = '#FF0000';  // КРАСНАЯ для видимости
-                    ctx.fillStyle = '#FF0000';
-                    ctx.lineWidth = 8;  // ОЧЕНЬ ТОЛСТАЯ
+                    ctx.globalAlpha = 0.6;  // Полупрозрачная
+                    ctx.strokeStyle = player.color;  // Цвет игрока
+                    ctx.fillStyle = player.color;
+                    ctx.lineWidth = 3;
                     ctx.lineCap = 'round';
 
                     // Линия стрелки
@@ -2257,10 +2273,6 @@
 
                     ctx.restore();
                     ctx.restore();
-
-                    console.log('🎯 Arrow drawn for', player.name, 'targetAngle:', player.targetAngle, 'controlScheme:', player.controlScheme);
-                } else if (player.controlScheme === 'arrow_steering' || player.controlScheme === 'arrow_instant') {
-                    console.log('⚠️ Arrow NOT drawn for', player.name, 'targetAngle:', player.targetAngle, 'controlScheme:', player.controlScheme);
                 }
 
                 // Draw player name above head

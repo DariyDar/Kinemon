@@ -6,8 +6,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="version" content="3.19.3-arrow-control">
-    <title>Kinemon - Controller v3.19.3</title>
+    <meta name="version" content="3.19.4-arrow-control">
+    <title>Kinemon - Controller v3.19.4</title>
     <style>
         * {
             margin: 0;
@@ -684,7 +684,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.19.3 - Arrow Control for Snake]', 'success');
+        addDebugLog('📱 Страница загружена [v3.19.4 - Arrow Control for Snake]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -752,18 +752,28 @@
 
         // Show control scheme panel for Snake game
         if (gameType === 'snake') {
+            console.log('🐍 Snake game detected, showing control scheme panel');
+            addDebugLog('🐍 Snake game - показываем панель управления', 'info');
             document.getElementById('controlSchemePanel').style.display = 'block';
             // Set saved control scheme
             const controlSchemeSelect = document.getElementById('controlSchemeSelect');
             if (controlSchemeSelect) {
                 controlSchemeSelect.value = currentControlScheme;
+                console.log('🎮 Current control scheme:', currentControlScheme);
+                addDebugLog(`🎮 Текущий режим управления: ${currentControlScheme}`, 'info');
                 // Listen for changes
                 controlSchemeSelect.addEventListener('change', (e) => {
                     currentControlScheme = e.target.value;
                     localStorage.setItem('playerControlScheme', currentControlScheme);
-                    console.log('Control scheme changed to:', currentControlScheme);
+                    console.log('✅ Control scheme changed to:', currentControlScheme);
+                    addDebugLog(`✅ Режим изменён на: ${currentControlScheme}`, 'success');
                 });
+            } else {
+                console.error('❌ controlSchemeSelect not found!');
+                addDebugLog('❌ controlSchemeSelect не найден!', 'error');
             }
+        } else {
+            console.log('ℹ️ Not Snake game (gameType:', gameType + '), control panel hidden');
         }
 
         console.log('=== End Debug ===');
@@ -943,6 +953,8 @@
                                 gameType: gameType,
                                 controlScheme: currentControlScheme
                             };
+                            console.log('📤 Sending join with controlScheme:', currentControlScheme);
+                            addDebugLog(`📤 Отправка join с controlScheme: ${currentControlScheme}`, 'info');
 
                             // Add team for pushers game
                             if (gameType === 'pushers') {

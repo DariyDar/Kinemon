@@ -530,6 +530,13 @@ function migrateRoomToNewGame(oldRoom, newGameType, newSettings) {
         newRoom.gameStarted = true;
     }
 
+    // Migrate Display WebSocket if present
+    if (oldRoom.displayWs) {
+        oldRoom.displayWs.roomId = newRoomId;
+        oldRoom.displayWs.isDisplay = true;
+        newRoom.displayWs = oldRoom.displayWs;
+    }
+
     // Destroy old room
     clearInterval(oldRoom.gameLoopInterval);
     rooms.delete(oldRoom.id);
@@ -2138,6 +2145,7 @@ wss.on('connection', (ws) => {
                 ws.isDisplay = true;
 
                 const room = rooms.get(roomId);
+                room.displayWs = ws; // Save display WebSocket for migration
 
                 // Apply settings from display (if provided and room already existed)
                 if (data.settings) {
@@ -2405,6 +2413,18 @@ wss.on('connection', (ws) => {
                         roomId: result.newRoomId,
                         gameType: data.gameType
                     }));
+
+                    // Send initial game state to all clients
+                    if (data.gameType === 'ship') {
+                        // For Ship: send lobby state
+                        broadcastGameState(result.newRoom);
+                    } else {
+                        // For other games: send game state
+                        broadcastToRoom(result.newRoomId, {
+                            type: 'update',
+                            gameState: serializeGameState(result.newRoom)
+                        });
+                    }
 
                     console.log(`[REPLAY] Migrated to ${data.gameType}, new room: ${result.newRoomId}`);
                 }

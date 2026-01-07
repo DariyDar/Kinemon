@@ -1788,17 +1788,10 @@
                         window.persistentQRGenerated = false;
                         generatePersistentQR(); // Regenerate QR
 
-                        // Show appropriate screen
-                        if (data.gameType === 'ship') {
-                            showScreen('lobby');
-                        } else if (data.gameType === 'pong' && (!gameState || !gameState.players || gameState.players.length < 2)) {
-                            showScreen('waiting');
-                        } else {
-                            showScreen('game');
-                            canvas.classList.add('active');
-                            roomInfo.style.display = 'block';
-                            scoreboard.style.display = 'block';
-                        }
+                        console.log(`QR code updated for new room ${data.roomId}, game ${data.gameType}`);
+
+                        // Don't show screen here - wait for 'update' message with gameState
+                        // The 'update' handler will show the correct screen based on gameState
                     }
                 };
             } catch (error) {

@@ -315,6 +315,287 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
     return room;
 }
 
+// ============================================================================
+// REPLAY SYSTEM - Helper Functions
+// ============================================================================
+
+// Broadcast message to all clients in a room
+function broadcastToRoom(roomId, message) {
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN && client.roomId === roomId) {
+            client.send(JSON.stringify(message));
+        }
+    });
+}
+
+// Reset room for replay (same game type)
+function resetRoomForReplay(room, preserveRoles = true) {
+    // Reset general state
+    room.gameOver = false;
+    room.winner = null;
+
+    // Reset all player scores
+    room.players.forEach(player => {
+        player.score = 0;
+    });
+
+    // Game-specific reset
+    if (room.gameType === 'snake') {
+        resetSnakeGame(room);
+    } else if (room.gameType === 'pong') {
+        resetPongGame(room);
+    } else if (room.gameType === 'pushers') {
+        resetPushersGame(room);
+    } else if (room.gameType === 'ship') {
+        resetShipGame(room, preserveRoles);
+    }
+
+    console.log(`Room ${room.id} reset for replay (${room.gameType})`);
+}
+
+// Reset Snake game state
+function resetSnakeGame(room) {
+    room.players.forEach(player => {
+        player.alive = true;
+        player.angle = 0;
+        player.targetAngle = 0;
+        player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
+        player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
+
+        // Reset segments to initial length
+        player.segments = [];
+        for (let i = 0; i < INITIAL_LENGTH; i++) {
+            player.segments.push({
+                x: player.headX - i * room.segmentSize,
+                y: player.headY
+            });
+        }
+    });
+
+    // Respawn pizzas
+    room.pizzas = [];
+    const initialCount = room.settings.initialPizzas || 100;
+    for (let i = 0; i < initialCount; i++) {
+        room.pizzas.push(spawnPizza(room));
+    }
+}
+
+// Reset Pong game state
+function resetPongGame(room) {
+    // Reset ball
+    resetBall(room);
+    room.gameStarted = true;
+
+    // Reset paddle positions
+    room.players.forEach(player => {
+        player.paddleY = room.canvas.height / 2 - room.paddleSize / 2;
+    });
+}
+
+// Reset Pushers game state
+function resetPushersGame(room) {
+    // Reset team scores
+    room.teamScores = { Blue: 0, Red: 0, Yellow: 0, Green: 0, White: 0 };
+    room.smileysCollected = 0;
+    room.ghosts = [];
+
+    // Reset square and smiley
+    room.square = {
+        x: room.canvas.width / 2,
+        y: room.canvas.height / 2,
+        vx: 0,
+        vy: 0
+    };
+    room.smiley = spawnSmiley(room);
+
+    // Reset player positions
+    room.players.forEach(player => {
+        const margin = room.squareSize / 2 + 10;
+        if (player.axis === 'x') {
+            player.x = room.canvas.width / 2;
+            player.y = margin + Math.random() * (room.canvas.height - 2 * margin);
+        } else {
+            player.x = margin + Math.random() * (room.canvas.width - 2 * margin);
+            player.y = room.canvas.height / 2;
+        }
+    });
+}
+
+// Reset Ship game state
+function resetShipGame(room, preserveRoles) {
+    const INVULNERABILITY_DURATION_MS = 3000;
+
+    // Reset ships
+    room.ships.blue = {
+        team: 'blue',
+        x: room.canvas.width * 0.25,
+        y: room.canvas.height / 2,
+        radius: 30,
+        vx: 0, vy: 0, rotation: 0,
+        health: 100, maxHealth: 100, coins: 0,
+        invulnerable: true,
+        invulnerableUntil: Date.now() + INVULNERABILITY_DURATION_MS,
+        spawnTime: Date.now(),
+        alive: true,
+        boosters: { extraBullets: 0, laserSight: false, attackShield: { active: false }, attackEngine: { active: false } }
+    };
+    room.ships.pink = {
+        team: 'pink',
+        x: room.canvas.width * 0.75,
+        y: room.canvas.height / 2,
+        radius: 30,
+        vx: 0, vy: 0, rotation: Math.PI,
+        health: 100, maxHealth: 100, coins: 0,
+        invulnerable: true,
+        invulnerableUntil: Date.now() + INVULNERABILITY_DURATION_MS,
+        spawnTime: Date.now(),
+        alive: true,
+        boosters: { extraBullets: 0, laserSight: false, attackShield: { active: false }, attackEngine: { active: false } }
+    };
+
+    // Reset team systems
+    ['blue', 'pink'].forEach(team => {
+        room.teamSystems[team] = {
+            engine: { amplitude: 0, energy: 0, hasPlayer: false },
+            rudder: { rotation: 0, autoRotateSpeed: 0.5 },
+            weapon: { energy: 0, lastWeaponTilt: undefined, isCharging: false, hasPlayer: false },
+            weaponDirection: { rotation: 0, autoRotateSpeed: 0.7 },
+            shield: { rotation: 0, arcSize: 72, active: false }
+        };
+    });
+
+    // Clear game objects
+    room.bullets = [];
+    room.asteroids = [];
+    room.hearts = [];
+    room.loot = [];
+    room.coins = [spawnCoin(room)];
+    room.lastAsteroidSpawn = Date.now();
+
+    // Handle roles/lobby
+    if (preserveRoles) {
+        // Keep teams and roles, mark all players as ready
+        room.players.forEach(player => {
+            player.ready = true;
+        });
+        room.gameStarted = true;
+        room.gameState = 'playing';
+    } else {
+        // Return to lobby - keep team/role assignments but reset ready status
+        room.players.forEach(player => {
+            player.ready = false;
+        });
+        room.gameStarted = false;
+        room.gameState = 'lobby';
+        room.lobbyCountdown = null;
+        room.lobbyCountdownStart = null;
+    }
+}
+
+// Migrate room to new game type
+function migrateRoomToNewGame(oldRoom, newGameType, newSettings) {
+    const newRoomId = generateRoomId();
+
+    // Save player information
+    const playerList = Array.from(oldRoom.players.values()).map(p => ({
+        id: p.id,
+        name: p.name,
+        ws: p.ws,
+        color: p.color,
+        controlScheme: p.controlScheme || 'arrow_instant' // for Snake
+    }));
+
+    // Create new room
+    createRoom(newRoomId, newGameType, newSettings);
+    const newRoom = rooms.get(newRoomId);
+
+    // Migrate players
+    playerList.forEach(info => {
+        const player = initializePlayerForGame(newGameType, info, newRoom);
+
+        // Update WebSocket associations
+        info.ws.roomId = newRoomId;
+        info.ws.playerId = player.id;
+
+        newRoom.players.set(player.id, player);
+    });
+
+    // Set gameStarted based on game type
+    if (newGameType === 'pong' && newRoom.players.size === 2) {
+        newRoom.gameStarted = true;
+    } else if (newGameType === 'ship') {
+        newRoom.gameStarted = false; // Requires lobby
+        newRoom.gameState = 'lobby';
+    } else {
+        newRoom.gameStarted = true;
+    }
+
+    // Destroy old room
+    clearInterval(oldRoom.gameLoopInterval);
+    rooms.delete(oldRoom.id);
+
+    console.log(`Migrated from ${oldRoom.id} (${oldRoom.gameType}) to ${newRoomId} (${newGameType})`);
+
+    return { newRoomId, newRoom };
+}
+
+// Initialize player for specific game type
+function initializePlayerForGame(gameType, playerInfo, room) {
+    const player = {
+        id: playerInfo.id,
+        name: playerInfo.name,
+        color: playerInfo.color,
+        score: 0,
+        tilt: 0.5,
+        ws: playerInfo.ws
+    };
+
+    // Game-specific initialization
+    if (gameType === 'snake') {
+        player.alive = true;
+        player.controlScheme = playerInfo.controlScheme || 'arrow_instant';
+        player.angle = 0;
+        player.targetAngle = 0;
+        player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
+        player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
+
+        player.segments = [];
+        for (let i = 0; i < INITIAL_LENGTH; i++) {
+            player.segments.push({
+                x: player.headX - i * room.segmentSize,
+                y: player.headY
+            });
+        }
+    } else if (gameType === 'pong') {
+        player.paddleY = room.canvas.height / 2 - room.paddleSize / 2;
+    } else if (gameType === 'pushers') {
+        player.team = playerInfo.color;
+        const margin = room.squareSize / 2 + 10;
+
+        // Alternate between x and y axis
+        const existingPlayers = Array.from(room.players.values());
+        const xAxisCount = existingPlayers.filter(p => p.axis === 'x').length;
+        const yAxisCount = existingPlayers.filter(p => p.axis === 'y').length;
+
+        if (xAxisCount <= yAxisCount) {
+            player.axis = 'x';
+            player.x = room.canvas.width / 2;
+            player.y = margin + Math.random() * (room.canvas.height - 2 * margin);
+        } else {
+            player.axis = 'y';
+            player.x = margin + Math.random() * (room.canvas.width - 2 * margin);
+            player.y = room.canvas.height / 2;
+        }
+    } else if (gameType === 'ship') {
+        // Ship requires lobby - assign default team but no role yet
+        player.team = room.players.size % 2 === 0 ? 'blue' : 'pink';
+        player.systemRole = null;
+        player.ready = false;
+    }
+
+    return player;
+}
+
 // Spawn pizza
 function spawnPizza(room) {
     const pizzaSize = room ? room.pizzaSize : BASE_PIZZA_SIZE;
@@ -2077,6 +2358,55 @@ wss.on('connection', (ws) => {
                     cancelLobbyCountdown(room);
 
                     broadcastGameState(room);
+                }
+            } else if (data.type === 'restart_game' && ws.roomId) {
+                // Restart the same game
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameOver) {
+                    const preserveRoles = data.preserveRoles !== false; // default true
+                    resetRoomForReplay(room, preserveRoles);
+
+                    // Broadcast to all clients in room
+                    broadcastToRoom(room.id, {
+                        type: 'game_restarted',
+                        preserveRoles: preserveRoles,
+                        gameType: room.gameType
+                    });
+
+                    console.log(`[REPLAY] Room ${room.id} restarted (preserveRoles: ${preserveRoles})`);
+                }
+            } else if (data.type === 'request_game_change' && ws.roomId && ws.isDisplay) {
+                // Request to change game (Display only)
+                const room = rooms.get(ws.roomId);
+                if (room) {
+                    // Send to Display to show game selection screen
+                    ws.send(JSON.stringify({
+                        type: 'show_game_selection'
+                    }));
+
+                    console.log(`[REPLAY] Display requested game change in room ${room.id}`);
+                }
+            } else if (data.type === 'confirm_game_change' && ws.roomId && ws.isDisplay) {
+                // Confirm game change and migrate to new game
+                const room = rooms.get(ws.roomId);
+                if (room) {
+                    const result = migrateRoomToNewGame(room, data.gameType, data.settings || {});
+
+                    // Broadcast to all clients (including Display)
+                    broadcastToRoom(result.newRoomId, {
+                        type: 'room_migrated',
+                        newRoomId: result.newRoomId,
+                        newGameType: data.gameType
+                    });
+
+                    // Send Display-specific message for QR code update
+                    ws.send(JSON.stringify({
+                        type: 'update_qr_code',
+                        roomId: result.newRoomId,
+                        gameType: data.gameType
+                    }));
+
+                    console.log(`[REPLAY] Migrated to ${data.gameType}, new room: ${result.newRoomId}`);
                 }
             }
         } catch (error) {

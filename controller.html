@@ -1444,6 +1444,55 @@
                             addDebugLog('✅ Калибровка уже завершена, пропускаем', 'info');
                         }
                     }
+
+                    // Handle game restart
+                    if (data.type === 'game_restarted') {
+                        addDebugLog('🔄 Игра перезапущена', 'success');
+
+                        if (data.gameType === 'ship' && !data.preserveRoles) {
+                            // Ship returned to lobby
+                            showScreen('lobby');
+                        } else {
+                            // Return to controller screen
+                            showScreen('controller');
+
+                            // For Snake: ensure motion data sending is enabled
+                            if (motionController && motionController.onTiltChange === null) {
+                                motionController.onTiltChange = (normalized) => {
+                                    tiltDisplay.textContent = normalized.toFixed(2);
+                                    if (ws && ws.readyState === WebSocket.OPEN) {
+                                        ws.send(JSON.stringify({
+                                            type: 'input',
+                                            tilt: normalized
+                                        }));
+                                    }
+                                };
+                            }
+                        }
+                    }
+
+                    // Handle room migration (game type changed)
+                    if (data.type === 'room_migrated') {
+                        roomId = data.newRoomId;
+                        gameType = data.newGameType;
+
+                        addDebugLog(`🎮 Новая игра: ${gameType}`, 'success');
+                        addDebugLog(`📍 Комната: ${roomId}`, 'info');
+
+                        // Update URL for recovery after reload
+                        const newUrl = new URL(window.location);
+                        newUrl.searchParams.set('room', roomId);
+                        newUrl.searchParams.set('game', gameType);
+                        window.history.replaceState({}, '', newUrl);
+
+                        // Show appropriate screen
+                        if (gameType === 'ship') {
+                            showScreen('lobby'); // Team/role selection
+                        } else {
+                            // Other games: go to controller (calibration already done)
+                            showScreen('controller');
+                        }
+                    }
                 };
             } catch (error) {
                 addDebugLog(`❌ Ошибка подключения: ${error.message}`, 'error');

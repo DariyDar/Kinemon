@@ -74,6 +74,15 @@
             background: #45a049;
         }
 
+        .game-select-btn {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .game-select-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+
         input {
             background: rgba(255, 255, 255, 0.1);
             color: white;
@@ -664,7 +673,54 @@
             <h1>🏆 Победа!</h1>
             <p id="winnerName" style="font-size: 32px; margin: 20px 0;"></p>
             <p id="winMessage">Собрал 50 пицц!</p>
-            <button class="btn" onclick="window.location.href='index.html'">Вернуться в меню</button>
+
+            <!-- Main action buttons -->
+            <div id="mainActions" style="margin: 30px 0; display: flex; gap: 20px; justify-content: center;">
+                <button id="replayBtn" class="btn" style="font-size: 24px; padding: 20px 40px;">
+                    🔄 Сыграть ещё раз
+                </button>
+                <button id="changeGameBtn" class="btn btn-secondary" style="font-size: 24px; padding: 20px 40px; background: #FF5722;">
+                    🎮 Выбрать другую игру
+                </button>
+            </div>
+
+            <!-- Ship-specific role choice (only shown for Ship game) -->
+            <div id="shipRoleChoice" style="display: none; margin-top: 20px;">
+                <p style="font-size: 18px; margin-bottom: 15px; opacity: 0.8;">Для игры "Корабль":</p>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                    <button id="keepRolesBtn" class="btn" style="font-size: 20px; padding: 15px 30px;">
+                        ⚡ Сохранить команды
+                    </button>
+                    <button id="changeRolesBtn" class="btn btn-secondary" style="font-size: 20px; padding: 15px 30px;">
+                        🔀 Изменить роли
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Selection Screen (when changing games) -->
+        <div id="gameSelectionScreen" class="screen">
+            <h1>🎮 Выберите новую игру</h1>
+            <p style="font-size: 18px; margin-bottom: 40px; opacity: 0.8;">Все игроки останутся подключены</p>
+
+            <div style="display: flex; flex-direction: column; gap: 20px; max-width: 400px; margin: 0 auto;">
+                <button class="game-select-btn" data-game="pong" style="font-size: 24px; padding: 20px; background: #2196F3; color: white; border: none; border-radius: 12px; cursor: pointer;">
+                    🏓 Pong
+                </button>
+                <button class="game-select-btn" data-game="snake" style="font-size: 24px; padding: 20px; background: #4CAF50; color: white; border: none; border-radius: 12px; cursor: pointer;">
+                    🐍 Pizza Snake
+                </button>
+                <button class="game-select-btn" data-game="pushers" style="font-size: 24px; padding: 20px; background: #FF5722; color: white; border: none; border-radius: 12px; cursor: pointer;">
+                    🔲 Толкатели
+                </button>
+                <button class="game-select-btn" data-game="ship" style="font-size: 24px; padding: 20px; background: #9C27B0; color: white; border: none; border-radius: 12px; cursor: pointer;">
+                    🚀 Корабль
+                </button>
+            </div>
+
+            <button id="cancelGameChangeBtn" class="btn" style="margin-top: 30px; font-size: 18px; padding: 15px 30px; background: #666;">
+                ❌ Отмена
+            </button>
         </div>
 
         <!-- Game Display -->
@@ -1252,6 +1308,42 @@
             });
         }
 
+        // Get default settings for a game type (for game switching)
+        function getDefaultSettingsForGame(gameType) {
+            if (gameType === 'pong') {
+                return {
+                    ballSpeed: parseInt(localStorage.getItem('pongBallSpeed')) || 3,
+                    paddleSize: parseInt(localStorage.getItem('pongPaddleSize')) || 2,
+                    winScore: parseInt(localStorage.getItem('pongWinScore')) || 11
+                };
+            } else if (gameType === 'snake') {
+                return {
+                    moveSpeed: parseInt(localStorage.getItem('snakeMoveSpeed')) || 3,
+                    turnSpeed: parseInt(localStorage.getItem('snakeTurnSpeed')) || 2,
+                    snakeSize: parseInt(localStorage.getItem('snakeSize')) || 1,
+                    growthSpeed: parseInt(localStorage.getItem('snakeGrowthSpeed')) || 1,
+                    winScore: parseInt(localStorage.getItem('snakeWinScore')) || 50,
+                    initialPizzas: parseInt(localStorage.getItem('snakeInitialPizzas')) || 100,
+                    controlMapping: localStorage.getItem('snakeControlMapping') || 'rotation_smooth',
+                    canvasWidth: canvas.width,
+                    canvasHeight: canvas.height
+                };
+            } else if (gameType === 'pushers') {
+                return {
+                    winScore: parseInt(localStorage.getItem('pushersWinScore')) || 15
+                };
+            } else if (gameType === 'ship') {
+                return {
+                    coinsToWin: parseInt(localStorage.getItem('shipCoinsToWin')) || 10,
+                    asteroidFrequency: localStorage.getItem('shipAsteroidFrequency') || 'medium',
+                    autopilotEnabled: localStorage.getItem('shipAutopilotEnabled') === 'true',
+                    canvasWidth: canvas.width,
+                    canvasHeight: canvas.height
+                };
+            }
+            return {};
+        }
+
         function showScreen(screenName) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
 
@@ -1636,6 +1728,76 @@
                         if (window.lobbyCountdownInterval) {
                             clearInterval(window.lobbyCountdownInterval);
                             window.lobbyCountdownInterval = null;
+                        }
+                    } else if (data.type === 'game_restarted') {
+                        // Game has been restarted
+                        console.log('🔄 Game restarted');
+
+                        // Return to appropriate screen
+                        if (data.gameType === 'ship' && !data.preserveRoles) {
+                            // Ship returned to lobby
+                            showScreen('lobby');
+                        } else {
+                            // All other cases: go to game screen
+                            showScreen('game');
+                            canvas.classList.add('active');
+                            roomInfo.style.display = 'block';
+                            scoreboard.style.display = 'block';
+                        }
+                    } else if (data.type === 'show_game_selection') {
+                        // Show game selection screen
+                        showScreen('gameSelection');
+
+                        // Setup game selection buttons
+                        const gameButtons = document.querySelectorAll('.game-select-btn');
+                        gameButtons.forEach(btn => {
+                            btn.onclick = () => {
+                                const newGameType = btn.dataset.game;
+
+                                ws.send(JSON.stringify({
+                                    type: 'confirm_game_change',
+                                    gameType: newGameType,
+                                    settings: getDefaultSettingsForGame(newGameType)
+                                }));
+                            };
+                        });
+
+                        // Cancel button
+                        document.getElementById('cancelGameChangeBtn').onclick = () => {
+                            // Return to win screen
+                            showWinScreen(gameState.winner, gameState.gameType);
+                        };
+                    } else if (data.type === 'room_migrated') {
+                        // Room migrated to new game
+                        roomId = data.newRoomId;
+                        gameType = data.newGameType;
+
+                        console.log(`Migrated to new game: ${gameType}, room: ${roomId}`);
+
+                        // Update UI
+                        roomCodeDisplay.textContent = roomId;
+                        roomIdInfo.textContent = roomId;
+                    } else if (data.type === 'update_qr_code') {
+                        // Regenerate QR code for new room
+                        const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');
+                        const timestamp = Date.now();
+                        const qrData = `${baseUrl}?room=${data.roomId}&game=${data.gameType}&server=${encodeURIComponent(serverUrl)}&t=${timestamp}`;
+
+                        // Update persistent QR data
+                        window.persistentQRData = qrData;
+                        window.persistentQRGenerated = false;
+                        generatePersistentQR(); // Regenerate QR
+
+                        // Show appropriate screen
+                        if (data.gameType === 'ship') {
+                            showScreen('lobby');
+                        } else if (data.gameType === 'pong' && (!gameState || !gameState.players || gameState.players.length < 2)) {
+                            showScreen('waiting');
+                        } else {
+                            showScreen('game');
+                            canvas.classList.add('active');
+                            roomInfo.style.display = 'block';
+                            scoreboard.style.display = 'block';
                         }
                     }
                 };
@@ -2042,6 +2204,48 @@
             canvas.classList.remove('active');
             roomInfo.style.display = 'none';
             scoreboard.style.display = 'none';
+
+            // Setup replay buttons
+            const shipRoleChoice = document.getElementById('shipRoleChoice');
+            const mainActions = document.getElementById('mainActions');
+            const replayBtn = document.getElementById('replayBtn');
+
+            if (gameType === 'ship') {
+                // For Ship: show role choice, hide regular replay button
+                shipRoleChoice.style.display = 'block';
+                replayBtn.style.display = 'none';
+
+                document.getElementById('keepRolesBtn').onclick = () => {
+                    ws.send(JSON.stringify({
+                        type: 'restart_game',
+                        preserveRoles: true
+                    }));
+                };
+
+                document.getElementById('changeRolesBtn').onclick = () => {
+                    ws.send(JSON.stringify({
+                        type: 'restart_game',
+                        preserveRoles: false
+                    }));
+                };
+            } else {
+                // Other games: show regular replay button
+                shipRoleChoice.style.display = 'none';
+                replayBtn.style.display = 'inline-block';
+
+                replayBtn.onclick = () => {
+                    ws.send(JSON.stringify({
+                        type: 'restart_game'
+                    }));
+                };
+            }
+
+            // Change game button (for all games)
+            document.getElementById('changeGameBtn').onclick = () => {
+                ws.send(JSON.stringify({
+                    type: 'request_game_change'
+                }));
+            };
         }
 
         function renderPong() {

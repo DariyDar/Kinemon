@@ -2671,6 +2671,239 @@
             };
         }
 
+        // Unified function to render ship systems (engine, shield, weapon)
+        // Works for both blue and pink ships by accepting systems as parameter
+        function renderShipSystems(ship, systems, teamColor) {
+            if (!systems) return;
+
+            // 1. Energy Progress Bar (gradient thrust system)
+            if (gameState.thrustSystem === 'gradient' && systems.engine) {
+                const energy = systems.engine.energy || 0;
+                if (energy > 0) {
+                    const colors = [
+                        { color: '#00BFFF', start: 0, end: 150 },      // Blue
+                        { color: '#00FF00', start: 150, end: 300 },    // Green
+                        { color: '#FFFF00', start: 300, end: 450 },    // Yellow
+                        { color: '#FFA500', start: 450, end: 600 },    // Orange
+                        { color: '#FF0000', start: 600, end: 750 }     // Red
+                    ];
+
+                    ctx.lineWidth = 8;
+                    const innerRadius = ship.radius - 10;
+
+                    colors.forEach((level, index) => {
+                        if (energy > level.start) {
+                            const levelEnergy = Math.min(energy, level.end) - level.start;
+                            const levelProgress = levelEnergy / (level.end - level.start);
+                            const segmentArc = (Math.PI * 2 / 5);
+                            const arcLength = segmentArc * levelProgress;
+                            const startAngle = -Math.PI / 2 + (index * segmentArc);
+                            const endAngle = startAngle + arcLength;
+
+                            ctx.strokeStyle = level.color;
+                            ctx.shadowBlur = 10;
+                            ctx.shadowColor = level.color;
+                            ctx.beginPath();
+                            ctx.arc(ship.x, ship.y, innerRadius, startAngle, endAngle);
+                            ctx.stroke();
+                        }
+                    });
+
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // 2. Shield Arc
+            if (systems.shield && systems.shield.active) {
+                ctx.save();
+                const shieldRot = systems.shield.rotation * Math.PI / 180;
+                let arcSize = systems.shield.arcSize * Math.PI / 180;
+
+                // Check boosters for this team
+                if (gameState.ships[teamColor] && gameState.ships[teamColor].boosters && gameState.ships[teamColor].boosters.attackShield && gameState.ships[teamColor].boosters.attackShield.active) {
+                    const sizeBonus = gameState.ships[teamColor].boosters.attackShield.sizeBonus || 0;
+                    arcSize *= (1 + sizeBonus / 100);
+                }
+
+                const shieldRadius = ship.radius + 15;
+                const shieldStartAngle = shieldRot - arcSize / 2;
+                const shieldEndAngle = shieldRot + arcSize / 2;
+
+                ctx.globalAlpha = 0.4 + 0.1 * Math.sin(Date.now() / 200);
+                const shieldColor = teamColor === 'blue' ? '#00BFFF' : '#E91E63';
+                ctx.strokeStyle = shieldColor;
+                ctx.lineWidth = 8;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = shieldColor;
+
+                ctx.beginPath();
+                ctx.arc(ship.x, ship.y, shieldRadius, shieldStartAngle, shieldEndAngle);
+                ctx.stroke();
+
+                // Shield edges (bright dots)
+                [shieldStartAngle, shieldEndAngle].forEach(angle => {
+                    ctx.fillStyle = shieldColor;
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(
+                        ship.x + Math.cos(angle) * shieldRadius,
+                        ship.y + Math.sin(angle) * shieldRadius,
+                        4, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                });
+
+                ctx.restore();
+            }
+
+            // 3. Engine (turbine + fire particles)
+            const enginePos = getSystemPosition(ship, systems.rudder.rotation);
+            const engineAngle = systems.rudder.rotation * Math.PI / 180;
+
+            // Draw turbine
+            ctx.save();
+            ctx.translate(enginePos.x, enginePos.y);
+            ctx.rotate(engineAngle);
+            ctx.fillStyle = '#666';
+            ctx.fillRect(-10, -6, 20, 12);
+            ctx.fillStyle = '#444';
+            ctx.fillRect(-10, -4, 20, 8);
+            ctx.restore();
+
+            // Fire particles (based on engine energy/amplitude)
+            const engineEnergy = systems.engine ? (systems.engine.energy || 0) : 0;
+            const engineAmplitude = systems.engine ? (systems.engine.amplitude || 0) : 0;
+            const engineActive = engineEnergy > 0 || engineAmplitude > 0;
+            const thrustIntensity = Math.max(engineEnergy / 750, engineAmplitude);
+
+            if (engineActive && thrustIntensity > 0.05) {
+                const thrustAngle = engineAngle + Math.PI; // Opposite to nozzle
+                const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * thrustIntensity));
+
+                // Gradient bonus
+                let flameSizeBonus = 1.0;
+                if (gameState.thrustSystem === 'gradient' && gameState.energyLevel) {
+                    flameSizeBonus = 1.0 + (gameState.energyLevel * 0.05);
+                }
+
+                for (let i = 0; i < particleCount; i++) {
+                    const dist = 15 + i * 12 + Math.random() * 5;
+                    const spread = (Math.random() - 0.5) * 0.3;
+                    const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
+                    const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
+                    const alpha = (1 - i / particleCount) * 0.9 * Math.min(thrustIntensity, 1);
+                    const hue = 30 + Math.random() * 30;
+                    ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+                    ctx.beginPath();
+                    const baseRadius = Math.max(1, 8 - i * 1.5);
+                    const radius = baseRadius * flameSizeBonus;
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 4. Weapon Charging Cone
+            if (gameState.weaponEnergy > 0 && systems.weaponDirection) {
+                const weaponPos = getSystemPosition(ship, systems.weaponDirection.rotation);
+                const weaponAngle = systems.weaponDirection.rotation * Math.PI / 180;
+
+                const energy = gameState.weaponEnergy;
+                const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
+                const futureSize = 4 + (powerLevel - 1) * (12 / 9);
+
+                const coneLength = 80;
+                const coneStartWidth = futureSize * 0.5;
+                const coneEndWidth = futureSize * 1.5;
+
+                ctx.save();
+                ctx.translate(weaponPos.x, weaponPos.y);
+                ctx.rotate(weaponAngle);
+
+                const gradient = ctx.createLinearGradient(0, 0, coneLength, 0);
+                const fillPercent = Math.min(energy / 10, 1);
+
+                gradient.addColorStop(0, '#00FFFF');
+                if (fillPercent > 0.2) gradient.addColorStop(0.2, '#00FF00');
+                if (fillPercent > 0.4) gradient.addColorStop(0.4, '#FFFF00');
+                if (fillPercent > 0.6) gradient.addColorStop(0.6, '#FFA500');
+                if (fillPercent > 0.8) gradient.addColorStop(0.8, '#FF0000');
+
+                gradient.addColorStop(fillPercent, fillPercent >= 0.8 ? '#FF0000' :
+                                                   fillPercent >= 0.6 ? '#FFA500' :
+                                                   fillPercent >= 0.4 ? '#FFFF00' :
+                                                   fillPercent >= 0.2 ? '#00FF00' : '#00FFFF');
+                gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.moveTo(0, -coneStartWidth);
+                ctx.lineTo(coneLength, -coneEndWidth);
+                ctx.lineTo(coneLength, coneEndWidth);
+                ctx.lineTo(0, coneStartWidth);
+                ctx.closePath();
+                ctx.fill();
+
+                const outlineColor = fillPercent >= 0.8 ? '#FF0000' :
+                                    fillPercent >= 0.6 ? '#FFA500' :
+                                    fillPercent >= 0.4 ? '#FFFF00' :
+                                    fillPercent >= 0.2 ? '#00FF00' : '#00FFFF';
+                ctx.strokeStyle = outlineColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // 5. Weapon Physical Render (cannon)
+            if (systems.weaponDirection) {
+                const weaponPos = getSystemPosition(ship, systems.weaponDirection.rotation);
+                const weaponAngle = systems.weaponDirection.rotation * Math.PI / 180;
+
+                ctx.save();
+                ctx.translate(weaponPos.x, weaponPos.y);
+                ctx.rotate(weaponAngle);
+
+                ctx.fillStyle = '#8B4513';
+                ctx.fillRect(-8, -8, 16, 16);
+
+                ctx.fillStyle = '#333';
+                ctx.fillRect(5, -4, 15, 8);
+                ctx.fillStyle = '#222';
+                ctx.fillRect(5, -3, 15, 6);
+
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(20, 0, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#555';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // 6. Laser Sight (if booster active)
+            if (gameState.ships[teamColor] && gameState.ships[teamColor].boosters && gameState.ships[teamColor].boosters.laserSight && systems.weaponDirection) {
+                const weaponPos = getSystemPosition(ship, systems.weaponDirection.rotation);
+                const weaponAngle = systems.weaponDirection.rotation * Math.PI / 180;
+
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(weaponPos.x, weaponPos.y);
+                ctx.lineTo(
+                    weaponPos.x + Math.cos(weaponAngle) * 5000,
+                    weaponPos.y + Math.sin(weaponAngle) * 5000
+                );
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+        }
+
         function renderShip() {
             // Apply screen shake
             ctx.save();
@@ -2964,322 +3197,13 @@
                     ctx.fillText(`${Math.ceil(ship.health)}`, ship.x, ship.y - 45);
                 }
 
-                // Energy progress bar (gradient system only)
-                if (gameState.thrustSystem === 'gradient' && gameState.systems && gameState.systems.engine) {
-                    const energy = gameState.systems.engine.energy || 0;
-
-                    if (energy > 0) {
-                        // 5-level color system
-                        const colors = [
-                            { color: '#00BFFF', start: 0, end: 150 },      // Blue
-                            { color: '#00FF00', start: 150, end: 300 },    // Green
-                            { color: '#FFFF00', start: 300, end: 450 },    // Yellow
-                            { color: '#FFA500', start: 450, end: 600 },    // Orange
-                            { color: '#FF0000', start: 600, end: 750 }     // Red
-                        ];
-
-                        ctx.lineWidth = 8;
-                        const innerRadius = ship.radius - 10; // Inside ship circle
-
-                        colors.forEach((level, index) => {
-                            if (energy > level.start) {
-                                const levelEnergy = Math.min(energy, level.end) - level.start;
-                                const levelProgress = levelEnergy / (level.end - level.start);
-                                const segmentArc = (Math.PI * 2 / 5); // Each level takes 1/5 of circle
-                                const arcLength = segmentArc * levelProgress;
-                                const startAngle = -Math.PI / 2 + (index * segmentArc); // Start at top, go clockwise
-                                const endAngle = startAngle + arcLength;
-
-                                ctx.strokeStyle = level.color;
-                                ctx.shadowBlur = 10;
-                                ctx.shadowColor = level.color;
-                                ctx.beginPath();
-                                ctx.arc(ship.x, ship.y, innerRadius, startAngle, endAngle);
-                                ctx.stroke();
-                            }
-                        });
-
-                        ctx.shadowBlur = 0; // Reset shadow
-                    }
-                }
-
-                // Draw shield arc - semi-transparent with shimmer
-                if (gameState.systems && gameState.systems.shield && gameState.systems.shield.active) {
-                    ctx.save();
-                    const shieldRot = gameState.systems.shield.rotation * Math.PI / 180;
-                    let arcSize = gameState.systems.shield.arcSize * Math.PI / 180;
-
-                    // v3.17: Increase arc size if attacking shield is active
-                    if (gameState.ships.blue.boosters && gameState.ships.blue.boosters.attackShield.active) {
-                        const sizeBonus = gameState.ships.blue.boosters.attackShield.sizeBonus || 0;
-                        arcSize *= (1 + sizeBonus / 100);
-                    }
-
-                    // Shimmer effect (pulsing opacity)
-                    const shimmer = 0.4 + Math.sin(Date.now() / 200) * 0.2;
-
-                    // Outer glow
-                    ctx.strokeStyle = `rgba(0, 255, 255, ${shimmer * 0.5})`;
-                    ctx.lineWidth = 12;
-                    ctx.shadowBlur = 20;
-                    ctx.shadowColor = '#00FFFF';
-                    ctx.beginPath();
-                    ctx.arc(
-                        ship.x, ship.y,
-                        ship.radius + 8,
-                        shieldRot - arcSize/2,
-                        shieldRot + arcSize/2
-                    );
-                    ctx.stroke();
-
-                    // Inner solid line
-                    ctx.strokeStyle = `rgba(0, 255, 255, ${shimmer})`;
-                    ctx.lineWidth = 6;
-                    ctx.shadowBlur = 15;
-                    ctx.beginPath();
-                    ctx.arc(
-                        ship.x, ship.y,
-                        ship.radius + 8,
-                        shieldRot - arcSize/2,
-                        shieldRot + arcSize/2
-                    );
-                    ctx.stroke();
-
-                    // Energy particles along shield
-                    ctx.shadowBlur = 5;
-                    for (let i = 0; i < 5; i++) {
-                        const particleAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
-                        const px = ship.x + Math.cos(particleAngle) * (ship.radius + 8);
-                        const py = ship.y + Math.sin(particleAngle) * (ship.radius + 8);
-                        ctx.fillStyle = `rgba(0, 255, 255, ${shimmer * 0.8})`;
-                        ctx.beginPath();
-                        ctx.arc(px, py, 3, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-
-                    // v3.17: Draw attacking shield spikes
-                    if (gameState.ships.blue.boosters && gameState.ships.blue.boosters.attackShield.active) {
-                        ctx.strokeStyle = '#FF00FF';
-                        ctx.lineWidth = 3;
-                        ctx.shadowBlur = 10;
-                        ctx.shadowColor = '#FF00FF';
-
-                        for (let i = 0; i < 5; i++) {
-                            const spikeAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
-                            const innerR = ship.radius + 2;
-                            const outerR = ship.radius + 14;
-                            const x1 = ship.x + Math.cos(spikeAngle) * innerR;
-                            const y1 = ship.y + Math.sin(spikeAngle) * innerR;
-                            const x2 = ship.x + Math.cos(spikeAngle) * outerR;
-                            const y2 = ship.y + Math.sin(spikeAngle) * outerR;
-
-                            ctx.beginPath();
-                            ctx.moveTo(x1, y1);
-                            ctx.lineTo(x2, y2);
-                            ctx.stroke();
-                        }
-                    }
-
-                    ctx.restore();
-                }
-
-                // Draw engine - turbine with fire particles
-                if (gameState.systems) {
-                    const enginePos = getSystemPosition(ship, gameState.systems.rudder.rotation);
-                    const engineAngle = gameState.systems.rudder.rotation * Math.PI / 180;
-
-                    // Turbine base (metallic gray rectangle)
-                    ctx.save();
-                    ctx.translate(enginePos.x, enginePos.y);
-                    ctx.rotate(engineAngle);
-                    ctx.fillStyle = '#666';
-                    ctx.fillRect(-10, -6, 20, 12);
-                    ctx.fillStyle = '#444';
-                    ctx.fillRect(-10, -4, 20, 8);
-                    ctx.restore();
-
-                    // Fire/thrust particles (based on engine amplitude/energy)
-                    const engineEnergy = gameState.systems.engine ? (gameState.systems.engine.energy || 0) : 0;
-                    const engineAmplitude = gameState.systems.engine ? (gameState.systems.engine.amplitude || 0) : 0;
-
-                    // Show fire when engine is active (has energy or amplitude)
-                    const engineActive = engineEnergy > 0 || engineAmplitude > 0;
-                    const thrustIntensity = Math.max(engineEnergy / 750, engineAmplitude); // Use whichever is active
-
-                    if (engineActive && thrustIntensity > 0.05) {
-                        // Fire direction is opposite to engine nozzle direction
-                        const thrustAngle = engineAngle + Math.PI; // Opposite to nozzle
-
-                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * thrustIntensity));
-
-                        // Gradient system: +5% flame size per energy level
-                        let flameSizeBonus = 1.0;
-                        if (gameState.thrustSystem === 'gradient' && gameState.energyLevel) {
-                            flameSizeBonus = 1.0 + (gameState.energyLevel * 0.05); // +5% per level (max +25% at level 5)
-                        }
-
-                        for (let i = 0; i < particleCount; i++) {
-                            const dist = 15 + i * 12 + Math.random() * 5;
-                            const spread = (Math.random() - 0.5) * 0.3;
-                            const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
-                            const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
-                            const alpha = (1 - i / particleCount) * 0.9 * Math.min(thrustIntensity, 1);
-                            const hue = 30 + Math.random() * 30; // Orange to yellow
-                            ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
-                            ctx.beginPath();
-                            const baseRadius = Math.max(1, 8 - i * 1.5); // Prevent negative radius
-                            const radius = baseRadius * flameSizeBonus; // Apply gradient bonus
-                            ctx.arc(x, y, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
-                    }
-
-                    // v3.17: Draw laser sight for blue ship
-                    if (gameState.ships.blue.boosters && gameState.ships.blue.boosters.laserSight) {
-                        const blueSystems = gameState.teamSystems.blue;
-                        const blueShip = gameState.ships.blue;
-                        const weaponPos = getSystemPosition(blueShip, blueSystems.weaponDirection.rotation);
-                        const weaponAngle = blueSystems.weaponDirection.rotation * Math.PI / 180;
-
-                        ctx.save();
-                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(weaponPos.x, weaponPos.y);
-                        ctx.lineTo(
-                            weaponPos.x + Math.cos(weaponAngle) * 5000,
-                            weaponPos.y + Math.sin(weaponAngle) * 5000
-                        );
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                        ctx.restore();
-                    }
-
-                    // v3.17: Draw laser sight for pink ship
-                    if (gameState.ships.pink.boosters && gameState.ships.pink.boosters.laserSight) {
-                        const pinkSystems = gameState.teamSystems.pink;
-                        const pinkShip = gameState.ships.pink;
-                        const weaponPos = getSystemPosition(pinkShip, pinkSystems.weaponDirection.rotation);
-                        const weaponAngle = pinkSystems.weaponDirection.rotation * Math.PI / 180;
-
-                        ctx.save();
-                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-                        ctx.lineWidth = 1;
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(weaponPos.x, weaponPos.y);
-                        ctx.lineTo(
-                            weaponPos.x + Math.cos(weaponAngle) * 5000,
-                            weaponPos.y + Math.sin(weaponAngle) * 5000
-                        );
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                        ctx.restore();
-                    }
-
-                    // Draw weapon charging cone (visible when energy > 0)
-                    if (gameState.weaponEnergy > 0) {
-                        const weaponPos = getSystemPosition(ship, gameState.systems.weaponDirection.rotation);
-                        const weaponAngle = gameState.systems.weaponDirection.rotation * Math.PI / 180;
-
-                        // Calculate cone parameters
-                        const energy = gameState.weaponEnergy;
-                        const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
-
-                        // Size of future bullet
-                        const futureSize = 4 + (powerLevel - 1) * (12 / 9);
-
-                        // Cone dimensions
-                        const coneLength = 80;
-                        const coneStartWidth = futureSize * 0.5;
-                        const coneEndWidth = futureSize * 1.5;
-
-                        ctx.save();
-                        ctx.translate(weaponPos.x, weaponPos.y);
-                        ctx.rotate(weaponAngle);
-
-                        // Gradient fill: голубой -> зелёный -> жёлтый -> оранжевый -> красный
-                        // Always starts from cyan at base, fills up to current energy level
-                        const gradient = ctx.createLinearGradient(0, 0, coneLength, 0);
-
-                        // Progress fill (0-10 energy -> 0-100%)
-                        const fillPercent = Math.min(energy / 10, 1);
-
-                        // Gradient stops based on energy level
-                        gradient.addColorStop(0, '#00FFFF');  // Голубой (всегда у основания)
-
-                        if (fillPercent > 0.2) {
-                            gradient.addColorStop(0.2, '#00FF00');  // Зелёный
-                        }
-                        if (fillPercent > 0.4) {
-                            gradient.addColorStop(0.4, '#FFFF00');  // Жёлтый
-                        }
-                        if (fillPercent > 0.6) {
-                            gradient.addColorStop(0.6, '#FFA500');  // Оранжевый
-                        }
-                        if (fillPercent > 0.8) {
-                            gradient.addColorStop(0.8, '#FF0000');  // Красный
-                        }
-
-                        // Fade out at the end
-                        gradient.addColorStop(fillPercent, fillPercent >= 0.8 ? '#FF0000' :
-                                                           fillPercent >= 0.6 ? '#FFA500' :
-                                                           fillPercent >= 0.4 ? '#FFFF00' :
-                                                           fillPercent >= 0.2 ? '#00FF00' : '#00FFFF');
-                        gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');  // Прозрачный
-
-                        ctx.fillStyle = gradient;
-                        ctx.beginPath();
-                        ctx.moveTo(0, -coneStartWidth);
-                        ctx.lineTo(coneLength, -coneEndWidth);
-                        ctx.lineTo(coneLength, coneEndWidth);
-                        ctx.lineTo(0, coneStartWidth);
-                        ctx.closePath();
-                        ctx.fill();
-
-                        // Outline
-                        const outlineColor = fillPercent >= 0.8 ? '#FF0000' :
-                                            fillPercent >= 0.6 ? '#FFA500' :
-                                            fillPercent >= 0.4 ? '#FFFF00' :
-                                            fillPercent >= 0.2 ? '#00FF00' : '#00FFFF';
-                        ctx.strokeStyle = outlineColor;
-                        ctx.lineWidth = 2;
-                        ctx.stroke();
-
-                        ctx.restore();
-                    }
-
-                    // Draw weapon - old pirate cannon
-                    const weaponPos = getSystemPosition(ship, gameState.systems.weaponDirection.rotation);
-                    const weaponAngle = gameState.systems.weaponDirection.rotation * Math.PI / 180;
-
-                    ctx.save();
-                    ctx.translate(weaponPos.x, weaponPos.y);
-                    ctx.rotate(weaponAngle);
-
-                    // Cannon base (brown wood)
-                    ctx.fillStyle = '#8B4513';
-                    ctx.fillRect(-8, -8, 16, 16);
-
-                    // Cannon barrel (dark gray metal)
-                    ctx.fillStyle = '#333';
-                    ctx.fillRect(5, -4, 15, 8);
-                    ctx.fillStyle = '#222';
-                    ctx.fillRect(5, -3, 15, 6);
-
-                    // Cannon mouth (black circle)
-                    ctx.fillStyle = '#000';
-                    ctx.beginPath();
-                    ctx.arc(20, 0, 4, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // Metal rim (gray highlight)
-                    ctx.strokeStyle = '#555';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-
-                    ctx.restore();
+                // Render ship systems (engine, shield, weapon) using unified function
+                if (gameState.teamSystems && gameState.teamSystems.blue) {
+                    // Use team-specific systems data
+                    renderShipSystems(ship, gameState.teamSystems.blue, 'blue');
+                } else if (gameState.systems) {
+                    // Backward compatibility: single-ship mode
+                    renderShipSystems(ship, gameState.systems, 'blue');
                 }
             }
 
@@ -3330,191 +3254,9 @@
                     ctx.fillText(`${Math.ceil(pinkShip.health)}`, pinkShip.x, pinkShip.y - 45);
                 }
 
-                // Draw pink ship systems (if teamSystems available)
+                // Draw pink ship systems using unified function
                 if (gameState.teamSystems && gameState.teamSystems.pink) {
-                    const pinkSystems = gameState.teamSystems.pink;
-
-                    // Draw shield for pink ship
-                    if (pinkSystems.shield && pinkSystems.shield.active) {
-                        ctx.save();
-                        const shieldRot = pinkSystems.shield.rotation * Math.PI / 180;
-                        let arcSize = pinkSystems.shield.arcSize * Math.PI / 180;
-
-                        // v3.17: Increase arc size if attacking shield is active
-                        if (gameState.ships.pink.boosters && gameState.ships.pink.boosters.attackShield.active) {
-                            const sizeBonus = gameState.ships.pink.boosters.attackShield.sizeBonus || 0;
-                            arcSize *= (1 + sizeBonus / 100);
-                        }
-
-                        const shimmer = 0.4 + Math.sin(Date.now() / 200) * 0.2;
-
-                        ctx.strokeStyle = `rgba(233, 30, 99, ${shimmer * 0.5})`;
-                        ctx.lineWidth = 12;
-                        ctx.shadowBlur = 20;
-                        ctx.shadowColor = '#E91E63';
-                        ctx.beginPath();
-                        ctx.arc(pinkShip.x, pinkShip.y, pinkShip.radius + 8, shieldRot - arcSize/2, shieldRot + arcSize/2);
-                        ctx.stroke();
-
-                        ctx.strokeStyle = `rgba(233, 30, 99, ${shimmer})`;
-                        ctx.lineWidth = 6;
-                        ctx.shadowBlur = 15;
-                        ctx.beginPath();
-                        ctx.arc(pinkShip.x, pinkShip.y, pinkShip.radius + 8, shieldRot - arcSize/2, shieldRot + arcSize/2);
-                        ctx.stroke();
-
-                        // v3.17: Draw attacking shield spikes
-                        if (gameState.ships.pink.boosters && gameState.ships.pink.boosters.attackShield.active) {
-                            ctx.strokeStyle = '#FF00FF';
-                            ctx.lineWidth = 3;
-                            ctx.shadowBlur = 10;
-                            ctx.shadowColor = '#FF00FF';
-
-                            for (let i = 0; i < 5; i++) {
-                                const spikeAngle = shieldRot - arcSize/2 + (arcSize * i / 4);
-                                const innerR = pinkShip.radius + 2;
-                                const outerR = pinkShip.radius + 14;
-                                const x1 = pinkShip.x + Math.cos(spikeAngle) * innerR;
-                                const y1 = pinkShip.y + Math.sin(spikeAngle) * innerR;
-                                const x2 = pinkShip.x + Math.cos(spikeAngle) * outerR;
-                                const y2 = pinkShip.y + Math.sin(spikeAngle) * outerR;
-
-                                ctx.beginPath();
-                                ctx.moveTo(x1, y1);
-                                ctx.lineTo(x2, y2);
-                                ctx.stroke();
-                            }
-                        }
-
-                        ctx.shadowBlur = 0;
-                        ctx.restore();
-                    }
-
-                    // Draw engine for pink ship
-                    const enginePos = getSystemPosition(pinkShip, pinkSystems.rudder.rotation);
-                    const engineAngle = pinkSystems.rudder.rotation * Math.PI / 180;
-
-                    ctx.save();
-                    ctx.translate(enginePos.x, enginePos.y);
-                    ctx.rotate(engineAngle);
-                    ctx.fillStyle = '#666';
-                    ctx.fillRect(-10, -6, 20, 12);
-                    ctx.fillStyle = '#444';
-                    ctx.fillRect(-10, -4, 20, 8);
-                    ctx.restore();
-
-                    // Fire particles for pink ship (based on engine amplitude/energy)
-                    const pinkEngineEnergy = pinkSystems.engine ? (pinkSystems.engine.energy || 0) : 0;
-                    const pinkEngineAmplitude = pinkSystems.engine ? (pinkSystems.engine.amplitude || 0) : 0;
-
-                    const pinkEngineActive = pinkEngineEnergy > 0 || pinkEngineAmplitude > 0;
-                    const pinkThrustIntensity = Math.max(pinkEngineEnergy / 750, pinkEngineAmplitude);
-
-                    if (pinkEngineActive && pinkThrustIntensity > 0.05) {
-                        const thrustAngle = engineAngle + Math.PI; // Opposite to nozzle
-                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * pinkThrustIntensity));
-
-                        for (let i = 0; i < particleCount; i++) {
-                            const dist = 15 + i * 12 + Math.random() * 5;
-                            const spread = (Math.random() - 0.5) * 0.3;
-                            const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
-                            const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
-                            const alpha = (1 - i / particleCount) * 0.9 * Math.min(pinkThrustIntensity, 1);
-                            const hue = 30 + Math.random() * 30;
-                            ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
-                            ctx.beginPath();
-                            const radius = Math.max(1, 8 - i * 1.5);
-                            ctx.arc(x, y, radius, 0, Math.PI * 2);
-                            ctx.fill();
-                        }
-                    }
-
-                    // Draw weapon for pink ship
-                    const weaponPos = getSystemPosition(pinkShip, pinkSystems.weaponDirection.rotation);
-                    const weaponAngle = pinkSystems.weaponDirection.rotation * Math.PI / 180;
-
-                    ctx.save();
-                    ctx.translate(weaponPos.x, weaponPos.y);
-                    ctx.rotate(weaponAngle);
-                    ctx.fillStyle = '#AAA';
-                    ctx.fillRect(-8, -4, 16, 8);
-                    ctx.fillStyle = '#666';
-                    ctx.fillRect(8, -2, 8, 4);
-                    ctx.restore();
-
-                    // Energy progress bar for pink ship (gradient system only)
-                    if (gameState.thrustSystem === 'gradient' && pinkSystems.engine) {
-                        const energy = pinkSystems.engine.energy || 0;
-
-                        if (energy > 0) {
-                            const colors = [
-                                { color: '#00BFFF', start: 0, end: 150 },
-                                { color: '#00FF00', start: 150, end: 300 },
-                                { color: '#FFFF00', start: 300, end: 450 },
-                                { color: '#FFA500', start: 450, end: 600 },
-                                { color: '#FF0000', start: 600, end: 750 }
-                            ];
-
-                            ctx.lineWidth = 8;
-                            const innerRadius = pinkShip.radius - 10;
-
-                            colors.forEach((level, index) => {
-                                if (energy > level.start) {
-                                    const levelEnergy = Math.min(energy, level.end) - level.start;
-                                    const levelProgress = levelEnergy / (level.end - level.start);
-                                    const segmentArc = (Math.PI * 2 / 5);
-                                    const arcLength = segmentArc * levelProgress;
-                                    const startAngle = -Math.PI / 2 + (index * segmentArc);
-                                    const endAngle = startAngle + arcLength;
-
-                                    ctx.strokeStyle = level.color;
-                                    ctx.shadowBlur = 10;
-                                    ctx.shadowColor = level.color;
-                                    ctx.beginPath();
-                                    ctx.arc(pinkShip.x, pinkShip.y, innerRadius, startAngle, endAngle);
-                                    ctx.stroke();
-                                }
-                            });
-
-                            ctx.shadowBlur = 0;
-                        }
-                    }
-
-                    // Weapon charging cone for pink ship
-                    if (pinkSystems.weapon && pinkSystems.weapon.energy > 0) {
-                        const energy = pinkSystems.weapon.energy;
-                        const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
-                        const futureSize = 4 + (powerLevel - 1) * (12 / 9);
-                        const coneLength = 80;
-                        const coneStartWidth = futureSize * 0.5;
-                        const coneEndWidth = futureSize * 1.5;
-
-                        ctx.save();
-                        ctx.translate(weaponPos.x, weaponPos.y);
-                        ctx.rotate(weaponAngle);
-
-                        const gradient = ctx.createLinearGradient(0, 0, coneLength, 0);
-                        const fillPercent = Math.min(energy / 10, 1);
-
-                        gradient.addColorStop(0, '#00FFFF');
-                        if (fillPercent > 0.2) gradient.addColorStop(0.2 / fillPercent, '#00FF00');
-                        if (fillPercent > 0.4) gradient.addColorStop(0.4 / fillPercent, '#FFFF00');
-                        if (fillPercent > 0.6) gradient.addColorStop(0.6 / fillPercent, '#FFA500');
-                        if (fillPercent > 0.8) gradient.addColorStop(0.8 / fillPercent, '#FF0000');
-                        gradient.addColorStop(1, '#FF0000');
-
-                        ctx.globalAlpha = 0.4;
-                        ctx.fillStyle = gradient;
-                        ctx.beginPath();
-                        ctx.moveTo(0, -coneStartWidth);
-                        ctx.lineTo(coneLength * fillPercent, -coneEndWidth);
-                        ctx.lineTo(coneLength * fillPercent, coneEndWidth);
-                        ctx.lineTo(0, coneStartWidth);
-                        ctx.closePath();
-                        ctx.fill();
-
-                        ctx.restore();
-                    }
+                    renderShipSystems(pinkShip, gameState.teamSystems.pink, 'pink');
                 }
             }
 

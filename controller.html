@@ -6,8 +6,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <meta name="version" content="3.20.0-arrow-control">
-    <title>Kinemon - Controller v3.20.0</title>
+    <meta name="version" content="3.22.0">
+    <title>Kinemon - Controller v3.22.0</title>
     <style>
         * {
             margin: 0;
@@ -694,7 +694,7 @@
         const defaultServer = isLocalhost ? 'ws://localhost:8080' : 'wss://kinemon.onrender.com';
 
         // Initial page load log
-        addDebugLog('📱 Страница загружена [v3.20.0 - Arrow Control for Snake]', 'success');
+        addDebugLog('📱 Страница загружена [v3.22.0]', 'success');
         addDebugLog(`Room: ${roomFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Game: ${gameFromUrl || 'не указано'}`, 'info');
         addDebugLog(`Server: ${serverFromUrl || defaultServer}`, 'info');
@@ -1324,27 +1324,37 @@
                                     // Check if role actually changed
                                     if (myPlayer.systemRole !== roleBeforeChange) {
                                         roleChangeOverlay.style.display = 'none';
-                                        addDebugLog(`✅ Роль изменена: ${roleBeforeChange} → ${myPlayer.systemRole}`, 'success');
 
-                                        // For late-joiners: if game started and just got assigned a role, start calibration immediately
-                                        if (window.isLateJoiner && myPlayer.systemRole) {
-                                            addDebugLog('🎮 Late-joiner получил роль, запускаем калибровку немедленно', 'info');
-                                            window.isLateJoiner = false; // Clear flag
+                                        // Auto-transition to controller screen
+                                        if (calibration && calibration.isComplete()) {
+                                            // Calibration already done - go straight to controller
+                                            showScreen('controller');
+
+                                            // Ensure motion data sending is active
+                                            if (motionController && motionController.onTiltChange === null) {
+                                                motionController.onTiltChange = (normalized) => {
+                                                    tiltDisplay.textContent = normalized.toFixed(2);
+                                                    if (ws && ws.readyState === WebSocket.OPEN) {
+                                                        ws.send(JSON.stringify({
+                                                            type: 'input',
+                                                            tilt: normalized
+                                                        }));
+                                                    }
+                                                };
+                                            }
+                                        } else {
+                                            // No calibration yet - start it
                                             (async () => {
                                                 try {
                                                     motionController.start();
                                                     await calibration.start();
-                                                    addDebugLog('📐 Калибровка начата для late-joiner', 'info');
                                                 } catch (err) {
-                                                    addDebugLog('❌ Ошибка калибровки: ' + err.message, 'error');
                                                     alert('❌ Ошибка калибровки: ' + err.message);
                                                 }
                                             })();
                                         }
 
                                         roleBeforeChange = null; // Reset
-                                    } else {
-                                        addDebugLog('⏳ Роль не изменилась, overlay остаётся открытым', 'info');
                                     }
                                 }
                             } else {
@@ -1403,7 +1413,7 @@
                         let remainingSeconds = Math.ceil(duration / 1000); // 5
 
                         // Update immediately
-                        readyBtn.textContent = `Подключаем к игре: ${remainingSeconds}`;
+                        readyBtn.textContent = `🎮 Начинаем: ${remainingSeconds}`;
                         readyBtn.disabled = true;
 
                         // Clear existing interval if any
@@ -1417,7 +1427,7 @@
                             remainingSeconds = Math.max(1, Math.ceil((duration - elapsed) / 1000));
 
                             if (remainingSeconds > 0) {
-                                readyBtn.textContent = `Подключаем к игре: ${remainingSeconds}`;
+                                readyBtn.textContent = `🎮 Начинаем: ${remainingSeconds}`;
                             } else {
                                 clearInterval(window.lobbyCountdownInterval);
                                 window.lobbyCountdownInterval = null;
@@ -1583,8 +1593,38 @@
                 ? players.filter(p => p.team === myPlayer.team)
                 : [];
 
-            // If no team selected, disable all role buttons
-            if (!myPlayer || !myPlayer.team) {
+            // If no player data yet, disable all
+            if (!myPlayer) {
+                roleButtons.forEach(btn => {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                });
+                return;
+            }
+
+            // Auto-assign team for late joiners if not set
+            if (!myPlayer.team && gameState.gameStarted) {
+                // Count players on each team
+                const bluePlayers = gameState.players.filter(p => p.team === 'blue').length;
+                const pinkPlayers = gameState.players.filter(p => p.team === 'pink').length;
+
+                // Assign to smaller team
+                const assignedTeam = bluePlayers <= pinkPlayers ? 'blue' : 'pink';
+
+                // Send team selection to server
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'select_team',
+                        team: assignedTeam
+                    }));
+                }
+
+                // Return and wait for update with team assigned
+                return;
+            }
+
+            // If still no team, disable buttons
+            if (!myPlayer.team) {
                 roleButtons.forEach(btn => {
                     btn.disabled = true;
                     btn.style.opacity = '0.5';

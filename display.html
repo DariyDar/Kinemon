@@ -553,7 +553,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.19.1</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.22.0</div>
         </div>
 
         <!-- Connection Screen -->
@@ -869,7 +869,7 @@
         let gameType = null; // 'pong' or 'snake'
         let isJoinMode = false; // false = create room, true = join existing room
         let joinRoomCode = null; // room code to join
-        console.log('🖥️ Display loaded [v3.20.0 - Arrow Control Debug]');
+        console.log('🖥️ Display loaded [v3.22.0]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1745,6 +1745,12 @@
                             scoreboard.style.display = 'block';
                         }
                     } else if (data.type === 'show_game_selection') {
+                        // Hide and clear canvas
+                        canvas.classList.remove('active');
+                        canvas.style.display = 'none';
+                        roomInfo.style.display = 'none';
+                        scoreboard.style.display = 'none';
+
                         // Show game selection screen
                         showScreen('gameSelection');
 
@@ -1777,6 +1783,14 @@
                         // Update UI
                         roomCodeDisplay.textContent = roomId;
                         roomIdInfo.textContent = roomId;
+
+                        // Clear canvas immediately
+                        ctx.fillStyle = '#000';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        // Show waiting screen until first update arrives
+                        showScreen('waiting');
+                        canvas.style.display = 'block'; // Re-enable canvas
                     } else if (data.type === 'update_qr_code') {
                         // Regenerate QR code for new room
                         const baseUrl = window.location.origin + window.location.pathname.replace('display.html', 'controller.html');

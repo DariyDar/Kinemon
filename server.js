@@ -1128,56 +1128,6 @@ function updateShipPositionForTeam(room, teamColor) {
     }
 }
 
-// Legacy single-ship fireBullet (backward compatibility)
-function fireBullet(room) {
-    const weapon = room.systems.weapon;
-
-    // Don't fire if no energy (минимум 0.1)
-    if (weapon.energy < 0.1) return;
-
-    // Calculate bullet parameters from energy (includes bulletCount)
-    const params = calculateBulletParams(weapon.energy);
-
-    const angle = room.systems.weaponDirection.rotation * Math.PI / 180;
-    const weaponPos = getSystemPosition(room.ship, room.systems.weaponDirection.rotation);
-
-    // Fire multiple bullets with slight spread
-    for (let i = 0; i < params.bulletCount; i++) {
-        // Small random spread for multiple bullets
-        const spread = params.bulletCount > 1 ? (Math.random() - 0.5) * 0.2 : 0;
-        const bulletAngle = angle + spread;
-
-        room.bullets.push({
-            x: weaponPos.x,
-            y: weaponPos.y,
-            vx: Math.cos(bulletAngle) * params.speed,
-            vy: Math.sin(bulletAngle) * params.speed,
-            damage: params.damage,
-            size: params.size,              // Для отрисовки
-            powerLevel: params.powerLevel,  // Для цвета (1-9 cyan, 10 red)
-            distanceTraveled: 0,
-            maxDistance: params.distance,
-            id: Date.now() + Math.random() + i
-        });
-    }
-
-    // Visual effects
-    const effectColor = (params.powerLevel === 10) ? '#FF0000' : '#00FFFF';
-    const effectCount = Math.ceil(params.bulletCount / 2);
-
-    broadcastEffect(room.id, 'particle', {
-        x: weaponPos.x,
-        y: weaponPos.y,
-        color: effectColor,
-        count: effectCount
-    });
-    broadcastEffect(room.id, 'shake', { intensity: params.powerLevel / 5 });
-
-    // Reset energy after firing
-    weapon.energy = 0;
-    weapon.isCharging = false;
-}
-
 // Create asteroid
 function createAsteroid(room, size) {
     // Spawn OUTSIDE field boundaries

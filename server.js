@@ -1781,7 +1781,7 @@ wss.on('connection', (ws) => {
                     player.targetAngle = 0;  // For arrow_steering control scheme
                     player.headX = room.canvas.width / 2 + (Math.random() - 0.5) * 200;
                     player.headY = room.canvas.height / 2 + (Math.random() - 0.5) * 200;
-                    player.controlScheme = data.controlScheme || 'rotation_smooth';  // Store per-player control
+                    player.controlScheme = data.controlScheme || 'arrow_instant';  // Store per-player control
 
                     // Initialize snake segments using room's segment size
                     for (let i = 0; i < INITIAL_LENGTH; i++) {
@@ -1936,7 +1936,7 @@ wss.on('connection', (ws) => {
                 if (room && room.gameType === 'snake') {
                     const player = room.players.get(ws.playerId);
                     if (player) {
-                        player.controlScheme = data.controlScheme || 'rotation_smooth';
+                        player.controlScheme = data.controlScheme || 'arrow_instant';
                         console.log(`Player ${player.id} changed control to ${player.controlScheme}`);
                     }
                 }

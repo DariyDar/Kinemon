@@ -963,6 +963,14 @@
                                 gameType: gameType,
                                 controlScheme: currentControlScheme
                             };
+
+                            // Add session token if reconnecting
+                            const savedToken = localStorage.getItem('sessionToken');
+                            if (savedToken) {
+                                joinMessage.sessionToken = savedToken;
+                                console.log('[RECONNECT] Attempting to reconnect with saved token');
+                            }
+
                             console.log('📤 Sending join with controlScheme:', currentControlScheme);
                             addDebugLog(`📤 Отправка join с controlScheme: ${currentControlScheme}`, 'info');
 
@@ -1055,6 +1063,14 @@
                             gameType: gameType,
                             controlScheme: currentControlScheme
                         };
+
+                        // Add session token if reconnecting
+                        const savedToken = localStorage.getItem('sessionToken');
+                        if (savedToken) {
+                            joinMessage.sessionToken = savedToken;
+                            console.log('[RECONNECT] Attempting to reconnect with saved token');
+                        }
+
                         ws.send(JSON.stringify(joinMessage));
                         addDebugLog('✅ Join отправлен, ожидаем init...', 'success');
                         console.log('Sent join message for Ship game:', joinMessage);
@@ -1120,6 +1136,19 @@
                     if (data.type === 'init') {
                         playerId = data.playerId;
                         console.log('Received player ID:', playerId);
+
+                        // Save session token for reconnection
+                        if (data.sessionToken) {
+                            localStorage.setItem('sessionToken', data.sessionToken);
+                            console.log('[RECONNECT] Session token saved');
+                        }
+
+                        // Check if this was a reconnection
+                        if (data.reconnected) {
+                            addDebugLog('🔄 Переподключение успешно!', 'success');
+                            console.log('[RECONNECT] Successfully reconnected to existing session');
+                        }
+
                         addDebugLog(`🎮 Init получен, gameType: "${gameType}"`, 'info');
                         console.log('Current gameType:', gameType, 'Type:', typeof gameType);
 
@@ -1542,6 +1571,9 @@
             if (motionController) {
                 motionController.stop();
             }
+            // Clear session token on explicit disconnect
+            localStorage.removeItem('sessionToken');
+            console.log('[RECONNECT] Session token cleared (explicit disconnect)');
             showScreen('room-input');
         });
 

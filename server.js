@@ -7,6 +7,7 @@ const WebSocket = require('ws');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 // Debug logging flag - set DEBUG=true environment variable to enable verbose logs
 const DEBUG = process.env.DEBUG === 'true' || false;
@@ -18,6 +19,7 @@ const PORT = process.env.PORT || 8080;
 const INVULNERABILITY_DURATION_MS = 5000;  // Ship respawn invulnerability (5 seconds)
 const DEFAULT_THRUST_SYSTEM = 'gradient';  // Ship game default (gradient or pump)
 const DEFAULT_ENGINE_FORMULA = 'linear';   // Thrust calculation formula (linear, quadratic, exponential)
+const RECONNECT_GRACE_PERIOD_MS = 60000;   // 60 seconds to reconnect before player is fully removed
 
 // Create HTTP server to serve static files
 const server = http.createServer((req, res) => {
@@ -64,6 +66,9 @@ const wss = new WebSocket.Server({
 // Game rooms: roomId -> room data
 const rooms = new Map();
 
+// Disconnected players: sessionToken -> { roomId, playerId, disconnectTime, playerData }
+const disconnectedPlayers = new Map();
+
 // Game constants
 const BASE_MOVE_SPEED = 1.8;
 const INITIAL_LENGTH = 7;
@@ -106,6 +111,33 @@ function generateRoomId() {
 
     return roomId;
 }
+
+// Generate secure session token for reconnection
+function generateSessionToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+// Clean up expired disconnections (called periodically)
+function cleanupExpiredDisconnections() {
+    const now = Date.now();
+    for (const [token, data] of disconnectedPlayers.entries()) {
+        if (now - data.disconnectTime > RECONNECT_GRACE_PERIOD_MS) {
+            console.log(`[RECONNECT] Grace period expired for player ${data.playerData.name} (token: ${token.substring(0, 8)}...)`);
+            disconnectedPlayers.delete(token);
+
+            // Remove player from room if they still exist
+            const room = rooms.get(data.roomId);
+            if (room && room.players.has(data.playerId)) {
+                room.players.delete(data.playerId);
+                console.log(`[RECONNECT] Removed expired player ${data.playerData.name} from room ${data.roomId}`);
+                broadcastGameState(room);
+            }
+        }
+    }
+}
+
+// Start cleanup interval (runs every 10 seconds)
+setInterval(cleanupExpiredDisconnections, 10000);
 
 // Generate random player color
 function getRandomColor() {
@@ -1933,9 +1965,52 @@ wss.on('connection', (ws) => {
             } else if (data.type === 'join') {
                 const roomId = data.roomId;
                 const gameType = data.gameType || 'snake';
+                const sessionToken = data.sessionToken; // Optional: client sends token if reconnecting
 
-                console.log(`[JOIN] Received join request: room=${roomId}, gameType=${gameType}, player=${data.name}`);
+                console.log(`[JOIN] Received join request: room=${roomId}, gameType=${gameType}, player=${data.name}, token=${sessionToken ? sessionToken.substring(0, 8) + '...' : 'none'}`);
 
+                // CHECK FOR RECONNECTION
+                if (sessionToken && disconnectedPlayers.has(sessionToken)) {
+                    const disconnectData = disconnectedPlayers.get(sessionToken);
+                    const room = rooms.get(disconnectData.roomId);
+
+                    // Verify room still exists and player is still in room
+                    if (room && room.players.has(disconnectData.playerId)) {
+                        const player = room.players.get(disconnectData.playerId);
+
+                        // Restore WebSocket connection
+                        player.ws = ws;
+                        ws.playerId = disconnectData.playerId;
+                        ws.roomId = disconnectData.roomId;
+
+                        // Remove from disconnected list
+                        disconnectedPlayers.delete(sessionToken);
+
+                        console.log(`[RECONNECT] Player ${player.name} reconnected to room ${room.id} (role: ${player.systemRole || 'none'})`);
+
+                        // Send init message with reconnection flag
+                        ws.send(JSON.stringify({
+                            type: 'init',
+                            playerId: player.id,
+                            roomId: room.id,
+                            sessionToken: sessionToken, // Send back same token
+                            reconnected: true, // Flag to client that this was a reconnection
+                            gameState: serializeGameState(room),
+                            gameStarted: room.gameStarted
+                        }));
+
+                        // Broadcast updated state (player no longer disconnected/autopilot)
+                        broadcastGameState(room);
+
+                        return; // Done with reconnection
+                    } else {
+                        // Room or player no longer exists - proceed as new join
+                        console.log(`[RECONNECT] Token found but room/player no longer exists, creating new player`);
+                        disconnectedPlayers.delete(sessionToken);
+                    }
+                }
+
+                // NORMAL JOIN FLOW (new player or failed reconnection)
                 // Create room if it doesn't exist
                 if (!rooms.has(roomId)) {
                     console.log(`[JOIN] Creating new room: ${roomId}`);
@@ -1955,6 +2030,7 @@ wss.on('connection', (ws) => {
                 }
 
                 const playerId = Date.now() + '-' + Math.random();
+                const newSessionToken = generateSessionToken(); // Generate token for new player
 
                 // Initialize player based on game type
                 const player = {
@@ -1963,7 +2039,8 @@ wss.on('connection', (ws) => {
                     color: getRandomColor(),
                     score: 0,
                     tilt: 0.5,
-                    ws: ws
+                    ws: ws,
+                    sessionToken: newSessionToken // Store session token on player for reconnection
                 };
 
                 if (room.gameType === 'pong') {
@@ -2043,11 +2120,12 @@ wss.on('connection', (ws) => {
                     console.log(`Pong game starting in room ${roomId} with 2 players`);
                 }
 
-                // Send initial state to new player
+                // Send initial state to new player (with session token)
                 const initMessage = {
                     type: 'init',
                     playerId: playerId,
                     roomId: roomId,
+                    sessionToken: newSessionToken, // Send token to client for reconnection
                     gameState: serializeGameState(room),
                     gameStarted: room.gameStarted // Include gameStarted flag for reconnect handling
                 };
@@ -2407,6 +2485,45 @@ wss.on('connection', (ws) => {
                 if (player) {
                     console.log(`Player ${player.name} disconnected from room ${ws.roomId}`);
 
+                    // Save player to disconnected list for reconnection
+                    if (player.sessionToken) {
+                        const playerData = {
+                            id: player.id,
+                            name: player.name,
+                            color: player.color,
+                            score: player.score,
+                            team: player.team,
+                            systemRole: player.systemRole,
+                            systemIndex: player.systemIndex,
+                            ready: player.ready,
+                            controlScheme: player.controlScheme,
+                            // Game-specific data
+                            paddleY: player.paddleY,
+                            paddleX: player.paddleX,
+                            side: player.side,
+                            axis: player.axis,
+                            x: player.x,
+                            y: player.y,
+                            segments: player.segments,
+                            angle: player.angle,
+                            targetAngle: player.targetAngle,
+                            headX: player.headX,
+                            headY: player.headY,
+                            alive: player.alive,
+                            lastTilt: player.lastTilt
+                        };
+
+                        disconnectedPlayers.set(player.sessionToken, {
+                            roomId: ws.roomId,
+                            playerId: ws.playerId,
+                            disconnectTime: Date.now(),
+                            playerData: playerData
+                        });
+
+                        console.log(`[RECONNECT] Player ${player.name} saved for reconnection (60s grace period)`);
+                        console.log(`[RECONNECT] Role ${player.systemRole || 'none'} will remain active via autopilot`);
+                    }
+
                     // For Ship game: handle lobby countdown cancellation
                     if (room.gameType === 'ship') {
                         // If player was ready in lobby, cancel countdown
@@ -2417,15 +2534,20 @@ wss.on('connection', (ws) => {
 
                         // Log role being freed (goes to autopilot)
                         if (player.systemRole) {
-                            console.log(`[DISCONNECT] Role ${player.systemRole} freed (autopilot)`);
+                            console.log(`[DISCONNECT] Role ${player.systemRole} will continue on autopilot`);
                         }
                     }
+
+                    // DO NOT DELETE PLAYER - keep them in room for reconnection
+                    // Player will be auto-removed after 60s grace period if they don't reconnect
+                    // Autopilot will continue controlling their role
+
+                    // Mark player as disconnected but keep in room
+                    player.ws = null; // Clear WebSocket reference
+                    broadcastGameState(room);
                 }
 
-                room.players.delete(ws.playerId);
-                broadcastGameState(room);
-
-                // Clean up empty rooms
+                // Clean up empty rooms (only if NO players at all, including disconnected)
                 if (room.players.size === 0 && !hasDisplayClient(ws.roomId)) {
                     clearInterval(room.gameLoopInterval);
                     rooms.delete(ws.roomId);

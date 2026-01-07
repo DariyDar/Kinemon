@@ -2771,8 +2771,9 @@
             }
 
             // 3. Engine (turbine + fire particles)
-            const enginePos = getSystemPosition(ship, systems.rudder.rotation);
-            const engineAngle = systems.rudder.rotation * Math.PI / 180;
+            // Engine is positioned opposite to rudder (180 degrees)
+            const enginePos = getSystemPosition(ship, systems.rudder.rotation + 180);
+            const engineAngle = (systems.rudder.rotation + 180) * Math.PI / 180;
 
             // Draw turbine
             ctx.save();
@@ -2817,11 +2818,11 @@
             }
 
             // 4. Weapon Charging Cone
-            if (gameState.weaponEnergy > 0 && systems.weaponDirection) {
+            if (systems.weapon && systems.weapon.energy > 0 && systems.weaponDirection) {
                 const weaponPos = getSystemPosition(ship, systems.weaponDirection.rotation);
                 const weaponAngle = systems.weaponDirection.rotation * Math.PI / 180;
 
-                const energy = gameState.weaponEnergy;
+                const energy = systems.weapon.energy;
                 const powerLevel = Math.max(1, Math.min(10, Math.ceil(energy)));
                 const futureSize = 4 + (powerLevel - 1) * (12 / 9);
 

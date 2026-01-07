@@ -1150,11 +1150,16 @@
                             console.log('Role buttons:', roleButtons);
 
                             // Role button click handler
+                            // Clear old handlers by replacing buttons (prevent duplicate handlers on reconnect)
                             roleButtons.forEach((btn, index) => {
                                 addDebugLog(`➕ Добавляю обработчик для кнопки ${index}: ${btn.dataset.role}`, 'info');
 
-                                btn.addEventListener('click', () => {
-                                    const role = btn.dataset.role;
+                                // Remove old handler by cloning node (removes all event listeners)
+                                const newBtn = btn.cloneNode(true);
+                                btn.parentNode.replaceChild(newBtn, btn);
+
+                                newBtn.addEventListener('click', () => {
+                                    const role = newBtn.dataset.role;
 
                                     // Проверяем, это кнопка выхода или выбора роли
                                     const myPlayer = window.currentGameState?.players?.find(p => p.id === playerId);
@@ -1194,15 +1199,19 @@
                             const pinkTeamBtn = document.getElementById('pinkTeamBtn');
                             let selectedTeam = null;
 
+                            // Clear old handlers by cloning
                             teamButtons.forEach(btn => {
-                                btn.addEventListener('click', () => {
-                                    const team = btn.dataset.team;
+                                const newBtn = btn.cloneNode(true);
+                                btn.parentNode.replaceChild(newBtn, btn);
+
+                                newBtn.addEventListener('click', () => {
+                                    const team = newBtn.dataset.team;
 
                                     addDebugLog(`🎨 Выбрана команда: ${team}`, 'success');
 
-                                    // Update selection state
-                                    teamButtons.forEach(b => b.classList.remove('selected'));
-                                    btn.classList.add('selected');
+                                    // Update selection state (re-query to get current buttons after cloning)
+                                    document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('selected'));
+                                    newBtn.classList.add('selected');
                                     selectedTeam = team;
 
                                     // Send to server
@@ -1222,8 +1231,13 @@
                             document.getElementById('teamSelector').style.display = 'block';
 
                             // Ready button click handler (toggle ready/unready)
-                            const readyBtn = document.getElementById('readyBtn');
+                            let readyBtn = document.getElementById('readyBtn');
                             if (readyBtn) {
+                                // Clear old handler by cloning
+                                const newReadyBtn = readyBtn.cloneNode(true);
+                                readyBtn.parentNode.replaceChild(newReadyBtn, readyBtn);
+                                readyBtn = newReadyBtn;
+
                                 readyBtn.addEventListener('click', () => {
                                     if (!isReady) {
                                         // Player is marking themselves as ready

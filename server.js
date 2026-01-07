@@ -2381,6 +2381,18 @@ wss.on('connection', (ws) => {
                         gameType: room.gameType
                     });
 
+                    // Send updated game state
+                    if (room.gameType === 'ship') {
+                        // For Ship: use broadcastGameState to include lobby/game state
+                        broadcastGameState(room);
+                    } else {
+                        // For other games: send update message
+                        broadcastToRoom(room.id, {
+                            type: 'update',
+                            gameState: serializeGameState(room)
+                        });
+                    }
+
                     console.log(`[REPLAY] Room ${room.id} restarted (preserveRoles: ${preserveRoles})`);
                 }
             } else if (data.type === 'request_game_change' && ws.roomId && ws.isDisplay) {

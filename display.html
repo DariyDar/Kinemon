@@ -3098,19 +3098,19 @@
                     ctx.fillRect(-10, -4, 20, 8);
                     ctx.restore();
 
-                    // Fire/thrust particles (based on ship velocity, not tilt)
-                    const shipSpeed = Math.hypot(ship.vx || 0, ship.vy || 0);
-                    const maxSpeed = physicsSettings.maxSpeed; // Use settings value
-                    const speedRatio = Math.min(shipSpeed / maxSpeed, 1); // 0-1
+                    // Fire/thrust particles (based on engine amplitude/energy)
+                    const engineEnergy = gameState.systems.engine ? (gameState.systems.engine.energy || 0) : 0;
+                    const engineAmplitude = gameState.systems.engine ? (gameState.systems.engine.amplitude || 0) : 0;
 
-                    // Only show fire when ship is actually moving (uses settings threshold)
-                    if (speedRatio > physicsSettings.fireThreshold) {
-                        // Fire direction is opposite to ship movement (reactive thrust)
-                        const movementAngle = Math.atan2(ship.vy || 0, ship.vx || 0);
-                        const thrustAngle = movementAngle + Math.PI; // Opposite direction
+                    // Show fire when engine is active (has energy or amplitude)
+                    const engineActive = engineEnergy > 0 || engineAmplitude > 0;
+                    const thrustIntensity = Math.max(engineEnergy / 750, engineAmplitude); // Use whichever is active
 
-                        const thrustIntensity = speedRatio * physicsSettings.fireIntensity; // Apply intensity multiplier
-                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * speedRatio));
+                    if (engineActive && thrustIntensity > 0.05) {
+                        // Fire direction is opposite to engine nozzle direction
+                        const thrustAngle = engineAngle + Math.PI; // Opposite to nozzle
+
+                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * thrustIntensity));
 
                         // Gradient system: +5% flame size per energy level
                         let flameSizeBonus = 1.0;
@@ -3403,23 +3403,23 @@
                     ctx.fillRect(-10, -4, 20, 8);
                     ctx.restore();
 
-                    // Fire particles for pink ship
-                    const shipSpeed = Math.hypot(pinkShip.vx || 0, pinkShip.vy || 0);
-                    const maxSpeed = physicsSettings.maxSpeed;
-                    const speedRatio = Math.min(shipSpeed / maxSpeed, 1);
+                    // Fire particles for pink ship (based on engine amplitude/energy)
+                    const pinkEngineEnergy = pinkSystems.engine ? (pinkSystems.engine.energy || 0) : 0;
+                    const pinkEngineAmplitude = pinkSystems.engine ? (pinkSystems.engine.amplitude || 0) : 0;
 
-                    if (speedRatio > physicsSettings.fireThreshold) {
-                        const movementAngle = Math.atan2(pinkShip.vy || 0, pinkShip.vx || 0);
-                        const thrustAngle = movementAngle + Math.PI;
-                        const thrustIntensity = speedRatio * physicsSettings.fireIntensity;
-                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * speedRatio));
+                    const pinkEngineActive = pinkEngineEnergy > 0 || pinkEngineAmplitude > 0;
+                    const pinkThrustIntensity = Math.max(pinkEngineEnergy / 750, pinkEngineAmplitude);
+
+                    if (pinkEngineActive && pinkThrustIntensity > 0.05) {
+                        const thrustAngle = engineAngle + Math.PI; // Opposite to nozzle
+                        const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * pinkThrustIntensity));
 
                         for (let i = 0; i < particleCount; i++) {
                             const dist = 15 + i * 12 + Math.random() * 5;
                             const spread = (Math.random() - 0.5) * 0.3;
                             const x = enginePos.x + Math.cos(thrustAngle + spread) * dist;
                             const y = enginePos.y + Math.sin(thrustAngle + spread) * dist;
-                            const alpha = (1 - i / particleCount) * 0.9 * Math.min(thrustIntensity, 1);
+                            const alpha = (1 - i / particleCount) * 0.9 * Math.min(pinkThrustIntensity, 1);
                             const hue = 30 + Math.random() * 30;
                             ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
                             ctx.beginPath();

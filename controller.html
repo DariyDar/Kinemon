@@ -1649,10 +1649,11 @@
                     if (readyHint) readyHint.style.display = 'block';
                 }
 
-                // If player is ready, disable button
+                // If player is ready, show appropriate state
                 if (myPlayer && myPlayer.ready) {
-                    readyBtn.textContent = 'Подключиться';
-                    readyBtn.disabled = true;
+                    // Keep current text (might be countdown or "❌ Отменить")
+                    // Don't override it with "Подключиться"
+                    readyBtn.disabled = false; // Allow unready
                     isReady = true;
                 }
 

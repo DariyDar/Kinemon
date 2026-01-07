@@ -1386,6 +1386,11 @@
                 scoreboard.style.display = 'none';
                 // Reset waiting QR flag for potential new game
                 window.waitingQRGenerated = false;
+            } else if (screenName === 'gameSelection') {
+                document.getElementById('gameSelectionScreen').classList.add('active');
+                canvas.classList.remove('active');
+                roomInfo.style.display = 'none';
+                scoreboard.style.display = 'none';
             } else if (screenName === 'game') {
                 canvas.classList.add('active');
                 scaleCanvasToScreen(); // Scale when canvas becomes visible

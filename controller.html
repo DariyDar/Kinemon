@@ -1711,9 +1711,15 @@
                     isReady = true;
                 }
 
-                // If game started, switch to controller screen
-                if (gameState.gameStarted && roomInputScreen.classList.contains('active')) {
-                    showScreen('calibration-min');
+                // If game started, switch to controller/calibration screen
+                const lobbyScreen = document.getElementById('lobbyScreen');
+                if (gameState.gameStarted && (roomInputScreen.classList.contains('active') || lobbyScreen.classList.contains('active'))) {
+                    // Check if calibration is needed
+                    if (calibration && calibration.isComplete()) {
+                        showScreen('controller');
+                    } else {
+                        showScreen('calibration-min');
+                    }
                 }
             }
         }

@@ -481,9 +481,11 @@ function resetShipGame(room, preserveRoles) {
         room.gameStarted = true;
         room.gameState = 'playing';
     } else {
-        // Return to lobby - keep team/role assignments but reset ready status
+        // Return to lobby - reset roles and ready status, allow new role selection
         room.players.forEach(player => {
             player.ready = false;
+            player.systemRole = null;  // Reset role so players can choose again
+            // Keep team assignment - players stay on their teams
         });
         room.gameStarted = false;
         room.gameState = 'lobby';

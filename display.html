@@ -2771,9 +2771,8 @@
             }
 
             // 3. Engine (turbine + fire particles)
-            // Engine is positioned opposite to rudder (180 degrees)
-            const enginePos = getSystemPosition(ship, systems.rudder.rotation + 180);
-            const engineAngle = (systems.rudder.rotation + 180) * Math.PI / 180;
+            const enginePos = getSystemPosition(ship, systems.rudder.rotation);
+            const engineAngle = systems.rudder.rotation * Math.PI / 180;
 
             // Draw turbine
             ctx.save();
@@ -2792,7 +2791,9 @@
             const thrustIntensity = Math.max(engineEnergy / 750, engineAmplitude);
 
             if (engineActive && thrustIntensity > 0.05) {
-                const thrustAngle = engineAngle + Math.PI; // Opposite to nozzle
+                // Fire direction is opposite to ship movement (reactive thrust)
+                const movementAngle = Math.atan2(ship.vy || 0, ship.vx || 0);
+                const thrustAngle = movementAngle + Math.PI; // Opposite to movement direction
                 const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * thrustIntensity));
 
                 // Gradient bonus

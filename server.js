@@ -2206,6 +2206,9 @@ wss.on('connection', (ws) => {
                     player.turnNumber = 0;
                     player.gameOver = false;
 
+                    // Spawn initial blocks for first turn
+                    spawnNewBlocks(player, room);
+
                     console.log(`Player ${player.name} joined Ballz game`);
                 } else {
                     // Snake: segments and position
@@ -3146,14 +3149,18 @@ function updateAiming(room, player) {
     if (!player.lastTilt) player.lastTilt = player.tilt;
     const tiltDelta = Math.abs(player.tilt - player.lastTilt);
 
-    if (tiltDelta < room.aimSensitivity) {
+    // CRITICAL: Use VERY small threshold (0.005 = 0.5%) to detect actual movement
+    // This allows free aiming while phone is actively moving
+    const movementThreshold = 0.005;
+
+    if (tiltDelta < movementThreshold) {
         // Aim is steady - track how long it's been steady
         if (!player.steadyAimStartTime) {
             player.steadyAimStartTime = Date.now();
         } else {
-            // Check if steady long enough to start charging (300ms minimum hold)
+            // Check if steady long enough to start charging (500ms minimum hold)
             const steadyTime = Date.now() - player.steadyAimStartTime;
-            if (steadyTime >= 300 && !player.chargeStartTime) {
+            if (steadyTime >= 500 && !player.chargeStartTime) {
                 player.chargeStartTime = Date.now();
                 player.turnState = 'charging';
             }

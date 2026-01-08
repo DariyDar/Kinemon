@@ -2418,12 +2418,15 @@
             } else if (gameType === 'ship') {
                 document.getElementById('winnerName').textContent = winner.team || 'Экипаж корабля';
                 document.getElementById('winMessage').textContent = `Собрал ${winner.score} монет!`;
+            } else if (gameType === 'ballz') {
+                document.getElementById('winnerName').textContent = winner.name;
+                document.getElementById('winMessage').textContent = `Score: ${winner.score} | Ходов: ${winner.turnNumber}`;
             } else {
                 document.getElementById('winnerName').textContent = winner.name;
                 if (gameType === 'pong') {
                     document.getElementById('winMessage').textContent = `Победа со счётом ${winner.score}!`;
                 } else {
-                    document.getElementById('winMessage').textContent = `Собрал ${winner.score} пицц!`;
+                    document.getElementById('winMessage').textContent = `Собрал ${winner.score} звёзд!`;
                 }
             }
 

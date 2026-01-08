@@ -2186,8 +2186,9 @@ wss.on('connection', (ws) => {
 
                     // Launch mechanics
                     player.launchX = null; // null = center initially
-                    player.aimAngle = Math.PI / 2; // 90° straight up
+                    player.aimAngle = 3 * Math.PI / 2; // 270° straight up
                     player.chargeStartTime = null;
+                    player.steadyAimStartTime = null;
                     player.chargeProgress = 0;
                     player.lastTilt = 0.5;
                     player.isInDeadZone = false;
@@ -3123,9 +3124,10 @@ function updateBallzPlayer(room, player) {
 
 // State: AIMING - Player is tilting phone to aim
 function updateAiming(room, player) {
-    // Convert tilt to angle (10° to 170°)
-    const minAngle = 10 * Math.PI / 180;
-    const maxAngle = 170 * Math.PI / 180;
+    // Convert tilt to angle - shooting UPWARD (canvas: 0° = right, 90° = down, 270° = up)
+    // tilt 0 = 190° (left-up), tilt 1 = 350° (right-up)
+    const minAngle = 190 * Math.PI / 180;  // 10° left of straight up
+    const maxAngle = 350 * Math.PI / 180;  // 10° right of straight up
     player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
 
     // CRITICAL: Check dead zone (both ends)
@@ -3145,11 +3147,20 @@ function updateAiming(room, player) {
     const tiltDelta = Math.abs(player.tilt - player.lastTilt);
 
     if (tiltDelta < room.aimSensitivity) {
-        if (!player.chargeStartTime) {
-            player.chargeStartTime = Date.now();
-            player.turnState = 'charging';
+        // Aim is steady - track how long it's been steady
+        if (!player.steadyAimStartTime) {
+            player.steadyAimStartTime = Date.now();
+        } else {
+            // Check if steady long enough to start charging (300ms minimum hold)
+            const steadyTime = Date.now() - player.steadyAimStartTime;
+            if (steadyTime >= 300 && !player.chargeStartTime) {
+                player.chargeStartTime = Date.now();
+                player.turnState = 'charging';
+            }
         }
     } else {
+        // Aim moved - reset steady timer
+        player.steadyAimStartTime = null;
         player.chargeStartTime = null;
     }
 
@@ -3381,6 +3392,7 @@ function advanceTurn(room, player) {
     player.firstBallTouched = false;
     player.newLaunchX = null;
     player.chargeStartTime = null;
+    player.steadyAimStartTime = null;
     player.chargeProgress = 0;
     player.turnState = 'aiming';
 }

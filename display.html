@@ -869,7 +869,6 @@
         let gameType = null; // 'pong' or 'snake'
         let isJoinMode = false; // false = create room, true = join existing room
         let joinRoomCode = null; // room code to join
-        console.log('🖥️ Display loaded [v3.22.0]');
 
         let gameSettings = {}; // Store game settings
 
@@ -1812,8 +1811,6 @@
                         // Room migrated to new game
                         roomId = data.newRoomId;
                         gameType = data.newGameType;
-
-                        console.log(`Migrated to new game: ${gameType}, room: ${roomId}`);
 
                         // Update UI
                         roomCodeDisplay.textContent = roomId;
@@ -2838,9 +2835,8 @@
             const thrustIntensity = Math.max(engineEnergy / 750, engineAmplitude);
 
             if (engineActive && thrustIntensity > 0.05) {
-                // Fire direction is opposite to ship movement (reactive thrust)
-                const movementAngle = Math.atan2(ship.vy || 0, ship.vx || 0);
-                const thrustAngle = movementAngle + Math.PI; // Opposite to movement direction
+                // Fire direction is opposite to engine nozzle direction
+                const thrustAngle = engineAngle + Math.PI; // Opposite to engine orientation
                 const particleCount = Math.max(2, Math.floor(physicsSettings.maxParticles * thrustIntensity));
 
                 // Gradient bonus

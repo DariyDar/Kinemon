@@ -2179,6 +2179,7 @@ wss.on('connection', (ws) => {
                     // Ballz: ball-shooting arcade game
                     player.score = 0;
                     player.ballCount = 1; // Start with 1 ball
+                    player.ballsThisTurn = 1; // Balls to launch this turn
                     player.alive = true;
 
                     // Turn state machine
@@ -3149,9 +3150,9 @@ function updateAiming(room, player) {
     if (!player.lastTilt) player.lastTilt = player.tilt;
     const tiltDelta = Math.abs(player.tilt - player.lastTilt);
 
-    // CRITICAL: Use VERY small threshold (0.005 = 0.5%) to detect actual movement
+    // CRITICAL: Use VERY small threshold (0.002 = 0.2%) to detect actual movement
     // This allows free aiming while phone is actively moving
-    const movementThreshold = 0.005;
+    const movementThreshold = 0.002;
 
     if (tiltDelta < movementThreshold) {
         // Aim is steady - track how long it's been steady
@@ -3207,6 +3208,7 @@ function updateCharging(room, player) {
         player.turnState = 'launching';
         player.nextBallLaunchTime = Date.now();
         player.turnStartTime = Date.now();
+        player.ballsThisTurn = player.ballCount; // Save count at turn start
     }
 
     player.lastTilt = player.tilt;
@@ -3220,7 +3222,7 @@ function updateLaunching(room, player) {
         (now - player.nextBallLaunchTime) / room.ballLaunchDelay
     ) + 1;
 
-    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballCount) {
+    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballsThisTurn) {
         // Launch next ball
         const launchX = player.launchX !== null
             ? player.launchX
@@ -3243,7 +3245,7 @@ function updateLaunching(room, player) {
     }
 
     // All balls launched - switch to balls_in_flight
-    if (launchedCount >= player.ballCount) {
+    if (launchedCount >= player.ballsThisTurn) {
         player.turnState = 'balls_in_flight';
     }
 }
@@ -3294,7 +3296,7 @@ function updateBallPhysics(room, player) {
 // Check if turn is complete (all balls returned)
 function checkTurnComplete(room, player) {
     const allInactive = player.balls.every(b => !b.active);
-    const allLaunched = player.balls.length === player.ballCount;
+    const allLaunched = player.balls.length === player.ballsThisTurn;
 
     if (allInactive && allLaunched) {
         player.turnState = 'turn_complete';

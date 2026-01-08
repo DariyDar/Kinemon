@@ -3732,25 +3732,111 @@
             ctx.fillRect(block.x - barWidth/2, block.y + halfSize - 10, barWidth * hpPercent, barHeight);
         }
 
+        // Calculate ball trajectory with reflections
+        function calculateTrajectory(player, startX, startY, angle, fieldWidth) {
+            const ballRadius = 5;
+            const blockSize = gameState.blockSize || 50;
+            const maxSegments = 5; // Max reflection segments to show
+            const segmentLength = 150; // Length per segment
+
+            const trajectory = [];
+            let x = startX;
+            let y = startY;
+            let vx = Math.cos(angle);
+            let vy = Math.sin(angle);
+
+            for (let i = 0; i < maxSegments; i++) {
+                // Simulate ball movement for this segment
+                let hitSomething = false;
+                let hitX = x;
+                let hitY = y;
+                let travelDist = 0;
+
+                while (travelDist < segmentLength && !hitSomething) {
+                    const step = 2;
+                    hitX += vx * step;
+                    hitY += vy * step;
+                    travelDist += step;
+
+                    // Check wall collisions
+                    if (hitX <= ballRadius || hitX >= fieldWidth - ballRadius) {
+                        vx = -vx;
+                        hitX = Math.max(ballRadius, Math.min(fieldWidth - ballRadius, hitX));
+                        hitSomething = true;
+                    }
+
+                    if (hitY <= ballRadius) {
+                        vy = -vy;
+                        hitY = ballRadius;
+                        hitSomething = true;
+                    }
+
+                    // Check block collisions
+                    for (const block of player.blocks || []) {
+                        if (checkBallBlockCollisionClient(hitX, hitY, block, blockSize, ballRadius)) {
+                            // Simple reflection - reverse direction based on hit side
+                            const dx = hitX - block.x;
+                            const dy = hitY - block.y;
+                            const halfSize = blockSize / 2;
+
+                            const overlapX = halfSize - Math.abs(dx);
+                            const overlapY = halfSize - Math.abs(dy);
+
+                            if (overlapX < overlapY) {
+                                vx = -vx;
+                            } else {
+                                vy = -vy;
+                            }
+                            hitSomething = true;
+                            break;
+                        }
+                    }
+                }
+
+                trajectory.push({ x1: x, y1: y, x2: hitX, y2: hitY });
+                x = hitX;
+                y = hitY;
+
+                // Stop if ball goes below launch line
+                if (y >= startY) break;
+            }
+
+            return trajectory;
+        }
+
+        // Client-side collision detection for trajectory preview
+        function checkBallBlockCollisionClient(ballX, ballY, block, blockSize, ballRadius) {
+            const halfSize = blockSize / 2;
+            const closestX = Math.max(block.x - halfSize, Math.min(ballX, block.x + halfSize));
+            const closestY = Math.max(block.y - halfSize, Math.min(ballY, block.y + halfSize));
+
+            const distX = ballX - closestX;
+            const distY = ballY - closestY;
+            const distSquared = distX * distX + distY * distY;
+
+            return distSquared < (ballRadius * ballRadius);
+        }
+
         function drawAimLineWithCharge(player, launchLine, width) {
             const launchX = player.launchX !== null ? player.launchX : width / 2;
             const angle = player.aimAngle;
-            const lineLength = 200;
 
-            const endX = launchX + Math.cos(angle) * lineLength;
-            const endY = launchLine + Math.sin(angle) * lineLength;
+            // Calculate trajectory with reflections
+            const trajectory = calculateTrajectory(player, launchX, launchLine, angle, width);
 
             // CRITICAL: Show dead zone blockage
             if (player.isInDeadZone) {
-                // Red blocking line
+                // Red blocking line - show simple trajectory
                 ctx.strokeStyle = '#FF0000';
                 ctx.lineWidth = 3;
                 ctx.setLineDash([5, 10]);
                 ctx.globalAlpha = 0.5;
-                ctx.beginPath();
-                ctx.moveTo(launchX, launchLine);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
+                for (const seg of trajectory) {
+                    ctx.beginPath();
+                    ctx.moveTo(seg.x1, seg.y1);
+                    ctx.lineTo(seg.x2, seg.y2);
+                    ctx.stroke();
+                }
                 ctx.setLineDash([]);
                 ctx.globalAlpha = 1.0;
 
@@ -3760,44 +3846,100 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('БЛОКИРОВАНО', launchX, launchLine - 30);
             } else {
-                // Normal dashed line
+                // Normal dashed trajectory with reflections
                 ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = 2;
                 ctx.setLineDash([5, 10]);
-                ctx.beginPath();
-                ctx.moveTo(launchX, launchLine);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
+                for (const seg of trajectory) {
+                    ctx.beginPath();
+                    ctx.moveTo(seg.x1, seg.y1);
+                    ctx.lineTo(seg.x2, seg.y2);
+                    ctx.stroke();
+                }
                 ctx.setLineDash([]);
 
-                // Charge effect - fill line
+                // Charge effect - fill trajectory segments
                 if (player.turnState === 'charging' && player.chargeProgress > 0) {
-                    const progressX = launchX + (endX - launchX) * player.chargeProgress;
-                    const progressY = launchLine + (endY - launchLine) * player.chargeProgress;
+                    // Calculate total trajectory length
+                    let totalLength = 0;
+                    const lengths = [];
+                    for (const seg of trajectory) {
+                        const len = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1);
+                        lengths.push(len);
+                        totalLength += len;
+                    }
 
-                    // Gradient green to red
-                    const gradient = ctx.createLinearGradient(launchX, launchLine, progressX, progressY);
-                    gradient.addColorStop(0, '#00FF00');
-                    gradient.addColorStop(0.5, '#FFFF00');
-                    gradient.addColorStop(1, '#FF0000');
+                    // Fill up to chargeProgress
+                    const targetLength = totalLength * player.chargeProgress;
+                    let filled = 0;
 
-                    ctx.strokeStyle = gradient;
                     ctx.lineWidth = 4;
                     ctx.shadowBlur = 10;
                     ctx.shadowColor = '#FFFFFF';
-                    ctx.beginPath();
-                    ctx.moveTo(launchX, launchLine);
-                    ctx.lineTo(progressX, progressY);
-                    ctx.stroke();
-                    ctx.shadowBlur = 0;
 
-                    // Pulsing circle at end
-                    const pulseSize = 5 + Math.sin(Date.now() / 100) * 2;
-                    ctx.fillStyle = player.chargeProgress >= 1 ? '#00FF00' : '#FFFF00';
-                    ctx.beginPath();
-                    ctx.arc(progressX, progressY, pulseSize, 0, Math.PI * 2);
-                    ctx.fill();
+                    for (let i = 0; i < trajectory.length; i++) {
+                        const seg = trajectory[i];
+                        const segLen = lengths[i];
+
+                        if (filled + segLen <= targetLength) {
+                            // Fill entire segment
+                            const gradient = ctx.createLinearGradient(seg.x1, seg.y1, seg.x2, seg.y2);
+                            const progress1 = filled / totalLength;
+                            const progress2 = (filled + segLen) / totalLength;
+                            gradient.addColorStop(0, getChargeColor(progress1));
+                            gradient.addColorStop(1, getChargeColor(progress2));
+
+                            ctx.strokeStyle = gradient;
+                            ctx.beginPath();
+                            ctx.moveTo(seg.x1, seg.y1);
+                            ctx.lineTo(seg.x2, seg.y2);
+                            ctx.stroke();
+
+                            filled += segLen;
+                        } else if (filled < targetLength) {
+                            // Partially fill segment
+                            const ratio = (targetLength - filled) / segLen;
+                            const endX = seg.x1 + (seg.x2 - seg.x1) * ratio;
+                            const endY = seg.y1 + (seg.y2 - seg.y1) * ratio;
+
+                            const gradient = ctx.createLinearGradient(seg.x1, seg.y1, endX, endY);
+                            const progress1 = filled / totalLength;
+                            const progress2 = targetLength / totalLength;
+                            gradient.addColorStop(0, getChargeColor(progress1));
+                            gradient.addColorStop(1, getChargeColor(progress2));
+
+                            ctx.strokeStyle = gradient;
+                            ctx.beginPath();
+                            ctx.moveTo(seg.x1, seg.y1);
+                            ctx.lineTo(endX, endY);
+                            ctx.stroke();
+
+                            // Pulsing circle at end
+                            const pulseSize = 5 + Math.sin(Date.now() / 100) * 2;
+                            ctx.fillStyle = player.chargeProgress >= 1 ? '#00FF00' : '#FFFF00';
+                            ctx.beginPath();
+                            ctx.arc(endX, endY, pulseSize, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            break;
+                        }
+                    }
+
+                    ctx.shadowBlur = 0;
                 }
+            }
+        }
+
+        // Get charge color based on progress (0-1)
+        function getChargeColor(progress) {
+            if (progress < 0.5) {
+                // Green to Yellow
+                const t = progress * 2;
+                return `rgb(${Math.floor(t * 255)}, 255, 0)`;
+            } else {
+                // Yellow to Red
+                const t = (progress - 0.5) * 2;
+                return `rgb(255, ${Math.floor((1 - t) * 255)}, 0)`;
             }
         }
 

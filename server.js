@@ -139,10 +139,33 @@ function cleanupExpiredDisconnections() {
 // Start cleanup interval (runs every 10 seconds)
 setInterval(cleanupExpiredDisconnections, 10000);
 
-// Generate random player color
-function getRandomColor() {
+// Generate random player color (ensures no duplicates in room)
+function getRandomColor(room) {
     const colors = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0', '#00BCD4', '#FFEB3B', '#795548'];
-    return colors[Math.floor(Math.random() * colors.length)];
+
+    // If no room provided, return random color
+    if (!room || !room.players) {
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Get colors already in use
+    const usedColors = new Set();
+    for (const player of room.players.values()) {
+        if (player.color) {
+            usedColors.add(player.color);
+        }
+    }
+
+    // Find available colors
+    const availableColors = colors.filter(color => !usedColors.has(color));
+
+    // If all colors are used, start reusing them
+    if (availableColors.length === 0) {
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Return random available color
+    return availableColors[Math.floor(Math.random() * availableColors.length)];
 }
 
 // Create new room
@@ -2037,7 +2060,7 @@ wss.on('connection', (ws) => {
                 const player = {
                     id: playerId,
                     name: data.name || `Player ${room.players.size + 1}`,
-                    color: getRandomColor(),
+                    color: getRandomColor(room),  // Pass room to ensure unique colors
                     score: 0,
                     tilt: 0.5,
                     ws: ws,

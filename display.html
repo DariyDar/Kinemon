@@ -708,7 +708,7 @@
                     🏓 Pong
                 </button>
                 <button class="game-select-btn" data-game="snake" style="font-size: 24px; padding: 20px; background: #4CAF50; color: white; border: none; border-radius: 12px; cursor: pointer;">
-                    🐍 Pizza Snake
+                    🐍 Star Snake
                 </button>
                 <button class="game-select-btn" data-game="pushers" style="font-size: 24px; padding: 20px; background: #FF5722; color: white; border: none; border-radius: 12px; cursor: pointer;">
                     🔲 Толкатели
@@ -1080,7 +1080,7 @@
                 document.getElementById('shipAutopilotEnabled').value = gameSettings.autopilotEnabled.toString();
 
             } else { // snake
-                gameTitle.textContent = '🐍 Настройки Pizza Snake';
+                gameTitle.textContent = '🐍 Настройки Star Snake';
                 settingsForm.innerHTML = `
                     <div class="setting-group">
                         <label for="snakeTurnSpeed">Скорость поворота</label>
@@ -1127,22 +1127,24 @@
                         <div class="setting-info">Влияет на размер змейки и пиццы</div>
                     </div>
                     <div class="setting-group">
-                        <label for="snakeWinScore">Пицц для победы</label>
+                        <label for="snakeWinScore">Звёзд для победы</label>
                         <select id="snakeWinScore">
-                            <option value="20">20 пицц</option>
-                            <option value="30">30 пицц</option>
-                            <option value="50" selected>50 пицц</option>
-                            <option value="75">75 пицц</option>
-                            <option value="100">100 пицц</option>
+                            <option value="20">20 звёзд</option>
+                            <option value="30">30 звёзд</option>
+                            <option value="50" selected>50 звёзд</option>
+                            <option value="75">75 звёзд</option>
+                            <option value="100">100 звёзд</option>
+                            <option value="150">150 звёзд</option>
+                            <option value="200">200 звёзд</option>
                         </select>
-                        <div class="setting-info">Количество пицц для победы</div>
+                        <div class="setting-info">Количество звёзд для победы</div>
                     </div>
                     <div class="setting-group">
-                        <label for="snakeInitialPizzas">Начальное количество пыли</label>
+                        <label for="snakeInitialPizzas">Начальное количество звёзд</label>
                         <select id="snakeInitialPizzas">
-                            <option value="100" selected>100 частиц</option>
-                            <option value="150">150 частиц</option>
-                            <option value="200">200 частиц</option>
+                            <option value="100" selected>100 звёзд</option>
+                            <option value="150">150 звёзд</option>
+                            <option value="200">200 звёзд</option>
                         </select>
                         <div class="setting-info">Количество звёздной пыли на старте</div>
                     </div>
@@ -2488,45 +2490,34 @@
                 if ((player.controlScheme === 'arrow_steering' || player.controlScheme === 'arrow_instant') && player.targetAngle !== undefined) {
                     const head = player.segments[0];
 
-                    // Параметры стрелки
-                    const arrowDistance = segmentSize * 2.0;  // Дистанция от головы
-                    const arrowLength = segmentSize * 1.5;    // Длина стрелки
-                    const arrowHeadSize = segmentSize * 0.7;  // Размер наконечника
+                    // Параметры тонкой линии со свечением
+                    const arrowDistance = segmentSize * 1.5;  // Начинается ближе к голове
+                    const arrowLength = segmentSize * 3.0;    // Длиннее для лучшей видимости
 
-                    // Позиция основания стрелки
-                    const arrowBaseX = head.x + Math.cos(player.targetAngle) * arrowDistance;
-                    const arrowBaseY = head.y + Math.sin(player.targetAngle) * arrowDistance;
+                    // Позиция начала линии (от головы)
+                    const arrowStartX = head.x + Math.cos(player.targetAngle) * arrowDistance;
+                    const arrowStartY = head.y + Math.sin(player.targetAngle) * arrowDistance;
 
-                    // Позиция кончика стрелки
-                    const arrowTipX = arrowBaseX + Math.cos(player.targetAngle) * arrowLength;
-                    const arrowTipY = arrowBaseY + Math.sin(player.targetAngle) * arrowLength;
+                    // Позиция конца линии
+                    const arrowEndX = arrowStartX + Math.cos(player.targetAngle) * arrowLength;
+                    const arrowEndY = arrowStartY + Math.sin(player.targetAngle) * arrowLength;
 
                     ctx.save();
-                    ctx.globalAlpha = 0.6;  // Полупрозрачная
-                    ctx.strokeStyle = player.color;  // Цвет игрока
-                    ctx.fillStyle = player.color;
-                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = 0.7;
+                    ctx.strokeStyle = player.color;
+                    ctx.lineWidth = 2;  // Тонкая линия
                     ctx.lineCap = 'round';
 
-                    // Линия стрелки
+                    // Эффект свечения
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = player.color;
+
+                    // Рисуем линию
                     ctx.beginPath();
-                    ctx.moveTo(arrowBaseX, arrowBaseY);
-                    ctx.lineTo(arrowTipX, arrowTipY);
+                    ctx.moveTo(arrowStartX, arrowStartY);
+                    ctx.lineTo(arrowEndX, arrowEndY);
                     ctx.stroke();
 
-                    // Наконечник (треугольник)
-                    ctx.save();
-                    ctx.translate(arrowTipX, arrowTipY);
-                    ctx.rotate(player.targetAngle);
-
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.lineTo(-arrowHeadSize, -arrowHeadSize / 2);
-                    ctx.lineTo(-arrowHeadSize, arrowHeadSize / 2);
-                    ctx.closePath();
-                    ctx.fill();
-
-                    ctx.restore();
                     ctx.restore();
                 }
 

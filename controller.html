@@ -608,7 +608,7 @@
         <div id="deathScreen" class="screen">
             <h1 style="font-size: 36px; margin-bottom: 30px;">💀 Поражение</h1>
             <p id="deathMessage" style="font-size: 20px; line-height: 1.6; margin-bottom: 40px;">
-                У тебя было <span id="deathScore" style="color: #FFD700; font-size: 28px; font-weight: bold;">0</span> пицц на момент смерти
+                У тебя было <span id="deathScore" style="color: #FFD700; font-size: 28px; font-weight: bold;">0</span> звёзд на момент смерти
             </p>
             <p style="font-size: 18px; opacity: 0.8; margin-bottom: 40px;">
                 Возвращайся в бой, чтобы вернуть их обратно!
@@ -1620,6 +1620,13 @@
 
                 // Show control selector again
                 document.getElementById('controlSelector').style.display = 'block';
+
+                // Restart motion controller if not running
+                if (!motionController.isRunning) {
+                    motionController.start().catch(err => {
+                        console.error('Failed to restart motion controller:', err);
+                    });
+                }
 
                 // Resume sending motion data
                 motionController.onTiltChange = (normalized) => {

@@ -334,13 +334,16 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.coinsToWin = settings.coinsToWin || 10;
         room.asteroidFrequency = settings.asteroidFrequency || 'medium';
         room.autopilotEnabled = settings.autopilotEnabled !== undefined ? settings.autopilotEnabled : false; // Default: disabled
+        room.coinSpawn = settings.coinSpawn !== undefined ? settings.coinSpawn : true; // Default: enabled
 
         // Set default thrust system and engine formula (removed from UI in v3.17.3)
         room.thrustSystem = DEFAULT_THRUST_SYSTEM;
         room.engineFormula = DEFAULT_ENGINE_FORMULA;
 
-        // Initialize coins - only 1 coin at a time
-        room.coins.push(spawnCoin(room));
+        // Initialize coins - only if coinSpawn is enabled
+        if (room.coinSpawn) {
+            room.coins.push(spawnCoin(room));
+        }
 
         room.gameStarted = false; // Ship starts after all players ready (lobby system)
         room.lobbyCountdown = null; // Countdown timer
@@ -525,7 +528,8 @@ function resetShipGame(room, preserveRoles) {
     room.asteroids = [];
     room.hearts = [];
     room.loot = [];
-    room.coins = [spawnCoin(room)];
+    // Initialize coins only if coinSpawn is enabled
+    room.coins = room.coinSpawn ? [spawnCoin(room)] : [];
     room.lastAsteroidSpawn = Date.now();
 
     // Handle roles/lobby
@@ -1333,8 +1337,10 @@ function applyLootEffect(room, ship, loot, teamColor) {
                 text: `ещё ${coinsRemaining} до победы!`,
                 color: teamColorHex
             });
-            // Spawn new coin
-            room.coins.push(spawnCoin(room));
+            // Spawn new coin only if coinSpawn is enabled
+            if (room.coinSpawn) {
+                room.coins.push(spawnCoin(room));
+            }
             break;
 
         case 'heart':
@@ -1660,7 +1666,10 @@ function checkShipCollisions(room) {
             if (dist < (ship.radius || 20) + 10) {
                 ship.coins = (ship.coins || 0) + 1;
                 room.coins.splice(i, 1);
-                room.coins.push(spawnCoin(room));
+                // Spawn new coin only if coinSpawn is enabled
+                if (room.coinSpawn) {
+                    room.coins.push(spawnCoin(room));
+                }
 
                 const teamColorHex = teamColor === 'blue' ? '#2196F3' : (teamColor === 'pink' ? '#E91E63' : '#FFD700');
                 broadcastEffect(room.id, 'particle', { x: coin.x, y: coin.y, color: '#FFD700', count: 10 });

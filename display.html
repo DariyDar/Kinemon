@@ -831,7 +831,7 @@
                 </div>
                 <div class="physics-control">
                     <label>Макс. скорость <span class="value-display" id="maxSpeedValue">3.0</span></label>
-                    <input type="range" id="maxSpeed" min="3" max="15" step="0.5" value="3">
+                    <input type="range" id="maxSpeed" min="1" max="10" step="0.5" value="3">
                 </div>
                 <div class="physics-control">
                     <label>Порог остановки <span class="value-display" id="stopThresholdValue">0.01</span></label>
@@ -1069,15 +1069,25 @@
                         </select>
                         <div class="setting-info">Автопилоты управляют незанятыми системами</div>
                     </div>
+                    <div class="setting-group">
+                        <label for="shipCoinSpawn">Спаун монет</label>
+                        <select id="shipCoinSpawn">
+                            <option value="true" selected>Включен</option>
+                            <option value="false">Выключен</option>
+                        </select>
+                        <div class="setting-info">Если выключен, монеты появляются только из астероидов</div>
+                    </div>
                 `;
                 // Load saved settings
                 gameSettings.coinsToWin = parseInt(localStorage.getItem('shipCoinsToWin')) || 10;
                 gameSettings.asteroidFrequency = localStorage.getItem('shipAsteroidFrequency') || 'medium';
                 gameSettings.autopilotEnabled = localStorage.getItem('shipAutopilotEnabled') === 'true' ? true : false;
+                gameSettings.coinSpawn = localStorage.getItem('shipCoinSpawn') !== 'false'; // default true
 
                 document.getElementById('shipCoinsToWin').value = gameSettings.coinsToWin;
                 document.getElementById('shipAsteroidFrequency').value = gameSettings.asteroidFrequency;
                 document.getElementById('shipAutopilotEnabled').value = gameSettings.autopilotEnabled.toString();
+                document.getElementById('shipCoinSpawn').value = gameSettings.coinSpawn.toString();
 
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Star Snake';
@@ -1202,9 +1212,11 @@
                 gameSettings.coinsToWin = parseInt(document.getElementById('shipCoinsToWin').value);
                 gameSettings.asteroidFrequency = document.getElementById('shipAsteroidFrequency').value;
                 gameSettings.autopilotEnabled = document.getElementById('shipAutopilotEnabled').value === 'true';
+                gameSettings.coinSpawn = document.getElementById('shipCoinSpawn').value === 'true';
                 localStorage.setItem('shipCoinsToWin', gameSettings.coinsToWin);
                 localStorage.setItem('shipAsteroidFrequency', gameSettings.asteroidFrequency);
                 localStorage.setItem('shipAutopilotEnabled', gameSettings.autopilotEnabled);
+                localStorage.setItem('shipCoinSpawn', gameSettings.coinSpawn);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
@@ -1352,6 +1364,7 @@
                     coinsToWin: parseInt(localStorage.getItem('shipCoinsToWin')) || 10,
                     asteroidFrequency: localStorage.getItem('shipAsteroidFrequency') || 'medium',
                     autopilotEnabled: localStorage.getItem('shipAutopilotEnabled') === 'true',
+                    coinSpawn: localStorage.getItem('shipCoinSpawn') !== 'false', // default true
                     canvasWidth: canvas.width,
                     canvasHeight: canvas.height
                 };

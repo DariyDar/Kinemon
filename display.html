@@ -1089,102 +1089,6 @@
                 document.getElementById('shipAutopilotEnabled').value = gameSettings.autopilotEnabled.toString();
                 document.getElementById('shipCoinSpawn').value = gameSettings.coinSpawn.toString();
 
-            } else { // snake
-                gameTitle.textContent = '🐍 Настройки Star Snake';
-                settingsForm.innerHTML = `
-                    <div class="setting-group">
-                        <label for="snakeTurnSpeed">Скорость поворота</label>
-                        <select id="snakeTurnSpeed">
-                            <option value="1">1x - Медленно</option>
-                            <option value="2" selected>2x - Нормально</option>
-                            <option value="3">3x - Быстро</option>
-                            <option value="4">4x - Очень быстро</option>
-                            <option value="5">5x - Экстремально</option>
-                        </select>
-                        <div class="setting-info">Влияет на скорость поворота змейки</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="snakeControlMapping">Режим управления</label>
-                        <select id="snakeControlMapping">
-                            <option value="rotation_smooth" selected>Поворот (плавный)</option>
-                            <option value="center_straight">Центр = прямо</option>
-                            <option value="rotation_linear">Поворот (чувствительный)</option>
-                            <option value="nonlinear_a">Нелинейный A (старый)</option>
-                            <option value="nonlinear_b">Нелинейный B (старый)</option>
-                            <option value="arrow_steering">Стрелка</option>
-                            <option value="arrow_instant">Послушная стрелка</option>
-                        </select>
-                        <div class="setting-info">Как наклон влияет на поворот змейки</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="snakeMoveSpeed">Скорость движения</label>
-                        <select id="snakeMoveSpeed">
-                            <option value="1">Медленная</option>
-                            <option value="2">Средняя</option>
-                            <option value="3" selected>Быстрая</option>
-                        </select>
-                        <div class="setting-info">Влияет на скорость движения змейки</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="snakeSize">Размер змейки</label>
-                        <select id="snakeSize">
-                            <option value="1" selected>1 - Минимум</option>
-                            <option value="2">2 - Маленький</option>
-                            <option value="3">3 - Средний</option>
-                            <option value="4">4 - Большой</option>
-                            <option value="5">5 - Максимум</option>
-                        </select>
-                        <div class="setting-info">Влияет на размер змейки и пиццы</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="snakeWinScore">Звёзд для победы</label>
-                        <select id="snakeWinScore">
-                            <option value="20">20 звёзд</option>
-                            <option value="30">30 звёзд</option>
-                            <option value="50" selected>50 звёзд</option>
-                            <option value="75">75 звёзд</option>
-                            <option value="100">100 звёзд</option>
-                            <option value="150">150 звёзд</option>
-                            <option value="200">200 звёзд</option>
-                        </select>
-                        <div class="setting-info">Количество звёзд для победы</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="snakeInitialPizzas">Начальное количество звёзд</label>
-                        <select id="snakeInitialPizzas">
-                            <option value="100" selected>100 звёзд</option>
-                            <option value="150">150 звёзд</option>
-                            <option value="200">200 звёзд</option>
-                        </select>
-                        <div class="setting-info">Количество звёздной пыли на старте</div>
-                    </div>
-                    <div class="setting-group">
-                        <label for="snakeGrowthSpeed">Скорость роста змейки</label>
-                        <select id="snakeGrowthSpeed">
-                            <option value="1" selected>Медленно</option>
-                            <option value="2">Средне (x2)</option>
-                            <option value="4">Быстро (x4)</option>
-                            <option value="8">Супер быстро (x8)</option>
-                        </select>
-                        <div class="setting-info">Как быстро растёт змейка после поедания пиццы</div>
-                    </div>
-                `;
-                // Load saved settings
-                gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
-                gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'rotation_smooth';
-                gameSettings.moveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed')) || 3;
-                gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
-                gameSettings.winScore = parseInt(localStorage.getItem('snakeWinScore')) || 50;
-                gameSettings.initialPizzas = parseInt(localStorage.getItem('snakeInitialPizzas')) || 100;
-                gameSettings.growthSpeed = parseInt(localStorage.getItem('snakeGrowthSpeed')) || 1;
-
-                document.getElementById('snakeTurnSpeed').value = gameSettings.turnSpeed;
-                document.getElementById('snakeControlMapping').value = gameSettings.controlMapping;
-                document.getElementById('snakeMoveSpeed').value = gameSettings.moveSpeed;
-                document.getElementById('snakeSize').value = gameSettings.snakeSize;
-                document.getElementById('snakeWinScore').value = gameSettings.winScore;
-                document.getElementById('snakeInitialPizzas').value = gameSettings.initialPizzas;
-                document.getElementById('snakeGrowthSpeed').value = gameSettings.growthSpeed;
             } else if (gameType === 'ballz') {
                 gameTitle.textContent = '🎯 Настройки Ballz';
                 settingsForm.innerHTML = `
@@ -1318,6 +1222,102 @@
                 document.getElementById('ballzBallSpeed').value = gameSettings.ballSpeed;
                 document.getElementById('ballzLaunchDelay').value = gameSettings.ballLaunchDelay;
                 document.getElementById('ballzBonusSpawnRate').value = gameSettings.bonusBallSpawnRate;
+            } else { // snake
+                gameTitle.textContent = '🐍 Настройки Star Snake';
+                settingsForm.innerHTML = `
+                    <div class="setting-group">
+                        <label for="snakeTurnSpeed">Скорость поворота</label>
+                        <select id="snakeTurnSpeed">
+                            <option value="1">1x - Медленно</option>
+                            <option value="2" selected>2x - Нормально</option>
+                            <option value="3">3x - Быстро</option>
+                            <option value="4">4x - Очень быстро</option>
+                            <option value="5">5x - Экстремально</option>
+                        </select>
+                        <div class="setting-info">Влияет на скорость поворота змейки</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="snakeControlMapping">Режим управления</label>
+                        <select id="snakeControlMapping">
+                            <option value="rotation_smooth" selected>Поворот (плавный)</option>
+                            <option value="center_straight">Центр = прямо</option>
+                            <option value="rotation_linear">Поворот (чувствительный)</option>
+                            <option value="nonlinear_a">Нелинейный A (старый)</option>
+                            <option value="nonlinear_b">Нелинейный B (старый)</option>
+                            <option value="arrow_steering">Стрелка</option>
+                            <option value="arrow_instant">Послушная стрелка</option>
+                        </select>
+                        <div class="setting-info">Как наклон влияет на поворот змейки</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="snakeMoveSpeed">Скорость движения</label>
+                        <select id="snakeMoveSpeed">
+                            <option value="1">Медленная</option>
+                            <option value="2">Средняя</option>
+                            <option value="3" selected>Быстрая</option>
+                        </select>
+                        <div class="setting-info">Влияет на скорость движения змейки</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="snakeSize">Размер змейки</label>
+                        <select id="snakeSize">
+                            <option value="1" selected>1 - Минимум</option>
+                            <option value="2">2 - Маленький</option>
+                            <option value="3">3 - Средний</option>
+                            <option value="4">4 - Большой</option>
+                            <option value="5">5 - Максимум</option>
+                        </select>
+                        <div class="setting-info">Влияет на размер змейки и пиццы</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="snakeWinScore">Звёзд для победы</label>
+                        <select id="snakeWinScore">
+                            <option value="20">20 звёзд</option>
+                            <option value="30">30 звёзд</option>
+                            <option value="50" selected>50 звёзд</option>
+                            <option value="75">75 звёзд</option>
+                            <option value="100">100 звёзд</option>
+                            <option value="150">150 звёзд</option>
+                            <option value="200">200 звёзд</option>
+                        </select>
+                        <div class="setting-info">Количество звёзд для победы</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="snakeInitialPizzas">Начальное количество звёзд</label>
+                        <select id="snakeInitialPizzas">
+                            <option value="100" selected>100 звёзд</option>
+                            <option value="150">150 звёзд</option>
+                            <option value="200">200 звёзд</option>
+                        </select>
+                        <div class="setting-info">Количество звёздной пыли на старте</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="snakeGrowthSpeed">Скорость роста змейки</label>
+                        <select id="snakeGrowthSpeed">
+                            <option value="1" selected>Медленно</option>
+                            <option value="2">Средне (x2)</option>
+                            <option value="4">Быстро (x4)</option>
+                            <option value="8">Супер быстро (x8)</option>
+                        </select>
+                        <div class="setting-info">Как быстро растёт змейка после поедания пиццы</div>
+                    </div>
+                `;
+                // Load saved settings
+                gameSettings.turnSpeed = parseInt(localStorage.getItem('snakeTurnSpeed')) || 2;
+                gameSettings.controlMapping = localStorage.getItem('snakeControlMapping') || 'rotation_smooth';
+                gameSettings.moveSpeed = parseInt(localStorage.getItem('snakeMoveSpeed')) || 3;
+                gameSettings.snakeSize = parseInt(localStorage.getItem('snakeSize')) || 1;
+                gameSettings.winScore = parseInt(localStorage.getItem('snakeWinScore')) || 50;
+                gameSettings.initialPizzas = parseInt(localStorage.getItem('snakeInitialPizzas')) || 100;
+                gameSettings.growthSpeed = parseInt(localStorage.getItem('snakeGrowthSpeed')) || 1;
+
+                document.getElementById('snakeTurnSpeed').value = gameSettings.turnSpeed;
+                document.getElementById('snakeControlMapping').value = gameSettings.controlMapping;
+                document.getElementById('snakeMoveSpeed').value = gameSettings.moveSpeed;
+                document.getElementById('snakeSize').value = gameSettings.snakeSize;
+                document.getElementById('snakeWinScore').value = gameSettings.winScore;
+                document.getElementById('snakeInitialPizzas').value = gameSettings.initialPizzas;
+                document.getElementById('snakeGrowthSpeed').value = gameSettings.growthSpeed;
             }
         }
 

@@ -2200,6 +2200,7 @@ wss.on('connection', (ws) => {
                     player.newLaunchX = null;
                     player.turnStartTime = null;
                     player.nextBallLaunchTime = null;
+                    player.lastBallLaunchTime = null;
 
                     // Field state (INDEPENDENT per player for synchronized gameplay)
                     player.blocks = new Map(); // "x,y" -> { x, y, hp, maxHp, gridX, gridY, id }
@@ -3217,31 +3218,34 @@ function updateCharging(room, player) {
 // State: LAUNCHING - Balls are being launched sequentially
 function updateLaunching(room, player) {
     const now = Date.now();
-    const launchedCount = player.balls.filter(b => b.hasLaunched).length;
-    const shouldHaveLaunched = Math.floor(
-        (now - player.nextBallLaunchTime) / room.ballLaunchDelay
-    ) + 1;
+    const launchedCount = player.balls.length;
 
-    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballsThisTurn) {
-        // Launch next ball
-        const launchX = player.launchX !== null
-            ? player.launchX
-            : room.canvas.width / 2;
-        const launchY = room.canvas.height - 40;
+    // Check if it's time to launch next ball
+    if (launchedCount < player.ballsThisTurn) {
+        const timeSinceLastLaunch = now - (player.lastBallLaunchTime || player.nextBallLaunchTime);
 
-        const speed = room.ballSpeed;
-        const vx = Math.cos(player.aimAngle) * speed;
-        const vy = Math.sin(player.aimAngle) * speed;
+        if (timeSinceLastLaunch >= room.ballLaunchDelay) {
+            // Launch next ball
+            const launchX = player.launchX !== null
+                ? player.launchX
+                : room.canvas.width / 2;
+            const launchY = room.canvas.height - 40;
 
-        player.balls.push({
-            x: launchX,
-            y: launchY,
-            vx: vx,
-            vy: vy,
-            active: true,
-            hasLaunched: true,
-            launchIndex: launchedCount
-        });
+            const speed = room.ballSpeed;
+            const vx = Math.cos(player.aimAngle) * speed;
+            const vy = Math.sin(player.aimAngle) * speed;
+
+            player.balls.push({
+                x: launchX,
+                y: launchY,
+                vx: vx,
+                vy: vy,
+                active: true,
+                launchIndex: launchedCount
+            });
+
+            player.lastBallLaunchTime = now;
+        }
     }
 
     // All balls launched - switch to balls_in_flight
@@ -3317,8 +3321,24 @@ function checkBallzCollisions(room, player) {
                 block.hp--;
 
                 if (block.hp <= 0) {
+                    // Block destroyed - big explosion
                     player.blocks.delete(key);
                     player.score++;
+
+                    broadcastEffect(room.id, 'particle', {
+                        x: block.x,
+                        y: block.y,
+                        color: player.color,
+                        count: 12
+                    });
+                } else {
+                    // Block hit - small particles
+                    broadcastEffect(room.id, 'particle', {
+                        x: ball.x,
+                        y: ball.y,
+                        color: '#FFFFFF',
+                        count: 4
+                    });
                 }
 
                 reflectBall(ball, block, blockSize);
@@ -3334,6 +3354,14 @@ function checkBallzCollisions(room, player) {
             if (dist < ballRadius + 10) {
                 player.bonusBalls.splice(i, 1);
                 player.ballCount++;
+
+                // Bonus pickup effect
+                broadcastEffect(room.id, 'particle', {
+                    x: bonus.x,
+                    y: bonus.y,
+                    color: '#FFD700',
+                    count: 8
+                });
             }
         }
     }
@@ -3402,6 +3430,7 @@ function advanceTurn(room, player) {
     player.newLaunchX = null;
     player.chargeStartTime = null;
     player.steadyAimStartTime = null;
+    player.lastBallLaunchTime = null;
     player.chargeProgress = 0;
     player.turnState = 'aiming';
 }

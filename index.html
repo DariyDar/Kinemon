@@ -114,10 +114,11 @@
             <button class="btn btn-secondary" id="snakeBtn">🐍 Star Snake</button>
             <button class="btn btn-tertiary" id="pushersBtn">🔲 Толкатели</button>
             <button class="btn" style="background: #9C27B0;" id="shipBtn">🚀 Корабль</button>
+            <button class="btn" style="background: #FF5722;" id="ballzBtn">🎯 Ballz</button>
         </div>
     </div>
 
-    <div id="version">v3.23.7</div>
+    <div id="version">v3.24.0</div>
 
     <script>
         // Redirect to display.html with game type parameter
@@ -135,6 +136,10 @@
 
         document.getElementById('shipBtn').addEventListener('click', () => {
             window.location.href = 'display.html?game=ship';
+        });
+
+        document.getElementById('ballzBtn').addEventListener('click', () => {
+            window.location.href = 'display.html?game=ballz';
         });
     </script>
 </body>

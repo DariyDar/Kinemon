@@ -168,6 +168,15 @@ function getRandomColor(room) {
     return availableColors[Math.floor(Math.random() * availableColors.length)];
 }
 
+// Seeded Random Number Generator for Ballz (deterministic block spawning)
+function createSeededRNG(seed) {
+    let state = seed;
+    return function() {
+        state = (state * 1664525 + 1013904223) % 4294967296;
+        return state / 4294967296;
+    };
+}
+
 // Create new room
 function createRoom(roomId, gameType = 'snake', settings = {}) {
     const room = {
@@ -348,6 +357,39 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.gameStarted = false; // Ship starts after all players ready (lobby system)
         room.lobbyCountdown = null; // Countdown timer
         room.lobbyCountdownStart = null; // Countdown start time
+    } else if (gameType === 'ballz') {
+        // Ballz: physics-based block breaking game
+
+        // Field configuration
+        room.fieldWidth = settings.fieldWidth || 7;
+        room.fieldHeight = settings.fieldHeight || 10;
+        room.blockSize = 50;
+
+        room.canvas = {
+            width: room.fieldWidth * room.blockSize,
+            height: room.fieldHeight * room.blockSize + 80
+        };
+
+        // HP progression settings
+        room.hpIncreaseEveryN = settings.hpIncreaseEveryN || 5;
+        room.maxBlockHP = settings.maxBlockHP || 50;
+        room.lowerHPChance = settings.lowerHPChance || 30;
+
+        // Ball & control settings
+        room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15;
+        room.ballSpeed = settings.ballSpeed || 5;
+        room.chargeTime = settings.chargeTime || 2000; // milliseconds
+        room.ballLaunchDelay = settings.ballLaunchDelay || 100; // milliseconds
+        room.deadZoneSize = settings.deadZoneSize || 0.05; // 5%
+        room.aimSensitivity = settings.aimSensitivity || 0.10; // 10%
+
+        // CRITICAL: Shared seed for synchronized levels between players
+        room.randomSeed = Date.now();
+        room.rng = createSeededRNG(room.randomSeed);
+
+        room.turnNumber = 0;
+        room.maxPlayers = 3; // Maximum 3 players for Ballz
+        room.leaderboard = null; // Set when game ends
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -2062,6 +2104,15 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
+                // For Ballz: limit to 3 players
+                if (room.gameType === 'ballz' && room.players.size >= 3) {
+                    ws.send(JSON.stringify({
+                        type: 'error',
+                        message: 'Room is full (max 3 players for Ballz)'
+                    }));
+                    return;
+                }
+
                 const playerId = Date.now() + '-' + Math.random();
                 const newSessionToken = generateSessionToken(); // Generate token for new player
 
@@ -2124,6 +2175,37 @@ wss.on('connection', (ws) => {
                     player.ready = false;         // Player hasn't pressed "Ready" button yet
 
                     console.log(`Player ${player.name} joined as observer (no role assigned)`);
+                } else if (room.gameType === 'ballz') {
+                    // Ballz: ball-shooting arcade game
+                    player.score = 0;
+                    player.ballCount = 1; // Start with 1 ball
+                    player.alive = true;
+
+                    // Turn state machine
+                    player.turnState = 'aiming'; // 'aiming' | 'charging' | 'launching' | 'balls_in_flight' | 'turn_complete'
+
+                    // Launch mechanics
+                    player.launchX = null; // null = center initially
+                    player.aimAngle = Math.PI / 2; // 90° straight up
+                    player.chargeStartTime = null;
+                    player.chargeProgress = 0;
+                    player.lastTilt = 0.5;
+                    player.isInDeadZone = false;
+
+                    // Ball physics (balls will be populated during launching state)
+                    player.balls = [];
+                    player.firstBallTouched = false;
+                    player.newLaunchX = null;
+                    player.turnStartTime = null;
+                    player.nextBallLaunchTime = null;
+
+                    // Field state (INDEPENDENT per player for synchronized gameplay)
+                    player.blocks = new Map(); // "x,y" -> { x, y, hp, maxHp, gridX, gridY, id }
+                    player.bonusBalls = []; // Array of bonus ball objects
+                    player.turnNumber = 0;
+                    player.gameOver = false;
+
+                    console.log(`Player ${player.name} joined Ballz game`);
                 } else {
                     // Snake: segments and position
                     player.alive = true;
@@ -2739,6 +2821,30 @@ function serializeGameState(room) {
         state.gameStarted = room.gameStarted;
         state.gameOver = room.gameOver;
         state.winner = room.winner;
+    } else if (room.gameType === 'ballz') {
+        // Ballz state - serialize independent player fields
+        state.blockSize = room.blockSize;
+        state.players = Array.from(room.players.values()).map(p => ({
+            id: p.id,
+            name: p.name,
+            color: p.color,
+            score: p.score,
+            ballCount: p.ballCount,
+            alive: p.alive,
+            turnState: p.turnState,
+            aimAngle: p.aimAngle,
+            chargeProgress: p.chargeProgress,
+            isInDeadZone: p.isInDeadZone,
+            launchX: p.launchX,
+            balls: p.balls,
+            blocks: Array.from(p.blocks.values()), // Convert Map to Array
+            bonusBalls: p.bonusBalls,
+            turnNumber: p.turnNumber,
+            gameOver: p.gameOver
+        }));
+        state.gameOver = room.gameOver;
+        state.winner = room.winner;
+        state.leaderboard = room.leaderboard; // Final leaderboard when all players done
     } else {
         // Snake state
         state.players = Array.from(room.players.values()).map(p => ({
@@ -2777,6 +2883,8 @@ function gameLoop(roomId) {
         updatePushers(room);
     } else if (room.gameType === 'ship') {
         updateShip(room);
+    } else if (room.gameType === 'ballz') {
+        updateBallz(room);
     } else {
         updateSnake(room);
     }
@@ -2973,6 +3081,453 @@ function updateSnake(room) {
 
     // Check collisions
     checkCollisions(room);
+}
+
+// ============================================================================
+// BALLZ GAME LOGIC
+// ============================================================================
+
+// Main Ballz update function
+function updateBallz(room) {
+    for (const player of room.players.values()) {
+        if (!player.alive || player.gameOver) continue;
+        updateBallzPlayer(room, player);
+    }
+
+    // Check victory condition
+    checkBallzVictory(room);
+}
+
+// Update individual player's Ballz state
+function updateBallzPlayer(room, player) {
+    switch (player.turnState) {
+        case 'aiming':
+            updateAiming(room, player);
+            break;
+        case 'charging':
+            updateCharging(room, player);
+            break;
+        case 'launching':
+            updateLaunching(room, player);
+            break;
+        case 'balls_in_flight':
+            updateBallPhysics(room, player);
+            checkBallzCollisions(room, player);
+            checkTurnComplete(room, player);
+            break;
+        case 'turn_complete':
+            advanceTurn(room, player);
+            break;
+    }
+}
+
+// State: AIMING - Player is tilting phone to aim
+function updateAiming(room, player) {
+    // Convert tilt to angle (10° to 170°)
+    const minAngle = 10 * Math.PI / 180;
+    const maxAngle = 170 * Math.PI / 180;
+    player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
+
+    // CRITICAL: Check dead zone (both ends)
+    const deadZone = room.deadZoneSize;
+    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
+
+    if (player.isInDeadZone) {
+        // In dead zone - reset charge
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        player.lastTilt = player.tilt;
+        return;
+    }
+
+    // Check for aim steadiness to start charging
+    if (!player.lastTilt) player.lastTilt = player.tilt;
+    const tiltDelta = Math.abs(player.tilt - player.lastTilt);
+
+    if (tiltDelta < room.aimSensitivity) {
+        if (!player.chargeStartTime) {
+            player.chargeStartTime = Date.now();
+            player.turnState = 'charging';
+        }
+    } else {
+        player.chargeStartTime = null;
+    }
+
+    player.lastTilt = player.tilt;
+}
+
+// State: CHARGING - Player is holding aim steady to charge shot
+function updateCharging(room, player) {
+    const elapsed = Date.now() - player.chargeStartTime;
+    player.chargeProgress = Math.min(1, elapsed / room.chargeTime);
+
+    // CRITICAL: Check dead zone (both ends)
+    const deadZone = room.deadZoneSize;
+    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
+
+    if (player.isInDeadZone) {
+        // Entered dead zone - reset to aiming
+        player.turnState = 'aiming';
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        return;
+    }
+
+    // Check for aim movement (using aimSensitivity)
+    const tiltDelta = Math.abs(player.tilt - player.lastTilt);
+    if (tiltDelta >= room.aimSensitivity) {
+        // Moved aim - reset to aiming
+        player.turnState = 'aiming';
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        player.lastTilt = player.tilt;
+        return;
+    }
+
+    // Full charge - auto launch
+    if (player.chargeProgress >= 1) {
+        player.turnState = 'launching';
+        player.nextBallLaunchTime = Date.now();
+        player.turnStartTime = Date.now();
+    }
+
+    player.lastTilt = player.tilt;
+}
+
+// State: LAUNCHING - Balls are being launched sequentially
+function updateLaunching(room, player) {
+    const now = Date.now();
+    const launchedCount = player.balls.filter(b => b.hasLaunched).length;
+    const shouldHaveLaunched = Math.floor(
+        (now - player.nextBallLaunchTime) / room.ballLaunchDelay
+    ) + 1;
+
+    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballCount) {
+        // Launch next ball
+        const launchX = player.launchX !== null
+            ? player.launchX
+            : room.canvas.width / 2;
+        const launchY = room.canvas.height - 40;
+
+        const speed = room.ballSpeed;
+        const vx = Math.cos(player.aimAngle) * speed;
+        const vy = Math.sin(player.aimAngle) * speed;
+
+        player.balls.push({
+            x: launchX,
+            y: launchY,
+            vx: vx,
+            vy: vy,
+            active: true,
+            hasLaunched: true,
+            launchIndex: launchedCount
+        });
+    }
+
+    // All balls launched - switch to balls_in_flight
+    if (launchedCount >= player.ballCount) {
+        player.turnState = 'balls_in_flight';
+    }
+}
+
+// Physics: Update ball positions
+function updateBallPhysics(room, player) {
+    const launchLine = room.canvas.height - 40;
+    const ballRadius = 5;
+
+    for (const ball of player.balls) {
+        if (!ball.active) continue;
+
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Wall bounces (left, right, top)
+        if (ball.x <= ballRadius || ball.x >= room.canvas.width - ballRadius) {
+            ball.vx = -ball.vx;
+            ball.x = Math.max(ballRadius, Math.min(room.canvas.width - ballRadius, ball.x));
+        }
+
+        if (ball.y <= ballRadius) {
+            ball.vy = -ball.vy;
+            ball.y = ballRadius;
+        }
+
+        // Bottom return (deactivate ball)
+        if (ball.y >= launchLine) {
+            ball.active = false;
+
+            // First ball sets new launch point
+            if (ball.launchIndex === 0 && !player.firstBallTouched) {
+                player.newLaunchX = ball.x;
+                player.firstBallTouched = true;
+            }
+        }
+    }
+
+    // Emergency timeout (60 seconds)
+    if (player.turnStartTime) {
+        const turnDuration = Date.now() - player.turnStartTime;
+        if (turnDuration > 60000) {
+            player.balls.forEach(b => b.active = false);
+        }
+    }
+}
+
+// Check if turn is complete (all balls returned)
+function checkTurnComplete(room, player) {
+    const allInactive = player.balls.every(b => !b.active);
+    const allLaunched = player.balls.length === player.ballCount;
+
+    if (allInactive && allLaunched) {
+        player.turnState = 'turn_complete';
+    }
+}
+
+// Collision detection for balls with blocks and bonuses
+function checkBallzCollisions(room, player) {
+    const ballRadius = 5;
+    const blockSize = room.blockSize;
+
+    for (const ball of player.balls) {
+        if (!ball.active) continue;
+
+        // Block collisions
+        for (const [key, block] of player.blocks.entries()) {
+            if (checkBallBlockCollision(ball, block, blockSize, ballRadius)) {
+                block.hp--;
+
+                if (block.hp <= 0) {
+                    player.blocks.delete(key);
+                    player.score++;
+                }
+
+                reflectBall(ball, block, blockSize);
+                break; // Only one collision per frame
+            }
+        }
+
+        // Bonus ball pickups (no collision, just touch)
+        for (let i = player.bonusBalls.length - 1; i >= 0; i--) {
+            const bonus = player.bonusBalls[i];
+            const dist = Math.hypot(ball.x - bonus.x, ball.y - bonus.y);
+
+            if (dist < ballRadius + 10) {
+                player.bonusBalls.splice(i, 1);
+                player.ballCount++;
+            }
+        }
+    }
+}
+
+// AABB circle-to-rect collision detection
+function checkBallBlockCollision(ball, block, blockSize, ballRadius) {
+    const halfSize = blockSize / 2;
+    const closestX = Math.max(block.x - halfSize, Math.min(ball.x, block.x + halfSize));
+    const closestY = Math.max(block.y - halfSize, Math.min(ball.y, block.y + halfSize));
+
+    const distX = ball.x - closestX;
+    const distY = ball.y - closestY;
+    const distSquared = distX * distX + distY * distY;
+
+    return distSquared < (ballRadius * ballRadius);
+}
+
+// Reflect ball off block (simplified physics: angle in = angle out)
+function reflectBall(ball, block, blockSize) {
+    const dx = ball.x - block.x;
+    const dy = ball.y - block.y;
+    const halfSize = blockSize / 2;
+
+    const overlapX = halfSize - Math.abs(dx);
+    const overlapY = halfSize - Math.abs(dy);
+
+    // Reflect on axis with smallest overlap
+    if (overlapX < overlapY) {
+        ball.vx = -ball.vx;
+    } else {
+        ball.vy = -ball.vy;
+    }
+}
+
+// Advance to next turn (descend blocks, spawn new, check game over)
+function advanceTurn(room, player) {
+    // Update launch position for next turn
+    player.launchX = player.newLaunchX || player.launchX || room.canvas.width / 2;
+
+    // Descend blocks and bonuses
+    descendBlocks(player, room);
+
+    // Spawn new blocks using seeded RNG
+    spawnNewBlocks(player, room);
+
+    // Maybe spawn bonus ball
+    if (Math.random() * 100 < room.bonusBallSpawnRate) {
+        spawnBonusBall(player, room);
+    }
+
+    // Check game over (block reached launch line)
+    const launchRow = Math.floor((room.canvas.height - 40) / room.blockSize);
+    for (const block of player.blocks.values()) {
+        if (block.gridY >= launchRow) {
+            player.gameOver = true;
+            player.alive = false;
+            return;
+        }
+    }
+
+    // Reset for next turn
+    player.turnNumber++;
+    player.balls = [];
+    player.firstBallTouched = false;
+    player.newLaunchX = null;
+    player.chargeStartTime = null;
+    player.chargeProgress = 0;
+    player.turnState = 'aiming';
+}
+
+// Descend all blocks and bonuses by one row
+function descendBlocks(player, room) {
+    const newBlocks = new Map();
+    for (const [key, block] of player.blocks.entries()) {
+        block.gridY++;
+        block.y += room.blockSize;
+        newBlocks.set(`${block.gridX},${block.gridY}`, block);
+    }
+    player.blocks = newBlocks;
+
+    // Descend bonuses too
+    for (const bonus of player.bonusBalls) {
+        bonus.gridY++;
+        bonus.y += room.blockSize;
+    }
+}
+
+// Spawn new blocks in top row (SEEDED RANDOM for synchronization)
+function spawnNewBlocks(player, room) {
+    // CRITICAL: Use seeded RNG based on player's turn number
+    const savedRNG = room.rng;
+    room.rng = createSeededRNG(room.randomSeed + player.turnNumber);
+
+    // Determine how many blocks to spawn (1-5)
+    const count = 1 + Math.floor(room.rng() * 5);
+
+    // Find available columns
+    const availableCols = [];
+    for (let x = 0; x < room.fieldWidth; x++) {
+        if (!player.blocks.has(`${x},0`)) {
+            availableCols.push(x);
+        }
+    }
+
+    // Leave at least 2 empty columns
+    const maxSpawn = Math.max(0, availableCols.length - 2);
+    if (maxSpawn === 0) {
+        room.rng = savedRNG;
+        return;
+    }
+
+    // Shuffle and spawn
+    shuffleSeeded(availableCols, room.rng);
+    const spawnCount = Math.min(count, maxSpawn);
+    const spawnCols = availableCols.slice(0, spawnCount);
+
+    for (const gridX of spawnCols) {
+        const hp = calculateBlockHP(player.turnNumber, room);
+        const block = {
+            gridX: gridX,
+            gridY: 0,
+            x: gridX * room.blockSize + room.blockSize / 2,
+            y: room.blockSize / 2,
+            hp: hp,
+            maxHp: hp,
+            id: `block_${player.turnNumber}_${gridX}`
+        };
+
+        player.blocks.set(`${gridX},0`, block);
+    }
+
+    // Restore RNG
+    room.rng = savedRNG;
+}
+
+// Calculate block HP based on turn number and settings
+function calculateBlockHP(turnNumber, room) {
+    const baseHP = 1 + Math.floor(turnNumber / room.hpIncreaseEveryN);
+    const cappedHP = Math.min(baseHP, room.maxBlockHP);
+
+    // Chance for lower HP
+    if (room.rng() * 100 < room.lowerHPChance && cappedHP > 1) {
+        return Math.max(1, cappedHP - Math.floor(room.rng() * 3 + 1));
+    }
+
+    return cappedHP;
+}
+
+// Seeded array shuffle for deterministic spawning
+function shuffleSeeded(array, rng) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+// Spawn bonus ball in random empty cell
+function spawnBonusBall(player, room) {
+    const emptyCells = [];
+    for (let y = 1; y < room.fieldHeight - 2; y++) {
+        for (let x = 0; x < room.fieldWidth; x++) {
+            const hasBlock = player.blocks.has(`${x},${y}`);
+            const hasBonus = player.bonusBalls.some(b => b.gridX === x && b.gridY === y);
+            if (!hasBlock && !hasBonus) {
+                emptyCells.push({ x, y });
+            }
+        }
+    }
+
+    if (emptyCells.length > 0) {
+        const cell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        player.bonusBalls.push({
+            gridX: cell.x,
+            gridY: cell.y,
+            x: cell.x * room.blockSize + room.blockSize / 2,
+            y: cell.y * room.blockSize + room.blockSize / 2,
+            id: `bonus_${Date.now()}_${Math.random()}`
+        });
+    }
+}
+
+// Check victory condition (all players finished)
+function checkBallzVictory(room) {
+    const alivePlayers = Array.from(room.players.values()).filter(p => !p.gameOver);
+
+    // All players lost - game over, show leaderboard
+    if (alivePlayers.length === 0 && room.players.size > 0) {
+        // Sort: score first (desc), then turnNumber (desc)
+        const sortedPlayers = Array.from(room.players.values())
+            .sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return b.turnNumber - a.turnNumber;
+            });
+
+        room.winner = {
+            id: sortedPlayers[0].id,
+            name: sortedPlayers[0].name,
+            score: sortedPlayers[0].score,
+            turnNumber: sortedPlayers[0].turnNumber
+        };
+
+        // Full leaderboard
+        room.leaderboard = sortedPlayers.map((p, i) => ({
+            rank: i + 1,
+            id: p.id,
+            name: p.name,
+            color: p.color,
+            score: p.score,
+            turnNumber: p.turnNumber
+        }));
+
+        room.gameOver = true;
+    }
 }
 
 // Update Pong game

@@ -1185,6 +1185,139 @@
                 document.getElementById('snakeWinScore').value = gameSettings.winScore;
                 document.getElementById('snakeInitialPizzas').value = gameSettings.initialPizzas;
                 document.getElementById('snakeGrowthSpeed').value = gameSettings.growthSpeed;
+            } else if (gameType === 'ballz') {
+                gameTitle.textContent = '🎯 Настройки Ballz';
+                settingsForm.innerHTML = `
+                    <div class="setting-group">
+                        <label for="ballzFieldWidth">Ширина поля (блоков)</label>
+                        <select id="ballzFieldWidth">
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7" selected>7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzFieldHeight">Высота поля (блоков)</label>
+                        <select id="ballzFieldHeight">
+                            <option value="8">8</option>
+                            <option value="10" selected>10</option>
+                            <option value="12">12</option>
+                            <option value="14">14</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzHPIncrease">HP растёт каждые N ходов</label>
+                        <select id="ballzHPIncrease">
+                            <option value="3">3</option>
+                            <option value="5" selected>5</option>
+                            <option value="7">7</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzMaxHP">Максимальный HP блока</label>
+                        <select id="ballzMaxHP">
+                            <option value="30">30</option>
+                            <option value="50" selected>50</option>
+                            <option value="75">75</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzLowerHPChance">Шанс низкого HP (%)</label>
+                        <select id="ballzLowerHPChance">
+                            <option value="0">0%</option>
+                            <option value="20">20%</option>
+                            <option value="30" selected>30%</option>
+                            <option value="50">50%</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzDeadZone">Размер мёртвой зоны</label>
+                        <select id="ballzDeadZone">
+                            <option value="0">0% - Нет блокировки</option>
+                            <option value="0.05" selected>5% - По краям</option>
+                            <option value="0.10">10%</option>
+                            <option value="0.15">15%</option>
+                        </select>
+                        <div class="setting-info">В крайних положениях выстрел блокируется</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzChargeTime">Время зарядки</label>
+                        <select id="ballzChargeTime">
+                            <option value="1000">1 секунда</option>
+                            <option value="2000" selected>2 секунды</option>
+                            <option value="3000">3 секунды</option>
+                            <option value="4000">4 секунды</option>
+                            <option value="5000">5 секунд</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzAimSensitivity">Чувствительность прицела</label>
+                        <select id="ballzAimSensitivity">
+                            <option value="0.02">Очень чувствительная</option>
+                            <option value="0.05">Чувствительная</option>
+                            <option value="0.10" selected>Средняя</option>
+                            <option value="0.15">Низкая</option>
+                            <option value="0.20">Очень низкая</option>
+                        </select>
+                        <div class="setting-info">Насколько легко сбивается зарядка</div>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzBallSpeed">Скорость шара</label>
+                        <select id="ballzBallSpeed">
+                            <option value="3">Медленно</option>
+                            <option value="5" selected>Средне</option>
+                            <option value="7">Быстро</option>
+                            <option value="9">Очень быстро</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzLaunchDelay">Задержка между шарами</label>
+                        <select id="ballzLaunchDelay">
+                            <option value="50">50 мс</option>
+                            <option value="100" selected>100 мс</option>
+                            <option value="150">150 мс</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="ballzBonusSpawnRate">Шанс бонусного шара</label>
+                        <select id="ballzBonusSpawnRate">
+                            <option value="5">5%</option>
+                            <option value="10">10%</option>
+                            <option value="15" selected>15%</option>
+                            <option value="25">25%</option>
+                        </select>
+                    </div>
+                `;
+
+                // Load saved settings
+                gameSettings.fieldWidth = parseInt(localStorage.getItem('ballzFieldWidth')) || 7;
+                gameSettings.fieldHeight = parseInt(localStorage.getItem('ballzFieldHeight')) || 10;
+                gameSettings.hpIncreaseEveryN = parseInt(localStorage.getItem('ballzHPIncrease')) || 5;
+                gameSettings.maxBlockHP = parseInt(localStorage.getItem('ballzMaxHP')) || 50;
+                gameSettings.lowerHPChance = parseInt(localStorage.getItem('ballzLowerHPChance')) || 30;
+                gameSettings.deadZoneSize = parseFloat(localStorage.getItem('ballzDeadZone')) || 0.05;
+                gameSettings.chargeTime = parseInt(localStorage.getItem('ballzChargeTime')) || 2000;
+                gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.10;
+                gameSettings.ballSpeed = parseInt(localStorage.getItem('ballzBallSpeed')) || 5;
+                gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 100;
+                gameSettings.bonusBallSpawnRate = parseInt(localStorage.getItem('ballzBonusSpawnRate')) || 15;
+
+                // Apply to form
+                document.getElementById('ballzFieldWidth').value = gameSettings.fieldWidth;
+                document.getElementById('ballzFieldHeight').value = gameSettings.fieldHeight;
+                document.getElementById('ballzHPIncrease').value = gameSettings.hpIncreaseEveryN;
+                document.getElementById('ballzMaxHP').value = gameSettings.maxBlockHP;
+                document.getElementById('ballzLowerHPChance').value = gameSettings.lowerHPChance;
+                document.getElementById('ballzDeadZone').value = gameSettings.deadZoneSize;
+                document.getElementById('ballzChargeTime').value = gameSettings.chargeTime;
+                document.getElementById('ballzAimSensitivity').value = gameSettings.aimSensitivity;
+                document.getElementById('ballzBallSpeed').value = gameSettings.ballSpeed;
+                document.getElementById('ballzLaunchDelay').value = gameSettings.ballLaunchDelay;
+                document.getElementById('ballzBonusSpawnRate').value = gameSettings.bonusBallSpawnRate;
             }
         }
 
@@ -1217,6 +1350,29 @@
                 localStorage.setItem('shipAsteroidFrequency', gameSettings.asteroidFrequency);
                 localStorage.setItem('shipAutopilotEnabled', gameSettings.autopilotEnabled);
                 localStorage.setItem('shipCoinSpawn', gameSettings.coinSpawn);
+            } else if (gameType === 'ballz') {
+                gameSettings.fieldWidth = parseInt(document.getElementById('ballzFieldWidth').value);
+                gameSettings.fieldHeight = parseInt(document.getElementById('ballzFieldHeight').value);
+                gameSettings.hpIncreaseEveryN = parseInt(document.getElementById('ballzHPIncrease').value);
+                gameSettings.maxBlockHP = parseInt(document.getElementById('ballzMaxHP').value);
+                gameSettings.lowerHPChance = parseInt(document.getElementById('ballzLowerHPChance').value);
+                gameSettings.deadZoneSize = parseFloat(document.getElementById('ballzDeadZone').value);
+                gameSettings.chargeTime = parseInt(document.getElementById('ballzChargeTime').value);
+                gameSettings.aimSensitivity = parseFloat(document.getElementById('ballzAimSensitivity').value);
+                gameSettings.ballSpeed = parseInt(document.getElementById('ballzBallSpeed').value);
+                gameSettings.ballLaunchDelay = parseInt(document.getElementById('ballzLaunchDelay').value);
+                gameSettings.bonusBallSpawnRate = parseInt(document.getElementById('ballzBonusSpawnRate').value);
+                localStorage.setItem('ballzFieldWidth', gameSettings.fieldWidth);
+                localStorage.setItem('ballzFieldHeight', gameSettings.fieldHeight);
+                localStorage.setItem('ballzHPIncrease', gameSettings.hpIncreaseEveryN);
+                localStorage.setItem('ballzMaxHP', gameSettings.maxBlockHP);
+                localStorage.setItem('ballzLowerHPChance', gameSettings.lowerHPChance);
+                localStorage.setItem('ballzDeadZone', gameSettings.deadZoneSize);
+                localStorage.setItem('ballzChargeTime', gameSettings.chargeTime);
+                localStorage.setItem('ballzAimSensitivity', gameSettings.aimSensitivity);
+                localStorage.setItem('ballzBallSpeed', gameSettings.ballSpeed);
+                localStorage.setItem('ballzLaunchDelay', gameSettings.ballLaunchDelay);
+                localStorage.setItem('ballzBonusSpawnRate', gameSettings.bonusBallSpawnRate);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
@@ -2225,6 +2381,12 @@
                 const winScreen = document.getElementById('winScreen');
                 const gameSelectionScreen = document.getElementById('gameSelectionScreen');
 
+                // For Ballz: render leaderboard instead of win screen
+                if (gameState.gameType === 'ballz' && gameState.leaderboard) {
+                    renderBallzLeaderboard();
+                    return;
+                }
+
                 // Only show win screen if not already on win/selection screens
                 if (!winScreen.classList.contains('active') && !gameSelectionScreen.classList.contains('active')) {
                     showWinScreen(gameState.winner, gameState.gameType);
@@ -2238,6 +2400,8 @@
                 renderPushers();
             } else if (gameState.gameType === 'ship') {
                 renderShip();
+            } else if (gameState.gameType === 'ballz') {
+                renderBallz();
             } else {
                 renderSnake();
             }
@@ -3396,6 +3560,323 @@
                 }
 
                 playerList.appendChild(playerDiv);
+            }
+        }
+
+        // ========================================================================
+        // BALLZ RENDERING
+        // ========================================================================
+
+        function renderBallz() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const blockSize = gameState.blockSize || 50;
+            const launchLine = canvas.height - 40;
+            const players = gameState.players || [];
+
+            // Layout: 1 player = full screen, 2 players = split left/right, 3 players = left/center/right
+            if (players.length === 1) {
+                renderPlayerField(players[0], 0, 0, canvas.width, canvas.height, blockSize, launchLine);
+            } else if (players.length === 2) {
+                const halfWidth = canvas.width / 2;
+                renderPlayerField(players[0], 0, 0, halfWidth, canvas.height, blockSize, launchLine);
+                renderPlayerField(players[1], halfWidth, 0, halfWidth, canvas.height, blockSize, launchLine);
+
+                // Divider
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(halfWidth, 0);
+                ctx.lineTo(halfWidth, canvas.height);
+                ctx.stroke();
+            } else if (players.length === 3) {
+                const colWidth = canvas.width / 3;
+                renderPlayerField(players[0], 0, 0, colWidth, canvas.height, blockSize, launchLine);
+                renderPlayerField(players[1], colWidth, 0, colWidth, canvas.height, blockSize, launchLine);
+                renderPlayerField(players[2], colWidth * 2, 0, colWidth, canvas.height, blockSize, launchLine);
+
+                // Dividers
+                ctx.strokeStyle = '#444';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(colWidth, 0);
+                ctx.lineTo(colWidth, canvas.height);
+                ctx.moveTo(colWidth * 2, 0);
+                ctx.lineTo(colWidth * 2, canvas.height);
+                ctx.stroke();
+            }
+
+            renderEffects();
+        }
+
+        function renderPlayerField(player, offsetX, offsetY, width, height, blockSize, launchLine) {
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+
+            ctx.beginPath();
+            ctx.rect(0, 0, width, height);
+            ctx.clip();
+
+            // If player is game over, show game over card
+            if (player.gameOver) {
+                drawGameOverCard(player, width, height);
+                ctx.restore();
+                return;
+            }
+
+            // Blocks
+            for (const block of player.blocks || []) {
+                drawBlock(block, blockSize, player.color);
+            }
+
+            // Bonus balls
+            for (const bonus of player.bonusBalls || []) {
+                ctx.fillStyle = '#FFD700';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(bonus.x, bonus.y, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // Balls in flight
+            for (const ball of player.balls || []) {
+                if (!ball.active) continue;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Aim line with charge effect
+            if (player.turnState === 'aiming' || player.turnState === 'charging') {
+                drawAimLineWithCharge(player, launchLine, width);
+            }
+
+            // UI overlay
+            drawUIOverlay(player, width, height);
+
+            ctx.restore();
+        }
+
+        function drawGameOverCard(player, width, height) {
+            // Semi-transparent background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Player color border
+            ctx.strokeStyle = player.color;
+            ctx.lineWidth = 5;
+            ctx.strokeRect(10, 10, width - 20, height - 20);
+
+            // Player name
+            ctx.fillStyle = player.color;
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText(player.name, width / 2, height * 0.2);
+
+            // "GAME OVER"
+            ctx.fillStyle = '#FF0000';
+            ctx.font = 'bold 32px sans-serif';
+            ctx.fillText('GAME OVER', width / 2, height * 0.35);
+
+            // Score
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.fillText(`Score: ${player.score}`, width / 2, height * 0.5);
+
+            // Turn Number
+            ctx.font = '20px sans-serif';
+            ctx.fillText(`Ходов: ${player.turnNumber}`, width / 2, height * 0.65);
+
+            // Waiting message
+            ctx.fillStyle = '#888';
+            ctx.font = '16px sans-serif';
+            ctx.fillText('Ожидание других игроков...', width / 2, height * 0.80);
+        }
+
+        function drawBlock(block, blockSize, playerColor) {
+            const halfSize = blockSize / 2;
+
+            // Block fill
+            ctx.fillStyle = playerColor;
+            ctx.globalAlpha = 0.7;
+            ctx.fillRect(block.x - halfSize, block.y - halfSize, blockSize, blockSize);
+            ctx.globalAlpha = 1.0;
+
+            // Border
+            ctx.strokeStyle = '#FFF';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(block.x - halfSize, block.y - halfSize, blockSize, blockSize);
+
+            // HP text
+            ctx.fillStyle = '#FFF';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(block.hp, block.x, block.y);
+
+            // HP bar
+            const barWidth = blockSize - 8;
+            const barHeight = 4;
+            const hpPercent = block.hp / block.maxHp;
+
+            ctx.fillStyle = '#333';
+            ctx.fillRect(block.x - barWidth/2, block.y + halfSize - 10, barWidth, barHeight);
+
+            ctx.fillStyle = hpPercent > 0.5 ? '#4CAF50' : (hpPercent > 0.25 ? '#FF9800' : '#F44336');
+            ctx.fillRect(block.x - barWidth/2, block.y + halfSize - 10, barWidth * hpPercent, barHeight);
+        }
+
+        function drawAimLineWithCharge(player, launchLine, width) {
+            const launchX = player.launchX !== null ? player.launchX : width / 2;
+            const angle = player.aimAngle;
+            const lineLength = 200;
+
+            const endX = launchX + Math.cos(angle) * lineLength;
+            const endY = launchLine + Math.sin(angle) * lineLength;
+
+            // CRITICAL: Show dead zone blockage
+            if (player.isInDeadZone) {
+                // Red blocking line
+                ctx.strokeStyle = '#FF0000';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 10]);
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(launchX, launchLine);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1.0;
+
+                // "BLOCKED" text
+                ctx.fillStyle = '#FF0000';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('БЛОКИРОВАНО', launchX, launchLine - 30);
+            } else {
+                // Normal dashed line
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 10]);
+                ctx.beginPath();
+                ctx.moveTo(launchX, launchLine);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Charge effect - fill line
+                if (player.turnState === 'charging' && player.chargeProgress > 0) {
+                    const progressX = launchX + (endX - launchX) * player.chargeProgress;
+                    const progressY = launchLine + (endY - launchLine) * player.chargeProgress;
+
+                    // Gradient green to red
+                    const gradient = ctx.createLinearGradient(launchX, launchLine, progressX, progressY);
+                    gradient.addColorStop(0, '#00FF00');
+                    gradient.addColorStop(0.5, '#FFFF00');
+                    gradient.addColorStop(1, '#FF0000');
+
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = 4;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.moveTo(launchX, launchLine);
+                    ctx.lineTo(progressX, progressY);
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+
+                    // Pulsing circle at end
+                    const pulseSize = 5 + Math.sin(Date.now() / 100) * 2;
+                    ctx.fillStyle = player.chargeProgress >= 1 ? '#00FF00' : '#FFFF00';
+                    ctx.beginPath();
+                    ctx.arc(progressX, progressY, pulseSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function drawUIOverlay(player, width, height) {
+            // Score
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(`Score: ${player.score}`, 10, 10);
+
+            // Ball count
+            ctx.font = 'bold 18px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText(`x${player.ballCount}`, width / 2, height - 25);
+
+            // Player name
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillStyle = player.color;
+            ctx.fillText(player.name, width / 2, 10);
+        }
+
+        function renderBallzLeaderboard() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Title
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 48px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            ctx.fillText('🏆 ФИНАЛЬНЫЕ РЕЗУЛЬТАТЫ 🏆', canvas.width / 2, 50);
+
+            // Leaderboard
+            const startY = 150;
+            const rowHeight = 80;
+
+            gameState.leaderboard.forEach((entry, i) => {
+                const y = startY + i * rowHeight;
+
+                // Highlight winner
+                if (entry.rank === 1) {
+                    ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
+                    ctx.fillRect(50, y - 10, canvas.width - 100, rowHeight - 10);
+                }
+
+                // Rank
+                ctx.fillStyle = entry.rank === 1 ? '#FFD700' : '#FFF';
+                ctx.font = 'bold 36px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(`#${entry.rank}`, 100, y);
+
+                // Player name (player color)
+                ctx.fillStyle = entry.color;
+                ctx.font = 'bold 28px sans-serif';
+                ctx.fillText(entry.name, 200, y);
+
+                // Score
+                ctx.fillStyle = '#FFF';
+                ctx.font = '24px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(`Score: ${entry.score}`, canvas.width - 300, y);
+
+                // Turn Number
+                ctx.fillStyle = '#AAA';
+                ctx.font = '20px sans-serif';
+                ctx.fillText(`Ходов: ${entry.turnNumber}`, canvas.width - 100, y);
+            });
+
+            // Instructions
+            ctx.fillStyle = '#888';
+            ctx.font = '18px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Используйте кнопки ниже для выбора действия', canvas.width / 2, canvas.height - 50);
+
+            // Show win screen buttons
+            const winScreen = document.getElementById('winScreen');
+            if (!winScreen.classList.contains('active')) {
+                showScreen('win');
             }
         }
 

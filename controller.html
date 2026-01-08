@@ -1389,8 +1389,19 @@
                                             // No calibration yet - start it
                                             (async () => {
                                                 try {
+                                                    // Отключаем кнопки пока калибровка инициализируется
+                                                    setMinBtn.disabled = true;
+                                                    setMaxBtn.disabled = true;
+
                                                     motionController.start();
                                                     await calibration.start();
+
+                                                    // Небольшая задержка чтобы calibration.currentStep точно установился
+                                                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                                                    // Включаем кнопки
+                                                    setMinBtn.disabled = false;
+                                                    setMaxBtn.disabled = false;
                                                 } catch (err) {
                                                     alert('❌ Ошибка калибровки: ' + err.message);
                                                 }

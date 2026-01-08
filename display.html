@@ -1142,6 +1142,8 @@
                         <label for="ballzDeadZone">Размер мёртвой зоны</label>
                         <select id="ballzDeadZone">
                             <option value="0">0% - Нет блокировки</option>
+                            <option value="0.01">1%</option>
+                            <option value="0.02">2%</option>
                             <option value="0.05" selected>5% - По краям</option>
                             <option value="0.10">10%</option>
                             <option value="0.15">15%</option>
@@ -1161,11 +1163,11 @@
                     <div class="setting-group">
                         <label for="ballzAimSensitivity">Чувствительность прицела</label>
                         <select id="ballzAimSensitivity">
-                            <option value="0.02">Очень чувствительная</option>
-                            <option value="0.05">Чувствительная</option>
-                            <option value="0.10" selected>Средняя</option>
-                            <option value="0.15">Низкая</option>
-                            <option value="0.20">Очень низкая</option>
+                            <option value="0.005">Минимальная</option>
+                            <option value="0.01">Очень низкая</option>
+                            <option value="0.02" selected>Низкая</option>
+                            <option value="0.05">Средняя</option>
+                            <option value="0.10">Высокая</option>
                         </select>
                         <div class="setting-info">Насколько легко сбивается зарядка</div>
                     </div>
@@ -1205,7 +1207,7 @@
                 gameSettings.lowerHPChance = parseInt(localStorage.getItem('ballzLowerHPChance')) || 30;
                 gameSettings.deadZoneSize = parseFloat(localStorage.getItem('ballzDeadZone')) || 0.05;
                 gameSettings.chargeTime = parseInt(localStorage.getItem('ballzChargeTime')) || 2000;
-                gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.10;
+                gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.02;
                 gameSettings.ballSpeed = parseInt(localStorage.getItem('ballzBallSpeed')) || 5;
                 gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 100;
                 gameSettings.bonusBallSpawnRate = parseInt(localStorage.getItem('ballzBonusSpawnRate')) || 15;
@@ -3615,16 +3617,43 @@
             ctx.save();
             ctx.translate(offsetX, offsetY);
 
+            const uiHeight = 40; // UI bar height above field
+            const fieldTop = uiHeight;
+            const fieldHeight = height - uiHeight;
+
+            // UI bar (above field)
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, width, uiHeight);
+            drawUIOverlay(player, width, uiHeight);
+
+            // Translate for field
+            ctx.save();
+            ctx.translate(0, fieldTop);
             ctx.beginPath();
-            ctx.rect(0, 0, width, height);
+            ctx.rect(0, 0, width, fieldHeight);
             ctx.clip();
 
             // If player is game over, show game over card
             if (player.gameOver) {
-                drawGameOverCard(player, width, height);
+                drawGameOverCard(player, width, fieldHeight);
+                ctx.restore();
                 ctx.restore();
                 return;
             }
+
+            // Field border
+            ctx.strokeStyle = player.color;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(0, 0, width, fieldHeight);
+
+            // Launch line
+            const adjustedLaunchLine = launchLine - fieldTop;
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, adjustedLaunchLine);
+            ctx.lineTo(width, adjustedLaunchLine);
+            ctx.stroke();
 
             // Blocks
             for (const block of player.blocks || []) {
@@ -3651,14 +3680,19 @@
                 ctx.fill();
             }
 
+            // Launch ball (on launch line)
+            const launchX = player.launchX !== null ? player.launchX : width / 2;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(launchX, adjustedLaunchLine, 5, 0, Math.PI * 2);
+            ctx.fill();
+
             // Aim line with charge effect
             if (player.turnState === 'aiming' || player.turnState === 'charging') {
-                drawAimLineWithCharge(player, launchLine, width);
+                drawAimLineWithCharge(player, adjustedLaunchLine, width);
             }
 
-            // UI overlay
-            drawUIOverlay(player, width, height);
-
+            ctx.restore();
             ctx.restore();
         }
 
@@ -3702,9 +3736,25 @@
         function drawBlock(block, blockSize, playerColor) {
             const halfSize = blockSize / 2;
 
+            // Color based on HP tier
+            let blockColor;
+            if (block.hp <= 5) {
+                blockColor = '#4CAF50'; // Green (easy)
+            } else if (block.hp <= 10) {
+                blockColor = '#2196F3'; // Blue
+            } else if (block.hp <= 20) {
+                blockColor = '#9C27B0'; // Purple
+            } else if (block.hp <= 30) {
+                blockColor = '#FF9800'; // Orange
+            } else if (block.hp <= 50) {
+                blockColor = '#F44336'; // Red
+            } else {
+                blockColor = '#B71C1C'; // Dark red (hard)
+            }
+
             // Block fill
-            ctx.fillStyle = playerColor;
-            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = blockColor;
+            ctx.globalAlpha = 0.85;
             ctx.fillRect(block.x - halfSize, block.y - halfSize, blockSize, blockSize);
             ctx.globalAlpha = 1.0;
 
@@ -3713,23 +3763,15 @@
             ctx.lineWidth = 2;
             ctx.strokeRect(block.x - halfSize, block.y - halfSize, blockSize, blockSize);
 
-            // HP text
+            // HP text (only number)
             ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 20px sans-serif';
+            ctx.font = 'bold 22px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 3;
+            ctx.shadowColor = '#000';
             ctx.fillText(block.hp, block.x, block.y);
-
-            // HP bar
-            const barWidth = blockSize - 8;
-            const barHeight = 4;
-            const hpPercent = block.hp / block.maxHp;
-
-            ctx.fillStyle = '#333';
-            ctx.fillRect(block.x - barWidth/2, block.y + halfSize - 10, barWidth, barHeight);
-
-            ctx.fillStyle = hpPercent > 0.5 ? '#4CAF50' : (hpPercent > 0.25 ? '#FF9800' : '#F44336');
-            ctx.fillRect(block.x - barWidth/2, block.y + halfSize - 10, barWidth * hpPercent, barHeight);
+            ctx.shadowBlur = 0;
         }
 
         // Calculate ball trajectory with reflections
@@ -3846,17 +3888,29 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('БЛОКИРОВАНО', launchX, launchLine - 30);
             } else {
-                // Normal dashed trajectory with reflections
+                // Normal trajectory with animated dots
                 ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 2;
-                ctx.setLineDash([5, 10]);
+                ctx.lineWidth = 1;
+                const dotSpacing = 10;
+                const dotRadius = 1.5;
+                const animationOffset = (Date.now() / 50) % dotSpacing; // Running dots
+
                 for (const seg of trajectory) {
-                    ctx.beginPath();
-                    ctx.moveTo(seg.x1, seg.y1);
-                    ctx.lineTo(seg.x2, seg.y2);
-                    ctx.stroke();
+                    const dx = seg.x2 - seg.x1;
+                    const dy = seg.y2 - seg.y1;
+                    const length = Math.hypot(dx, dy);
+                    const steps = Math.floor(length / dotSpacing);
+
+                    for (let i = 0; i < steps; i++) {
+                        const t = ((i * dotSpacing + animationOffset) % length) / length;
+                        const x = seg.x1 + dx * t;
+                        const y = seg.y1 + dy * t;
+
+                        ctx.beginPath();
+                        ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
-                ctx.setLineDash([]);
 
                 // Charge effect - fill trajectory segments
                 if (player.turnState === 'charging' && player.chargeProgress > 0) {
@@ -3943,24 +3997,25 @@
             }
         }
 
-        function drawUIOverlay(player, width, height) {
-            // Score
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 24px sans-serif';
+        function drawUIOverlay(player, width, uiHeight) {
+            // Player name (left)
+            ctx.fillStyle = player.color;
+            ctx.font = 'bold 16px sans-serif';
             ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
-            ctx.fillText(`Score: ${player.score}`, 10, 10);
+            ctx.textBaseline = 'middle';
+            ctx.fillText(player.name, 10, uiHeight / 2);
 
-            // Ball count
+            // Ball count (center)
+            ctx.fillStyle = '#FFD700';
             ctx.font = 'bold 18px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#FFD700';
-            ctx.fillText(`x${player.ballCount}`, width / 2, height - 25);
+            ctx.fillText(`x${player.ballCount}`, width / 2, uiHeight / 2);
 
-            // Player name
-            ctx.font = 'bold 16px sans-serif';
-            ctx.fillStyle = player.color;
-            ctx.fillText(player.name, width / 2, 10);
+            // Score (right)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 18px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${player.score}`, width - 10, uiHeight / 2);
         }
 
         function renderBallzLeaderboard() {

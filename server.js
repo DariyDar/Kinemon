@@ -3128,10 +3128,12 @@ function updateBallzPlayer(room, player) {
 
 // State: AIMING - Player is tilting phone to aim
 function updateAiming(room, player) {
-    // Convert tilt to angle - shooting UPWARD (canvas: 0° = right, 90° = down, 270° = up)
-    // tilt 0 = 190° (left-up), tilt 1 = 350° (right-up)
-    const minAngle = 190 * Math.PI / 180;  // 10° left of straight up
-    const maxAngle = 350 * Math.PI / 180;  // 10° right of straight up
+    // CRITICAL FIX: Full 160° aiming arc shooting UPWARD
+    // Canvas coordinates with -sin(angle): 0° = right, 90° = up, 180° = left
+    // Full aiming range: 10° (nearly right) to 170° (nearly left)
+    // tilt 0 = 10°, tilt 0.5 = 90° (straight up), tilt 1 = 170°
+    const minAngle = 10 * Math.PI / 180;   // 10° from horizontal right
+    const maxAngle = 170 * Math.PI / 180;  // 10° from horizontal left
     player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
 
     // CRITICAL: Check dead zone (both ends)

@@ -83,7 +83,20 @@ class MotionController {
         // Map to normalized value between min and max calibration
         if (this.minTilt !== 0 || this.maxTilt !== 0) {
             // Calibrated mode
-            const range = this.maxTilt - this.minTilt;
+            let range = this.maxTilt - this.minTilt;
+
+            // CRITICAL FIX: Ensure minimum range to prevent jumpy normalization
+            // If range is too small (< 15°), interpolation becomes unstable
+            const MIN_RANGE = 15;
+            if (Math.abs(range) < MIN_RANGE) {
+                console.warn(`⚠️ Calibration range too small (${range.toFixed(1)}°), enforcing minimum ${MIN_RANGE}°`);
+                // Expand range symmetrically around current midpoint
+                const midpoint = (this.minTilt + this.maxTilt) / 2;
+                this.minTilt = midpoint - MIN_RANGE / 2;
+                this.maxTilt = midpoint + MIN_RANGE / 2;
+                range = MIN_RANGE;
+            }
+
             const normalized = (rawValue - this.minTilt) / range;
             // Allow 30% overflow beyond calibrated range (-0.3 to 1.3)
             this.currentTilt = Math.max(-0.3, Math.min(1.3, normalized));

@@ -1396,6 +1396,10 @@
 
             console.log('Game settings:', gameSettings);
 
+            // Reset QR generation flags for new game
+            window.waitingQRCodeGenerated = false;
+            window.persistentQRGenerated = false;
+
             // Show connection screen and connect
             showScreen('connection');
 
@@ -1715,36 +1719,44 @@
 
                         console.log('QR Code URL:', qrData);
 
-                        // Generate large QR code for waiting screen (only once!)
-                        // ALWAYS clean up before generating new QR code to prevent duplicates
-                        const waitingQR = document.getElementById('waitingQRCode');
+                        // CRITICAL FIX: Prevent duplicate QR code generation
+                        // Only generate if not already generated
+                        if (!window.waitingQRCodeGenerated) {
+                            console.log('✅ Generating waiting QR code (first time)');
 
-                        // Aggressive cleanup - remove all child nodes
-                        while (waitingQR.firstChild) {
-                            waitingQR.removeChild(waitingQR.firstChild);
+                            const waitingQR = document.getElementById('waitingQRCode');
+
+                            // Aggressive cleanup - remove all child nodes
+                            while (waitingQR.firstChild) {
+                                waitingQR.removeChild(waitingQR.firstChild);
+                            }
+
+                            // Adaptive QR size based on screen resolution
+                            const screenWidth = window.innerWidth;
+                            const screenHeight = window.innerHeight;
+                            let qrSize = 500; // Default for small screens (phones)
+
+                            if (screenWidth >= 2560 || screenHeight >= 1440) {
+                                qrSize = 250; // 4K projectors - very small
+                            } else if (screenWidth >= 1920 || screenHeight >= 1080) {
+                                qrSize = 300; // Full HD projectors - small
+                            } else if (screenWidth >= 1024 || screenHeight >= 768) {
+                                qrSize = 380; // Tablets/medium projectors
+                            }
+
+                            new QRCode(waitingQR, {
+                                text: qrData,
+                                width: qrSize,
+                                height: qrSize,
+                                colorDark: '#000000',
+                                colorLight: '#ffffff',
+                                correctLevel: QRCode.CorrectLevel.M
+                            });
+
+                            window.waitingQRCodeGenerated = true;
+                        } else {
+                            console.log('⚠️ Waiting QR code already generated, skipping duplicate');
                         }
-
-                        // Adaptive QR size based on screen resolution
-                        const screenWidth = window.innerWidth;
-                        const screenHeight = window.innerHeight;
-                        let qrSize = 500; // Default for small screens (phones)
-
-                        if (screenWidth >= 2560 || screenHeight >= 1440) {
-                            qrSize = 250; // 4K projectors - very small
-                        } else if (screenWidth >= 1920 || screenHeight >= 1080) {
-                            qrSize = 300; // Full HD projectors - small
-                        } else if (screenWidth >= 1024 || screenHeight >= 768) {
-                            qrSize = 380; // Tablets/medium projectors
-                        }
-
-                        new QRCode(waitingQR, {
-                            text: qrData,
-                            width: qrSize,
-                            height: qrSize,
-                            colorDark: '#000000',
-                            colorLight: '#ffffff',
-                            correctLevel: QRCode.CorrectLevel.M
-                        });
 
                         // Store QR data globally for later use (lobby/game screens)
                         window.persistentQRData = qrData;
@@ -2366,6 +2378,13 @@
                 const winScreen = document.getElementById('winScreen');
                 const gameSelectionScreen = document.getElementById('gameSelectionScreen');
 
+                // CRITICAL FIX: Don't interfere if game selection screen is active
+                // User clicked "Change Game" button and selection screen must remain visible
+                if (gameSelectionScreen && gameSelectionScreen.classList.contains('active')) {
+                    // Game selection screen is active - don't render anything, just return
+                    return;
+                }
+
                 // For Ballz: render leaderboard instead of win screen
                 if (gameState.gameType === 'ballz' && gameState.leaderboard) {
                     renderBallzLeaderboard();
@@ -2373,7 +2392,7 @@
                 }
 
                 // Only show win screen if not already on win/selection screens
-                if (!winScreen.classList.contains('active') && !gameSelectionScreen.classList.contains('active')) {
+                if (!winScreen.classList.contains('active')) {
                     showWinScreen(gameState.winner, gameState.gameType);
                 }
                 return;

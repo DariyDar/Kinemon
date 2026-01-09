@@ -3603,570 +3603,304 @@
         // BALLZ RENDERING
         // ========================================================================
 
-        function renderBallz() {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // ==================== BALLZ v3.25.0 - Single Player ====================
 
-            const players = gameState.players || [];
-            const launchLine = canvas.height - 40;
+function renderBallz() {
+    // Black background
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // CRITICAL: Calculate field dimensions based on player count
-            // Each player needs their own scaled field that fits in their portion of screen
-            let playerWidth, playerCount;
+    // v3.25.0: Single player only
+    const player = gameState.players && gameState.players[0];
+    if (!player) return;
 
-            if (players.length === 1) {
-                playerWidth = canvas.width;
-                playerCount = 1;
-            } else if (players.length === 2) {
-                playerWidth = canvas.width / 2;
-                playerCount = 2;
-            } else {
-                playerWidth = canvas.width / 3;
-                playerCount = 3;
-            }
+    // Game over screen
+    if (player.gameOver) {
+        drawBallzGameOver(player);
+        return;
+    }
 
-            // CRITICAL: Calculate blockSize that fits in player's width
-            // Server uses fieldWidth blocks, we need to fit them in playerWidth
-            const fieldWidth = gameState.fieldWidth || 7;
-            const blockSize = Math.floor(playerWidth / fieldWidth);
+    // Calculate field dimensions with aspect ratio
+    const aspectRatio = gameState.aspectRatio || 0.75; // 3:4 default
+    const cols = gameState.cols || 7;
+    const rows = gameState.rows || 14;
 
-            // Layout players
-            if (players.length === 1) {
-                renderPlayerField(players[0], 0, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
-            } else if (players.length === 2) {
-                renderPlayerField(players[0], 0, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
-                renderPlayerField(players[1], playerWidth, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
+    // Adaptive canvas sizing
+    let fieldWidth, fieldHeight;
+    if (canvas.width / canvas.height > aspectRatio) {
+        // Canvas wider than needed - fit by height
+        fieldHeight = canvas.height;
+        fieldWidth = fieldHeight * aspectRatio;
+    } else {
+        // Canvas taller than needed - fit by width
+        fieldWidth = canvas.width;
+        fieldHeight = fieldWidth / aspectRatio;
+    }
 
-                // Divider
-                ctx.strokeStyle = '#444';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.moveTo(playerWidth, 0);
-                ctx.lineTo(playerWidth, canvas.height);
-                ctx.stroke();
-            } else if (players.length === 3) {
-                renderPlayerField(players[0], 0, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
-                renderPlayerField(players[1], playerWidth, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
-                renderPlayerField(players[2], playerWidth * 2, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
+    // Center the field
+    const offsetX = (canvas.width - fieldWidth) / 2;
+    const offsetY = (canvas.height - fieldHeight) / 2;
 
-                // Dividers
-                ctx.strokeStyle = '#444';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.moveTo(playerWidth, 0);
-                ctx.lineTo(playerWidth, canvas.height);
-                ctx.moveTo(playerWidth * 2, 0);
-                ctx.lineTo(playerWidth * 2, canvas.height);
-                ctx.stroke();
-            }
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
 
-            // Render visual effects
-            // Particles
-            for (const p of effects.particles) {
-                ctx.globalAlpha = p.alpha;
-                ctx.fillStyle = p.color;
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.globalAlpha = 1.0;
+    // Field border
+    ctx.strokeStyle = player.color || '#4CAF50';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, fieldWidth, fieldHeight);
 
-            // Flash
-            if (effects.flash.active) {
-                ctx.fillStyle = effects.flash.color;
-                ctx.globalAlpha = effects.flash.alpha;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.globalAlpha = 1.0;
-            }
+    // Launch line (at y = 1.0 = bottom)
+    const launchLineY = fieldHeight * 0.95; // 95% down
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, launchLineY);
+    ctx.lineTo(fieldWidth, launchLineY);
+    ctx.stroke();
 
-            // Score animations
-            ctx.font = 'bold 24px sans-serif';
-            ctx.textAlign = 'center';
-            for (const anim of effects.scoreAnims) {
-                ctx.globalAlpha = anim.alpha;
-                ctx.fillStyle = anim.color;
-                ctx.fillText(anim.text, anim.x, anim.y);
-            }
-            ctx.globalAlpha = 1.0;
-        }
+    // Blocks (relative gridX, gridY)
+    const blockWidth = fieldWidth / cols;
+    const blockHeight = fieldHeight / rows;
 
-        function renderPlayerField(player, offsetX, offsetY, width, height, blockSize, launchLine, fieldWidth) {
-            ctx.save();
-            ctx.translate(offsetX, offsetY);
+    for (const block of player.blocks || []) {
+        const x = block.gridX * blockWidth + blockWidth / 2;
+        const y = block.gridY * blockHeight + blockHeight / 2;
+        drawBallzBlock(x, y, blockWidth, blockHeight, block.hp, block.maxHp);
+    }
 
-            const uiHeight = 40; // UI bar height above field
-            const fieldTop = uiHeight;
-            const fieldHeight = height - uiHeight;
+    // Bonus balls
+    for (const bonus of player.bonusBalls || []) {
+        const x = bonus.gridX * blockWidth + blockWidth / 2;
+        const y = bonus.gridY * blockHeight + blockHeight / 2;
+        ctx.fillStyle = '#FFD700';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    }
 
-            // CRITICAL: Calculate scale factor for coordinates
-            // Server generates coordinates for 50px blocks, we use dynamic blockSize
-            const serverBlockSize = 50;
-            const scale = blockSize / serverBlockSize;
+    // Flying balls (relative 0-1 coordinates)
+    for (const ball of player.balls || []) {
+        if (!ball.active) continue;
+        const x = ball.x * fieldWidth;
+        const y = ball.y * fieldHeight;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
-            // UI bar (above field)
-            ctx.fillStyle = '#1a1a1a';
-            ctx.fillRect(0, 0, width, uiHeight);
-            drawUIOverlay(player, width, uiHeight);
+    // Launch ball (only when aiming/charging)
+    if (player.turnState === 'aiming' || player.turnState === 'charging') {
+        const launchX = player.launchX !== null ? player.launchX * fieldWidth : fieldWidth / 2;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(launchX, launchLineY, 5, 0, Math.PI * 2);
+        ctx.fill();
 
-            // Translate for field
-            ctx.save();
-            ctx.translate(0, fieldTop);
+        // Aim line with charge effect
+        drawBallzAimLine(player, launchX, launchLineY, fieldWidth, fieldHeight, cols, rows);
+    }
+
+    // UI overlay (top of field)
+    drawBallzUI(player, fieldWidth);
+
+    ctx.restore();
+
+    // Render effects (particles, etc.)
+    renderEffects();
+}
+
+function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {
+    const halfW = width / 2;
+    const halfH = height / 2;
+
+    // HP-based color
+    let color;
+    if (hp <= 5) color = '#4CAF50'; // Green (1-5)
+    else if (hp <= 10) color = '#2196F3'; // Blue (6-10)
+    else if (hp <= 20) color = '#9C27B0'; // Purple (11-20)
+    else if (hp <= 30) color = '#FF9800'; // Orange (21-30)
+    else if (hp <= 50) color = '#F44336'; // Red (31-50)
+    else color = '#B71C1C'; // Dark red (51+)
+
+    // Block fill
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.8;
+    ctx.fillRect(centerX - halfW, centerY - halfH, width, height);
+    ctx.globalAlpha = 1.0;
+
+    // Border
+    ctx.strokeStyle = '#FFF';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(centerX - halfW, centerY - halfH, width, height);
+
+    // HP text
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(hp, centerX, centerY);
+}
+
+function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, cols, rows) {
+    const angle = player.aimAngle;
+
+    // Dead zone check
+    if (player.isInDeadZone) {
+        // Red blocked line
+        const endX = launchX + Math.cos(angle) * 150;
+        const endY = launchY + -Math.sin(angle) * 150;
+
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = 0.5;
+        ctx.setLineDash([5, 10]);
+        ctx.beginPath();
+        ctx.moveTo(launchX, launchY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1.0;
+
+        // "BLOCKED" text
+        ctx.fillStyle = '#FF0000';
+        ctx.font = 'bold 16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('BLOCKED', launchX, launchY - 30);
+        return;
+    }
+
+    // Simulate trajectory (TODO: call server function or replicate logic)
+    // For now, simple line with charge effect
+    const endX = launchX + Math.cos(angle) * 200;
+    const endY = launchY + -Math.sin(angle) * 200;
+
+    // Dotted line (animated)
+    const dotSpacing = 8;
+    const dotRadius = 1;
+    const offset = (Date.now() / 500) % 1; // Toggle every 0.5s
+
+    ctx.fillStyle = '#FFFFFF';
+    for (let d = 0; d < 200; d += dotSpacing) {
+        const t = d / 200;
+        if (Math.floor((t + offset) * 2) % 2 === 0) {
+            const x = launchX + (endX - launchX) * t;
+            const y = launchY + (endY - launchY) * t;
             ctx.beginPath();
-            ctx.rect(0, 0, width, fieldHeight);
-            ctx.clip();
+            ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
 
-            // If player is game over, show game over card
-            if (player.gameOver) {
-                drawGameOverCard(player, width, fieldHeight);
-                ctx.restore();
-                ctx.restore();
-                return;
-            }
+    // Charge effect (fill line)
+    if (player.turnState === 'charging' && player.chargeProgress > 0) {
+        const progressX = launchX + (endX - launchX) * player.chargeProgress;
+        const progressY = launchY + (endY - launchY) * player.chargeProgress;
 
-            // Field border
-            ctx.strokeStyle = player.color;
-            ctx.lineWidth = 3;
-            ctx.strokeRect(0, 0, width, fieldHeight);
-
-            // Launch line (scale Y coordinate)
-            // No need to subtract fieldTop - we already translated by fieldTop
-            const adjustedLaunchLine = launchLine * scale;
-            ctx.strokeStyle = '#666';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(0, adjustedLaunchLine);
-            ctx.lineTo(width, adjustedLaunchLine);
-            ctx.stroke();
-
-            // Blocks (scale coordinates from server space to player space)
-            // No need to subtract fieldTop - we already translated by fieldTop
-            for (const block of player.blocks || []) {
-                const blockCopy = {
-                    ...block,
-                    x: block.x * scale,
-                    y: block.y * scale
-                };
-                drawBlock(blockCopy, blockSize, player.color);
-            }
-
-            // Bonus balls (scale coordinates)
-            for (const bonus of player.bonusBalls || []) {
-                ctx.fillStyle = '#FFD700';
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = '#FFD700';
-                ctx.beginPath();
-                ctx.arc(bonus.x * scale, bonus.y * scale, 10, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-
-            // Balls in flight (scale coordinates)
-            for (const ball of player.balls || []) {
-                if (!ball.active) continue;
-                ctx.fillStyle = '#FFFFFF';
-                ctx.beginPath();
-                ctx.arc(ball.x * scale, ball.y * scale, 5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Launch ball (on launch line) - ONLY show when NOT launching or in flight
-            if (player.turnState !== 'launching' && player.turnState !== 'balls_in_flight') {
-                const launchX = player.launchX !== null ? player.launchX : width / 2;
-                ctx.fillStyle = '#FFFFFF';
-                ctx.beginPath();
-                ctx.arc(launchX, adjustedLaunchLine, 5, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // Aim line with charge effect
-            if (player.turnState === 'aiming' || player.turnState === 'charging') {
-                drawAimLineWithCharge(player, adjustedLaunchLine, width);
-            }
-
-            ctx.restore();
-            ctx.restore();
+        // Gradient: green → yellow → red
+        const gradient = ctx.createLinearGradient(launchX, launchY, progressX, progressY);
+        const progress = player.chargeProgress;
+        if (progress < 0.5) {
+            gradient.addColorStop(0, '#00FF00');
+            gradient.addColorStop(1, '#FFFF00');
+        } else {
+            gradient.addColorStop(0, '#FFFF00');
+            gradient.addColorStop(1, '#FF0000');
         }
 
-        function drawGameOverCard(player, width, height) {
-            // Semi-transparent background
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-            ctx.fillRect(0, 0, width, height);
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(launchX, launchY);
+        ctx.lineTo(progressX, progressY);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
-            // Player color border
-            ctx.strokeStyle = player.color;
-            ctx.lineWidth = 5;
-            ctx.strokeRect(10, 10, width - 20, height - 20);
+        // Pulsing indicator
+        const pulseSize = 5 + Math.sin(Date.now() / 100) * 2;
+        ctx.fillStyle = progress >= 1 ? '#00FF00' : '#FFFF00';
+        ctx.beginPath();
+        ctx.arc(progressX, progressY, pulseSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
 
-            // Player name
-            ctx.fillStyle = player.color;
-            ctx.font = 'bold 24px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText(player.name, width / 2, height * 0.2);
+function drawBallzUI(player, fieldWidth) {
+    const uiHeight = 40;
 
-            // "GAME OVER"
-            ctx.fillStyle = '#FF0000';
-            ctx.font = 'bold 32px sans-serif';
-            ctx.fillText('GAME OVER', width / 2, height * 0.35);
+    // UI background
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, fieldWidth, uiHeight);
 
-            // Score
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 28px sans-serif';
-            ctx.fillText(`Score: ${player.score}`, width / 2, height * 0.5);
+    // Player name (left)
+    ctx.fillStyle = player.color || '#4CAF50';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(player.name, 10, uiHeight / 2);
 
-            // Turn Number
-            ctx.font = '20px sans-serif';
-            ctx.fillText(`Ходов: ${player.turnNumber}`, width / 2, height * 0.65);
+    // Ball count (center)
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(`x${player.ballCount}`, fieldWidth / 2, uiHeight / 2);
 
-            // Waiting message
-            ctx.fillStyle = '#888';
-            ctx.font = '16px sans-serif';
-            ctx.fillText('Ожидание других игроков...', width / 2, height * 0.80);
-        }
+    // Score (right)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${player.score}`, fieldWidth - 10, uiHeight / 2);
+}
 
-        function drawBlock(block, blockSize, playerColor) {
-            const halfSize = blockSize / 2;
+function drawBallzGameOver(player) {
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Color based on HP tier
-            let blockColor;
-            if (block.hp <= 5) {
-                blockColor = '#4CAF50'; // Green (easy)
-            } else if (block.hp <= 10) {
-                blockColor = '#2196F3'; // Blue
-            } else if (block.hp <= 20) {
-                blockColor = '#9C27B0'; // Purple
-            } else if (block.hp <= 30) {
-                blockColor = '#FF9800'; // Orange
-            } else if (block.hp <= 50) {
-                blockColor = '#F44336'; // Red
-            } else {
-                blockColor = '#B71C1C'; // Dark red (hard)
-            }
+    // Player color border
+    ctx.strokeStyle = player.color || '#4CAF50';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(50, 50, canvas.width - 100, canvas.height - 100);
 
-            // Block fill
-            ctx.fillStyle = blockColor;
-            ctx.globalAlpha = 0.85;
-            ctx.fillRect(block.x - halfSize, block.y - halfSize, blockSize, blockSize);
-            ctx.globalAlpha = 1.0;
+    // "GAME OVER"
+    ctx.fillStyle = '#FF0000';
+    ctx.font = 'bold 48px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GAME OVER', canvas.width / 2, canvas.height * 0.3);
 
-            // Border
-            ctx.strokeStyle = '#FFF';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(block.x - halfSize, block.y - halfSize, blockSize, blockSize);
+    // Score
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.fillText(`Score: ${player.score}`, canvas.width / 2, canvas.height * 0.5);
 
-            // HP text (only number)
-            ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 22px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.shadowBlur = 3;
-            ctx.shadowColor = '#000';
-            ctx.fillText(block.hp, block.x, block.y);
-            ctx.shadowBlur = 0;
-        }
+    // Turn number
+    ctx.font = '24px sans-serif';
+    ctx.fillText(`Ходов: ${player.turnNumber}`, canvas.width / 2, canvas.height * 0.65);
 
-        // Calculate ball trajectory with reflections
-        function calculateTrajectory(player, startX, startY, angle, fieldWidth) {
-            const ballRadius = 5;
-            const blockSize = gameState.blockSize || 50;
-            const maxSegments = 5; // Max reflection segments to show
-            const segmentLength = 150; // Length per segment
+    // Player name
+    ctx.fillStyle = player.color || '#4CAF50';
+    ctx.font = 'bold 20px sans-serif';
+    ctx.fillText(player.name, canvas.width / 2, canvas.height * 0.8);
+}
 
-            const trajectory = [];
-            let x = startX;
-            let y = startY;
-            let vx = Math.cos(angle);
-            let vy = -Math.sin(angle); // NEGATIVE because canvas Y grows downward
+function renderBallzLeaderboard() {
+    // This function is only called for multiplayer (which v3.25.0 doesn't have)
+    // Keeping it for compatibility, but single-player uses drawBallzGameOver instead
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            for (let i = 0; i < maxSegments; i++) {
-                // Simulate ball movement for this segment
-                let hitSomething = false;
-                let hitX = x;
-                let hitY = y;
-                let travelDist = 0;
-
-                while (travelDist < segmentLength && !hitSomething) {
-                    const step = 2;
-                    hitX += vx * step;
-                    hitY += vy * step;
-                    travelDist += step;
-
-                    // Check wall collisions
-                    if (hitX <= ballRadius || hitX >= fieldWidth - ballRadius) {
-                        vx = -vx;
-                        hitX = Math.max(ballRadius, Math.min(fieldWidth - ballRadius, hitX));
-                        hitSomething = true;
-                    }
-
-                    if (hitY <= ballRadius) {
-                        vy = -vy;
-                        hitY = ballRadius;
-                        hitSomething = true;
-                    }
-
-                    // Check block collisions
-                    for (const block of player.blocks || []) {
-                        if (checkBallBlockCollisionClient(hitX, hitY, block, blockSize, ballRadius)) {
-                            // Simple reflection - reverse direction based on hit side
-                            const dx = hitX - block.x;
-                            const dy = hitY - block.y;
-                            const halfSize = blockSize / 2;
-
-                            const overlapX = halfSize - Math.abs(dx);
-                            const overlapY = halfSize - Math.abs(dy);
-
-                            if (overlapX < overlapY) {
-                                vx = -vx;
-                            } else {
-                                vy = -vy;
-                            }
-                            hitSomething = true;
-                            break;
-                        }
-                    }
-                }
-
-                trajectory.push({ x1: x, y1: y, x2: hitX, y2: hitY });
-                x = hitX;
-                y = hitY;
-
-                // Stop if ball goes below launch line
-                if (y >= startY) break;
-            }
-
-            return trajectory;
-        }
-
-        // Client-side collision detection for trajectory preview
-        function checkBallBlockCollisionClient(ballX, ballY, block, blockSize, ballRadius) {
-            const halfSize = blockSize / 2;
-            const closestX = Math.max(block.x - halfSize, Math.min(ballX, block.x + halfSize));
-            const closestY = Math.max(block.y - halfSize, Math.min(ballY, block.y + halfSize));
-
-            const distX = ballX - closestX;
-            const distY = ballY - closestY;
-            const distSquared = distX * distX + distY * distY;
-
-            return distSquared < (ballRadius * ballRadius);
-        }
-
-        function drawAimLineWithCharge(player, launchLine, width) {
-            const launchX = player.launchX !== null ? player.launchX : width / 2;
-            const angle = player.aimAngle;
-
-            // Calculate trajectory with reflections
-            const trajectory = calculateTrajectory(player, launchX, launchLine, angle, width);
-
-            // CRITICAL: Show dead zone blockage
-            if (player.isInDeadZone) {
-                // Red blocking line - show simple trajectory
-                ctx.strokeStyle = '#FF0000';
-                ctx.lineWidth = 3;
-                ctx.setLineDash([5, 10]);
-                ctx.globalAlpha = 0.5;
-                for (const seg of trajectory) {
-                    ctx.beginPath();
-                    ctx.moveTo(seg.x1, seg.y1);
-                    ctx.lineTo(seg.x2, seg.y2);
-                    ctx.stroke();
-                }
-                ctx.setLineDash([]);
-                ctx.globalAlpha = 1.0;
-
-                // "BLOCKED" text
-                ctx.fillStyle = '#FF0000';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('БЛОКИРОВАНО', launchX, launchLine - 30);
-            } else {
-                // Normal trajectory with simple 2-frame dot animation
-                ctx.fillStyle = '#FFFFFF';
-                const dotSpacing = 8;
-                const dotRadius = 1; // 1px dots
-                const frame = Math.floor(Date.now() / 500) % 2; // Toggle every 0.5s
-
-                for (const seg of trajectory) {
-                    const dx = seg.x2 - seg.x1;
-                    const dy = seg.y2 - seg.y1;
-                    const length = Math.hypot(dx, dy);
-                    const steps = Math.floor(length / dotSpacing);
-
-                    for (let i = frame; i < steps; i += 2) { // Every other dot based on frame
-                        const t = (i * dotSpacing) / length;
-                        const x = seg.x1 + dx * t;
-                        const y = seg.y1 + dy * t;
-
-                        ctx.beginPath();
-                        ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-
-                // Charge effect - fill trajectory segments
-                if (player.turnState === 'charging' && player.chargeProgress > 0) {
-                    // Calculate total trajectory length
-                    let totalLength = 0;
-                    const lengths = [];
-                    for (const seg of trajectory) {
-                        const len = Math.hypot(seg.x2 - seg.x1, seg.y2 - seg.y1);
-                        lengths.push(len);
-                        totalLength += len;
-                    }
-
-                    // Fill up to chargeProgress
-                    const targetLength = totalLength * player.chargeProgress;
-                    let filled = 0;
-
-                    ctx.lineWidth = 4;
-                    ctx.shadowBlur = 10;
-                    ctx.shadowColor = '#FFFFFF';
-
-                    for (let i = 0; i < trajectory.length; i++) {
-                        const seg = trajectory[i];
-                        const segLen = lengths[i];
-
-                        if (filled + segLen <= targetLength) {
-                            // Fill entire segment
-                            const gradient = ctx.createLinearGradient(seg.x1, seg.y1, seg.x2, seg.y2);
-                            const progress1 = filled / totalLength;
-                            const progress2 = (filled + segLen) / totalLength;
-                            gradient.addColorStop(0, getChargeColor(progress1));
-                            gradient.addColorStop(1, getChargeColor(progress2));
-
-                            ctx.strokeStyle = gradient;
-                            ctx.beginPath();
-                            ctx.moveTo(seg.x1, seg.y1);
-                            ctx.lineTo(seg.x2, seg.y2);
-                            ctx.stroke();
-
-                            filled += segLen;
-                        } else if (filled < targetLength) {
-                            // Partially fill segment
-                            const ratio = (targetLength - filled) / segLen;
-                            const endX = seg.x1 + (seg.x2 - seg.x1) * ratio;
-                            const endY = seg.y1 + (seg.y2 - seg.y1) * ratio;
-
-                            const gradient = ctx.createLinearGradient(seg.x1, seg.y1, endX, endY);
-                            const progress1 = filled / totalLength;
-                            const progress2 = targetLength / totalLength;
-                            gradient.addColorStop(0, getChargeColor(progress1));
-                            gradient.addColorStop(1, getChargeColor(progress2));
-
-                            ctx.strokeStyle = gradient;
-                            ctx.beginPath();
-                            ctx.moveTo(seg.x1, seg.y1);
-                            ctx.lineTo(endX, endY);
-                            ctx.stroke();
-
-                            // Pulsing circle at end
-                            const pulseSize = 5 + Math.sin(Date.now() / 100) * 2;
-                            ctx.fillStyle = player.chargeProgress >= 1 ? '#00FF00' : '#FFFF00';
-                            ctx.beginPath();
-                            ctx.arc(endX, endY, pulseSize, 0, Math.PI * 2);
-                            ctx.fill();
-
-                            break;
-                        }
-                    }
-
-                    ctx.shadowBlur = 0;
-                }
-            }
-        }
-
-        // Get charge color based on progress (0-1)
-        function getChargeColor(progress) {
-            if (progress < 0.5) {
-                // Green to Yellow
-                const t = progress * 2;
-                return `rgb(${Math.floor(t * 255)}, 255, 0)`;
-            } else {
-                // Yellow to Red
-                const t = (progress - 0.5) * 2;
-                return `rgb(255, ${Math.floor((1 - t) * 255)}, 0)`;
-            }
-        }
-
-        function drawUIOverlay(player, width, uiHeight) {
-            // Player name (left)
-            ctx.fillStyle = player.color;
-            ctx.font = 'bold 16px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(player.name, 10, uiHeight / 2);
-
-            // Ball count (center)
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 18px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`x${player.ballCount}`, width / 2, uiHeight / 2);
-
-            // Score (right)
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = 'bold 18px sans-serif';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${player.score}`, width - 10, uiHeight / 2);
-        }
-
-        function renderBallzLeaderboard() {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Title
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 48px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText('🏆 ФИНАЛЬНЫЕ РЕЗУЛЬТАТЫ 🏆', canvas.width / 2, 50);
-
-            // Leaderboard
-            const startY = 150;
-            const rowHeight = 80;
-
-            gameState.leaderboard.forEach((entry, i) => {
-                const y = startY + i * rowHeight;
-
-                // Highlight winner
-                if (entry.rank === 1) {
-                    ctx.fillStyle = 'rgba(255, 215, 0, 0.2)';
-                    ctx.fillRect(50, y - 10, canvas.width - 100, rowHeight - 10);
-                }
-
-                // Rank
-                ctx.fillStyle = entry.rank === 1 ? '#FFD700' : '#FFF';
-                ctx.font = 'bold 36px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText(`#${entry.rank}`, 100, y);
-
-                // Player name (player color)
-                ctx.fillStyle = entry.color;
-                ctx.font = 'bold 28px sans-serif';
-                ctx.fillText(entry.name, 200, y);
-
-                // Score
-                ctx.fillStyle = '#FFF';
-                ctx.font = '24px sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(`Score: ${entry.score}`, canvas.width - 300, y);
-
-                // Turn Number
-                ctx.fillStyle = '#AAA';
-                ctx.font = '20px sans-serif';
-                ctx.fillText(`Ходов: ${entry.turnNumber}`, canvas.width - 100, y);
-            });
-
-            // Instructions
-            ctx.fillStyle = '#888';
-            ctx.font = '18px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('Используйте кнопки ниже для выбора действия', canvas.width / 2, canvas.height - 50);
-
-            // Show win screen buttons
-            const winScreen = document.getElementById('winScreen');
-            if (!winScreen.classList.contains('active')) {
-                showScreen('win');
-            }
-        }
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Single Player Mode', canvas.width / 2, canvas.height / 2);
+}
 
         function lightenColor(color, percent) {
             const num = parseInt(color.replace('#', ''), 16);

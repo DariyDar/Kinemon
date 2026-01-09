@@ -916,6 +916,8 @@
         const waitingScreen = document.getElementById('waitingScreen');
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        // Disable image smoothing for crisp rendering (fixes blurry appearance)
+        ctx.imageSmoothingEnabled = false;
 
         // Function to scale canvas to fit screen while maintaining aspect ratio
         function scaleCanvasToScreen() {
@@ -1557,7 +1559,6 @@
                 roomInfo.style.display = 'none';
                 scoreboard.style.display = 'none';
                 // Reset waiting QR flag when leaving waiting screen
-                window.waitingQRGenerated = false;
                 // Generate and show persistent QR on lobby screen (first time only)
                 if (!window.persistentQRGenerated && window.persistentQRData) {
                     generatePersistentQR(window.persistentQRData);
@@ -1571,7 +1572,6 @@
                 roomInfo.style.display = 'none';
                 scoreboard.style.display = 'none';
                 // Reset waiting QR flag for potential new game
-                window.waitingQRGenerated = false;
             } else if (screenName === 'gameSelection') {
                 document.getElementById('gameSelectionScreen').classList.add('active');
                 canvas.classList.remove('active');
@@ -1581,7 +1581,6 @@
                 canvas.classList.add('active');
                 scaleCanvasToScreen(); // Scale when canvas becomes visible
                 // Reset waiting QR flag when leaving waiting screen
-                window.waitingQRGenerated = false;
                 // Generate and show persistent QR on game screen (first time only)
                 if (!window.persistentQRGenerated && window.persistentQRData) {
                     generatePersistentQR(window.persistentQRData);
@@ -1717,51 +1716,35 @@
                         console.log('QR Code URL:', qrData);
 
                         // Generate large QR code for waiting screen (only once!)
-                        if (!window.waitingQRGenerated) {
-                            const waitingQR = document.getElementById('waitingQRCode');
+                        // ALWAYS clean up before generating new QR code to prevent duplicates
+                        const waitingQR = document.getElementById('waitingQRCode');
 
-                            console.log('🔍 Before cleanup - child count:', waitingQR.children.length);
-
-                            // Aggressive cleanup - remove all child nodes
-                            while (waitingQR.firstChild) {
-                                waitingQR.removeChild(waitingQR.firstChild);
-                            }
-
-                            console.log('🧹 After cleanup - child count:', waitingQR.children.length);
-
-                            // Adaptive QR size based on screen resolution
-                            const screenWidth = window.innerWidth;
-                            const screenHeight = window.innerHeight;
-                            let qrSize = 500; // Default for small screens (phones)
-
-                            if (screenWidth >= 2560 || screenHeight >= 1440) {
-                                qrSize = 250; // 4K projectors - very small
-                            } else if (screenWidth >= 1920 || screenHeight >= 1080) {
-                                qrSize = 300; // Full HD projectors - small
-                            } else if (screenWidth >= 1024 || screenHeight >= 768) {
-                                qrSize = 380; // Tablets/medium projectors
-                            }
-
-                            new QRCode(waitingQR, {
-                                text: qrData,
-                                width: qrSize,
-                                height: qrSize,
-                                colorDark: '#000000',
-                                colorLight: '#ffffff',
-                                correctLevel: QRCode.CorrectLevel.M
-                            });
-
-                            // Mark as generated to prevent duplicates
-                            window.waitingQRGenerated = true;
-
-                            // Wait for QR to be created
-                            setTimeout(() => {
-                                console.log('✅ Waiting QR code generated - child count:', waitingQR.children.length);
-                                console.log('📊 Children types:', Array.from(waitingQR.children).map(c => c.tagName).join(', '));
-                            }, 100);
-                        } else {
-                            console.log('⚠️ Waiting QR already generated, skipping duplicate generation');
+                        // Aggressive cleanup - remove all child nodes
+                        while (waitingQR.firstChild) {
+                            waitingQR.removeChild(waitingQR.firstChild);
                         }
+
+                        // Adaptive QR size based on screen resolution
+                        const screenWidth = window.innerWidth;
+                        const screenHeight = window.innerHeight;
+                        let qrSize = 500; // Default for small screens (phones)
+
+                        if (screenWidth >= 2560 || screenHeight >= 1440) {
+                            qrSize = 250; // 4K projectors - very small
+                        } else if (screenWidth >= 1920 || screenHeight >= 1080) {
+                            qrSize = 300; // Full HD projectors - small
+                        } else if (screenWidth >= 1024 || screenHeight >= 768) {
+                            qrSize = 380; // Tablets/medium projectors
+                        }
+
+                        new QRCode(waitingQR, {
+                            text: qrData,
+                            width: qrSize,
+                            height: qrSize,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M
+                        });
 
                         // Store QR data globally for later use (lobby/game screens)
                         window.persistentQRData = qrData;
@@ -3684,28 +3667,30 @@
             ctx.lineTo(width, adjustedLaunchLine);
             ctx.stroke();
 
-            // Blocks
+            // Blocks (coordinates are absolute, need to adjust for field offset)
             for (const block of player.blocks || []) {
-                drawBlock(block, blockSize, player.color);
+                // Block coordinates are in absolute canvas space, translate to field space
+                const blockCopy = { ...block, y: block.y - fieldTop };
+                drawBlock(blockCopy, blockSize, player.color);
             }
 
-            // Bonus balls
+            // Bonus balls (coordinates are absolute, need to adjust for field offset)
             for (const bonus of player.bonusBalls || []) {
                 ctx.fillStyle = '#FFD700';
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(bonus.x, bonus.y, 10, 0, Math.PI * 2);
+                ctx.arc(bonus.x, bonus.y - fieldTop, 10, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
 
-            // Balls in flight
+            // Balls in flight (coordinates are absolute, need to adjust for field offset)
             for (const ball of player.balls || []) {
-                if (!ball.active) continue;
+                if (!ball.active && !ball.waiting) continue;
                 ctx.fillStyle = '#FFFFFF';
                 ctx.beginPath();
-                ctx.arc(ball.x, ball.y, 5, 0, Math.PI * 2);
+                ctx.arc(ball.x, ball.y - fieldTop, 5, 0, Math.PI * 2);
                 ctx.fill();
             }
 
@@ -3814,7 +3799,7 @@
             let x = startX;
             let y = startY;
             let vx = Math.cos(angle);
-            let vy = Math.sin(angle);
+            let vy = -Math.sin(angle); // NEGATIVE because canvas Y grows downward
 
             for (let i = 0; i < maxSegments; i++) {
                 // Simulate ball movement for this segment

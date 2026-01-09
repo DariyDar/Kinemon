@@ -3224,15 +3224,19 @@ function updateLaunching(room, player) {
 
             const speed = room.ballSpeed;
             const vx = Math.cos(player.aimAngle) * speed;
-            const vy = Math.sin(player.aimAngle) * speed;
+            const vy = -Math.sin(player.aimAngle) * speed; // NEGATIVE because canvas Y grows downward
 
+            // CRITICAL: Add ball but mark as NOT active until launch delay passes
+            // Ball starts as "waiting" and becomes active after its turn
             player.balls.push({
                 x: launchX,
                 y: launchY,
                 vx: vx,
                 vy: vy,
-                active: true,
-                launchIndex: player.balls.length // Use current length as index
+                active: false, // NOT active yet - will activate in physics update
+                waiting: true, // Waiting to launch
+                launchIndex: player.balls.length, // Use current length as index
+                launchTime: now // Timestamp when this ball should start moving
             });
 
             player.lastBallLaunchTime = now;
@@ -3249,8 +3253,20 @@ function updateLaunching(room, player) {
 function updateBallPhysics(room, player) {
     const launchLine = room.canvas.height - 40;
     const ballRadius = 5;
+    const now = Date.now();
 
     for (const ball of player.balls) {
+        // CRITICAL: Activate waiting balls when their time comes
+        if (ball.waiting) {
+            const timeSinceLaunch = now - ball.launchTime;
+            if (timeSinceLaunch >= 0) {
+                ball.active = true;
+                ball.waiting = false;
+            } else {
+                continue; // Skip physics for balls still waiting
+            }
+        }
+
         if (!ball.active) continue;
 
         ball.x += ball.vx;
@@ -3291,7 +3307,7 @@ function updateBallPhysics(room, player) {
 
 // Check if turn is complete (all balls returned)
 function checkTurnComplete(room, player) {
-    const allInactive = player.balls.every(b => !b.active);
+    const allInactive = player.balls.every(b => !b.active && !b.waiting);
     const allLaunched = player.balls.length === player.ballsThisTurn;
 
     if (allInactive && allLaunched) {

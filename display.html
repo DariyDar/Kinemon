@@ -1396,6 +1396,9 @@
 
             console.log('Game settings:', gameSettings);
 
+            // Reset debug counter
+            window.roomCreatedCount = 0;
+
             // Show connection screen and connect
             showScreen('connection');
 
@@ -1702,7 +1705,11 @@
                     if (data.type === 'room_created') {
                         // Room created, show QR code
                         roomId = data.roomId;
-                        console.log('Room created:', roomId);
+
+                        // DEBUG: Track how many times this event fires
+                        if (!window.roomCreatedCount) window.roomCreatedCount = 0;
+                        window.roomCreatedCount++;
+                        console.log(`🔔 room_created event #${window.roomCreatedCount} - roomId: ${roomId}`);
 
                         roomCodeDisplay.textContent = roomId;
                         roomIdInfo.textContent = roomId;
@@ -1715,13 +1722,16 @@
 
                         console.log('QR Code URL:', qrData);
 
-                        // CRITICAL FIX (7th attempt - FINAL FIX):
-                        // Root cause: QRCode library APPENDS elements, doesn't replace them
-                        // Solution: ALWAYS clear container before generating, regardless of flags
+                        // CRITICAL FIX (8th attempt - DEBUG):
+                        // Check child count before and after to diagnose the issue
                         const waitingQR = document.getElementById('waitingQRCode');
 
-                        // ALWAYS clear container FIRST (library appends, not replaces!)
+                        console.log(`🔍 BEFORE clear - childElementCount: ${waitingQR.childElementCount}`);
+
+                        // ALWAYS clear container FIRST
                         waitingQR.innerHTML = '';
+
+                        console.log(`🧹 AFTER clear - childElementCount: ${waitingQR.childElementCount}`);
 
                         // Adaptive QR size based on screen resolution
                         const screenWidth = window.innerWidth;
@@ -1745,7 +1755,7 @@
                             correctLevel: QRCode.CorrectLevel.M
                         });
 
-                        console.log('✅ Waiting QR code generated');
+                        console.log(`✅ QR generated - childElementCount NOW: ${waitingQR.childElementCount}`);
 
                         // Store QR data globally for later use (lobby/game screens)
                         window.persistentQRData = qrData;

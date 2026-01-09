@@ -358,39 +358,31 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.lobbyCountdown = null; // Countdown timer
         room.lobbyCountdownStart = null; // Countdown start time
     } else if (gameType === 'ballz') {
-        // Ballz: physics-based block breaking game
+        // Ballz v3.25.0: Single-player physics arcade
+        // Adaptive canvas sizing - actual dimensions set client-side
+        // All measurements are relative to canvas size
 
-        // Field configuration
-        room.fieldWidth = settings.fieldWidth || 7;
-        room.fieldHeight = settings.fieldHeight || 10;
-        room.blockSize = 50;
+        // Gameplay settings
+        room.cols = settings.cols || 7; // Grid columns (7 default)
+        room.rows = settings.rows || 14; // Grid rows (14 default)
+        room.aspectRatio = settings.aspectRatio || 0.75; // Width/Height = 3:4
 
-        room.canvas = {
-            width: room.fieldWidth * room.blockSize,
-            height: room.fieldHeight * room.blockSize + 80
-        };
-
-        // HP progression settings
-        room.hpIncreaseEveryN = settings.hpIncreaseEveryN || 5;
+        // HP progression
+        room.hpIncreaseEveryN = settings.hpIncreaseEveryN || 5; // HP+1 every N turns
         room.maxBlockHP = settings.maxBlockHP || 50;
-        room.lowerHPChance = settings.lowerHPChance || 30;
+        room.lowerHPChance = settings.lowerHPChance || 30; // % chance for lower HP
 
-        // Ball & control settings
-        room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15;
-        room.ballSpeed = settings.ballSpeed || 5;
-        room.chargeTime = settings.chargeTime || 2000; // milliseconds
-        room.ballLaunchDelay = settings.ballLaunchDelay || 100; // milliseconds
-        // CRITICAL FIX: Use !== undefined to allow 0 value (0% dead zone)
-        room.deadZoneSize = settings.deadZoneSize !== undefined ? settings.deadZoneSize : 0.05; // default 5%
-        room.aimSensitivity = settings.aimSensitivity || 0.10; // 10%
+        // Ball physics
+        room.ballSpeed = settings.ballSpeed || 3; // 1=slow, 5=fast
+        room.ballLaunchDelay = settings.ballLaunchDelay || 100; // ms between balls
+        room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15; // % chance per turn
 
-        // CRITICAL: Shared seed for synchronized levels between players
-        room.randomSeed = Date.now();
-        room.rng = createSeededRNG(room.randomSeed);
+        // Controls
+        room.chargeTime = settings.chargeTime || 2000; // ms to full charge
+        room.deadZoneSize = settings.deadZoneSize !== undefined ? settings.deadZoneSize : 0.05; // 5% default
 
-        room.turnNumber = 0;
-        room.maxPlayers = 3; // Maximum 3 players for Ballz
-        room.leaderboard = null; // Set when game ends
+        // NO multiplayer - single player only
+        room.maxPlayers = 1;
     } else {
         // Snake: pizzas and calculated settings
         room.moveSpeed = BASE_MOVE_SPEED * ((settings.moveSpeed || 3) / 3); // 3 = fastest
@@ -2105,11 +2097,11 @@ wss.on('connection', (ws) => {
                     return;
                 }
 
-                // For Ballz: limit to 3 players
-                if (room.gameType === 'ballz' && room.players.size >= 3) {
+                // For Ballz: single player only
+                if (room.gameType === 'ballz' && room.players.size >= 1) {
                     ws.send(JSON.stringify({
                         type: 'error',
-                        message: 'Room is full (max 3 players for Ballz)'
+                        message: 'Room is full (Ballz is single-player only)'
                     }));
                     return;
                 }
@@ -2177,39 +2169,35 @@ wss.on('connection', (ws) => {
 
                     console.log(`Player ${player.name} joined as observer (no role assigned)`);
                 } else if (room.gameType === 'ballz') {
-                    // Ballz: ball-shooting arcade game
+                    // Ballz v3.25.0: Single-player arcade
                     player.score = 0;
-                    player.ballCount = 1; // Start with 1 ball
-                    player.ballsThisTurn = 1; // Balls to launch this turn
-                    player.alive = true;
-
-                    // Turn state machine
-                    player.turnState = 'aiming'; // 'aiming' | 'charging' | 'launching' | 'balls_in_flight' | 'turn_complete'
-
-                    // Launch mechanics
-                    player.launchX = null; // null = center initially
-                    player.aimAngle = 3 * Math.PI / 2; // 270° straight up
-                    player.chargeStartTime = null;
-                    player.chargeProgress = 0;
-                    player.lastTilt = 0.5;
-                    player.isInDeadZone = false;
-
-                    // Ball physics (balls will be populated during launching state)
-                    player.balls = [];
-                    player.firstBallTouched = false;
-                    player.newLaunchX = null;
-                    player.turnStartTime = null;
-                    player.nextBallLaunchTime = null;
-                    player.lastBallLaunchTime = null;
-
-                    // Field state (INDEPENDENT per player for synchronized gameplay)
-                    player.blocks = new Map(); // "x,y" -> { x, y, hp, maxHp, gridX, gridY, id }
-                    player.bonusBalls = []; // Array of bonus ball objects
+                    player.ballCount = 1;
                     player.turnNumber = 0;
+                    player.alive = true;
                     player.gameOver = false;
 
-                    // Spawn initial blocks for first turn
-                    spawnNewBlocks(player, room);
+                    // State machine: aiming → charging → launching → balls_in_flight → turn_complete
+                    player.turnState = 'aiming';
+
+                    // Aiming & charging
+                    player.aimAngle = Math.PI / 2; // 90° up
+                    player.lastTilt = null;
+                    player.chargeStartTime = null;
+                    player.chargeProgress = 0;
+                    player.isInDeadZone = false;
+
+                    // Launch position (relative 0-1, null = center)
+                    player.launchX = null;
+
+                    // Flying balls
+                    player.balls = [];
+
+                    // Field (relative coordinates 0-1)
+                    player.blocks = []; // [{gridX, gridY, hp, maxHp}]
+                    player.bonusBalls = []; // [{gridX, gridY}]
+
+                    // Spawn initial blocks
+                    ballzSpawnBlocks(player, room);
 
                     console.log(`Player ${player.name} joined Ballz game`);
                 } else {
@@ -2828,8 +2816,10 @@ function serializeGameState(room) {
         state.gameOver = room.gameOver;
         state.winner = room.winner;
     } else if (room.gameType === 'ballz') {
-        // Ballz state - serialize independent player fields
-        state.blockSize = room.blockSize;
+        // Ballz v3.25.0: Single-player with relative coordinates
+        state.cols = room.cols;
+        state.rows = room.rows;
+        state.aspectRatio = room.aspectRatio;
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id,
             name: p.name,
@@ -2842,15 +2832,14 @@ function serializeGameState(room) {
             chargeProgress: p.chargeProgress,
             isInDeadZone: p.isInDeadZone,
             launchX: p.launchX,
-            balls: p.balls,
-            blocks: Array.from(p.blocks.values()), // Convert Map to Array
+            balls: p.balls, // Already relative coordinates
+            blocks: p.blocks, // Already array with gridX, gridY
             bonusBalls: p.bonusBalls,
             turnNumber: p.turnNumber,
             gameOver: p.gameOver
         }));
         state.gameOver = room.gameOver;
         state.winner = room.winner;
-        state.leaderboard = room.leaderboard; // Final leaderboard when all players done
     } else {
         // Snake state
         state.players = Array.from(room.players.values()).map(p => ({
@@ -2892,7 +2881,7 @@ function gameLoop(roomId) {
     } else if (room.gameType === 'ship') {
         updateShip(room);
     } else if (room.gameType === 'ballz') {
-        updateBallz(room);
+        ballzUpdate(room); // v3.25.0: New single-player implementation
     } else {
         updateSnake(room);
     }
@@ -3125,489 +3114,10 @@ function updateSnake(room) {
 // BALLZ GAME LOGIC
 // ============================================================================
 
-// Main Ballz update function
-function updateBallz(room) {
-    for (const player of room.players.values()) {
-        if (!player.alive || player.gameOver) continue;
-        updateBallzPlayer(room, player);
-    }
-
-    // Check victory condition
-    checkBallzVictory(room);
-}
-
-// Update individual player's Ballz state
-function updateBallzPlayer(room, player) {
-    switch (player.turnState) {
-        case 'aiming':
-            updateAiming(room, player);
-            break;
-        case 'charging':
-            updateCharging(room, player);
-            break;
-        case 'launching':
-            updateLaunching(room, player);
-            break;
-        case 'balls_in_flight':
-            updateBallPhysics(room, player);
-            checkBallzCollisions(room, player);
-            checkTurnComplete(room, player);
-            break;
-        case 'turn_complete':
-            advanceTurn(room, player);
-            break;
-    }
-}
-
-// State: AIMING - Player is tilting phone to aim
-function updateAiming(room, player) {
-    // CRITICAL FIX: Full 160° aiming arc shooting UPWARD
-    // Canvas coordinates with -sin(angle): 0° = right, 90° = up, 180° = left
-    // Full aiming range: 10° (nearly right) to 170° (nearly left)
-    // tilt 0 = 10°, tilt 0.5 = 90° (straight up), tilt 1 = 170°
-    const minAngle = 10 * Math.PI / 180;   // 10° from horizontal right
-    const maxAngle = 170 * Math.PI / 180;  // 10° from horizontal left
-    player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
-
-    // CRITICAL: Check dead zone (both ends)
-    const deadZone = room.deadZoneSize;
-    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
-
-    if (player.isInDeadZone) {
-        // In dead zone - reset charge
-        player.chargeStartTime = null;
-        player.chargeProgress = 0;
-        player.lastTilt = player.tilt;
-        return;
-    }
-
-    // Check for aim steadiness to start charging
-    if (!player.lastTilt) player.lastTilt = player.tilt;
-    const tiltDelta = Math.abs(player.tilt - player.lastTilt);
-
-    // CRITICAL: Use VERY small threshold (0.002 = 0.2%) to detect actual movement
-    // This allows free aiming while phone is actively moving
-    const movementThreshold = 0.002;
-
-    if (tiltDelta < movementThreshold) {
-        // Aim is steady - start charging IMMEDIATELY (no delay)
-        if (!player.chargeStartTime) {
-            player.chargeStartTime = Date.now();
-            player.turnState = 'charging';
-        }
-    } else {
-        // Aim moved - reset charge
-        player.chargeStartTime = null;
-    }
-
-    player.lastTilt = player.tilt;
-}
-
-// State: CHARGING - Player is holding aim steady to charge shot
-function updateCharging(room, player) {
-    const elapsed = Date.now() - player.chargeStartTime;
-    player.chargeProgress = Math.min(1, elapsed / room.chargeTime);
-
-    // CRITICAL: Check dead zone (both ends)
-    const deadZone = room.deadZoneSize;
-    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
-
-    if (player.isInDeadZone) {
-        // Entered dead zone - reset to aiming
-        player.turnState = 'aiming';
-        player.chargeStartTime = null;
-        player.chargeProgress = 0;
-        return;
-    }
-
-    // Check for aim movement (using aimSensitivity)
-    const tiltDelta = Math.abs(player.tilt - player.lastTilt);
-    if (tiltDelta >= room.aimSensitivity) {
-        // Moved aim - reset to aiming
-        player.turnState = 'aiming';
-        player.chargeStartTime = null;
-        player.chargeProgress = 0;
-        player.lastTilt = player.tilt;
-        return;
-    }
-
-    // Full charge - auto launch
-    if (player.chargeProgress >= 1) {
-        player.turnState = 'launching';
-        player.nextBallLaunchTime = Date.now();
-        player.turnStartTime = Date.now();
-        player.ballsThisTurn = player.ballCount; // Save count at turn start
-    }
-
-    player.lastTilt = player.tilt;
-}
-
-// State: LAUNCHING - Balls are being launched sequentially (5TH REWRITE - SIMPLE)
-function updateLaunching(room, player) {
-    const now = Date.now();
-
-    // Initialize on first entry to LAUNCHING state
-    if (!player.ballsLaunched) {
-        player.ballsLaunched = 0;
-        player.nextBallLaunchTime = now; // Launch first ball immediately
-    }
-
-    // Time to launch next ball?
-    if (now >= player.nextBallLaunchTime && player.ballsLaunched < player.ballsThisTurn) {
-        const launchX = player.launchX !== null ? player.launchX : room.canvas.width / 2;
-        const launchY = room.canvas.height - 40;
-
-        const speed = room.ballSpeed;
-        const vx = Math.cos(player.aimAngle) * speed;
-        const vy = -Math.sin(player.aimAngle) * speed;
-
-        // SIMPLE: Create active ball immediately, no waiting state
-        player.balls.push({
-            x: launchX,
-            y: launchY,
-            vx: vx,
-            vy: vy,
-            active: true,
-            launchIndex: player.ballsLaunched
-        });
-
-        player.ballsLaunched++;
-        player.nextBallLaunchTime = now + room.ballLaunchDelay; // Schedule next ball
-    }
-
-    // All balls launched - switch to balls_in_flight
-    if (player.ballsLaunched >= player.ballsThisTurn) {
-        player.turnState = 'balls_in_flight';
-    }
-}
-
-// Physics: Update ball positions
-function updateBallPhysics(room, player) {
-    const launchLine = room.canvas.height - 40;
-    const ballRadius = 5;
-
-    for (const ball of player.balls) {
-        if (!ball.active) continue;
-
-        ball.x += ball.vx;
-        ball.y += ball.vy;
-
-        // Wall bounces (left, right, top)
-        if (ball.x <= ballRadius || ball.x >= room.canvas.width - ballRadius) {
-            ball.vx = -ball.vx;
-            ball.x = Math.max(ballRadius, Math.min(room.canvas.width - ballRadius, ball.x));
-        }
-
-        if (ball.y <= ballRadius) {
-            ball.vy = -ball.vy;
-            ball.y = ballRadius;
-        }
-
-        // Bottom return (deactivate ball)
-        if (ball.y >= launchLine) {
-            ball.y = launchLine; // Clamp to exact launch line position
-            ball.active = false;
-
-            // First ball sets new launch point
-            if (ball.launchIndex === 0 && !player.firstBallTouched) {
-                player.newLaunchX = ball.x;
-                player.firstBallTouched = true;
-            }
-        }
-    }
-
-    // Emergency timeout (60 seconds)
-    if (player.turnStartTime) {
-        const turnDuration = Date.now() - player.turnStartTime;
-        if (turnDuration > 60000) {
-            player.balls.forEach(b => b.active = false);
-        }
-    }
-}
-
-// Check if turn is complete (all balls returned)
-function checkTurnComplete(room, player) {
-    const allInactive = player.balls.every(b => !b.active);
-    const allLaunched = player.ballsLaunched >= player.ballsThisTurn;
-
-    if (allInactive && allLaunched) {
-        player.turnState = 'turn_complete';
-    }
-}
-
-// Collision detection for balls with blocks and bonuses
-function checkBallzCollisions(room, player) {
-    const ballRadius = 5;
-    const blockSize = room.blockSize;
-
-    for (const ball of player.balls) {
-        if (!ball.active) continue;
-
-        // Block collisions
-        for (const [key, block] of player.blocks.entries()) {
-            if (checkBallBlockCollision(ball, block, blockSize, ballRadius)) {
-                block.hp--;
-
-                if (block.hp <= 0) {
-                    // Block destroyed - big explosion
-                    player.blocks.delete(key);
-                    player.score++;
-
-                    broadcastEffect(room.id, 'particle', {
-                        x: block.x,
-                        y: block.y,
-                        color: player.color,
-                        count: 12
-                    });
-                } else {
-                    // Block hit - small particles
-                    broadcastEffect(room.id, 'particle', {
-                        x: ball.x,
-                        y: ball.y,
-                        color: '#FFFFFF',
-                        count: 4
-                    });
-                }
-
-                reflectBall(ball, block, blockSize);
-                break; // Only one collision per frame
-            }
-        }
-
-        // Bonus ball pickups (no collision, just touch)
-        for (let i = player.bonusBalls.length - 1; i >= 0; i--) {
-            const bonus = player.bonusBalls[i];
-            const dist = Math.hypot(ball.x - bonus.x, ball.y - bonus.y);
-
-            if (dist < ballRadius + 10) {
-                player.bonusBalls.splice(i, 1);
-                player.ballCount++;
-
-                // Bonus pickup effect
-                broadcastEffect(room.id, 'particle', {
-                    x: bonus.x,
-                    y: bonus.y,
-                    color: '#FFD700',
-                    count: 8
-                });
-            }
-        }
-    }
-}
-
-// AABB circle-to-rect collision detection
-function checkBallBlockCollision(ball, block, blockSize, ballRadius) {
-    const halfSize = blockSize / 2;
-    const closestX = Math.max(block.x - halfSize, Math.min(ball.x, block.x + halfSize));
-    const closestY = Math.max(block.y - halfSize, Math.min(ball.y, block.y + halfSize));
-
-    const distX = ball.x - closestX;
-    const distY = ball.y - closestY;
-    const distSquared = distX * distX + distY * distY;
-
-    return distSquared < (ballRadius * ballRadius);
-}
-
-// Reflect ball off block (simplified physics: angle in = angle out)
-function reflectBall(ball, block, blockSize) {
-    const dx = ball.x - block.x;
-    const dy = ball.y - block.y;
-    const halfSize = blockSize / 2;
-
-    const overlapX = halfSize - Math.abs(dx);
-    const overlapY = halfSize - Math.abs(dy);
-
-    // Reflect on axis with smallest overlap
-    if (overlapX < overlapY) {
-        ball.vx = -ball.vx;
-    } else {
-        ball.vy = -ball.vy;
-    }
-}
-
-// Advance to next turn (descend blocks, spawn new, check game over)
-function advanceTurn(room, player) {
-    // Update launch position for next turn
-    player.launchX = player.newLaunchX || player.launchX || room.canvas.width / 2;
-
-    // Descend blocks and bonuses
-    descendBlocks(player, room);
-
-    // Spawn new blocks using seeded RNG
-    spawnNewBlocks(player, room);
-
-    // Maybe spawn bonus ball
-    if (Math.random() * 100 < room.bonusBallSpawnRate) {
-        spawnBonusBall(player, room);
-    }
-
-    // Check game over (block reached launch line)
-    const launchRow = Math.floor((room.canvas.height - 40) / room.blockSize);
-    for (const block of player.blocks.values()) {
-        if (block.gridY >= launchRow) {
-            player.gameOver = true;
-            player.alive = false;
-            return;
-        }
-    }
-
-    // Reset for next turn
-    player.turnNumber++;
-    player.balls = [];
-    player.ballsLaunched = 0; // Reset launch counter
-    player.firstBallTouched = false;
-    player.newLaunchX = null;
-    player.chargeStartTime = null;
-    player.steadyAimStartTime = null;
-    player.lastBallLaunchTime = null;
-    player.chargeProgress = 0;
-    player.turnState = 'aiming';
-}
-
-// Descend all blocks and bonuses by one row
-function descendBlocks(player, room) {
-    const newBlocks = new Map();
-    for (const [key, block] of player.blocks.entries()) {
-        block.gridY++;
-        block.y += room.blockSize;
-        newBlocks.set(`${block.gridX},${block.gridY}`, block);
-    }
-    player.blocks = newBlocks;
-
-    // Descend bonuses too
-    for (const bonus of player.bonusBalls) {
-        bonus.gridY++;
-        bonus.y += room.blockSize;
-    }
-}
-
-// Spawn new blocks in top row (SEEDED RANDOM for synchronization)
-function spawnNewBlocks(player, room) {
-    // CRITICAL: Use seeded RNG based on player's turn number
-    const savedRNG = room.rng;
-    room.rng = createSeededRNG(room.randomSeed + player.turnNumber);
-
-    // Determine how many blocks to spawn (1-5)
-    const count = 1 + Math.floor(room.rng() * 5);
-
-    // Find available columns
-    const availableCols = [];
-    for (let x = 0; x < room.fieldWidth; x++) {
-        if (!player.blocks.has(`${x},0`)) {
-            availableCols.push(x);
-        }
-    }
-
-    // Leave at least 2 empty columns
-    const maxSpawn = Math.max(0, availableCols.length - 2);
-    if (maxSpawn === 0) {
-        room.rng = savedRNG;
-        return;
-    }
-
-    // Shuffle and spawn
-    shuffleSeeded(availableCols, room.rng);
-    const spawnCount = Math.min(count, maxSpawn);
-    const spawnCols = availableCols.slice(0, spawnCount);
-
-    for (const gridX of spawnCols) {
-        const hp = calculateBlockHP(player.turnNumber, room);
-        const block = {
-            gridX: gridX,
-            gridY: 0,
-            x: gridX * room.blockSize + room.blockSize / 2,
-            y: room.blockSize / 2,
-            hp: hp,
-            maxHp: hp,
-            id: `block_${player.turnNumber}_${gridX}`
-        };
-
-        player.blocks.set(`${gridX},0`, block);
-    }
-
-    // Restore RNG
-    room.rng = savedRNG;
-}
-
-// Calculate block HP based on turn number and settings
-function calculateBlockHP(turnNumber, room) {
-    const baseHP = 1 + Math.floor(turnNumber / room.hpIncreaseEveryN);
-    const cappedHP = Math.min(baseHP, room.maxBlockHP);
-
-    // Chance for lower HP
-    if (room.rng() * 100 < room.lowerHPChance && cappedHP > 1) {
-        return Math.max(1, cappedHP - Math.floor(room.rng() * 3 + 1));
-    }
-
-    return cappedHP;
-}
-
-// Seeded array shuffle for deterministic spawning
-function shuffleSeeded(array, rng) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-}
-
-// Spawn bonus ball in random empty cell
-function spawnBonusBall(player, room) {
-    const emptyCells = [];
-    for (let y = 1; y < room.fieldHeight - 2; y++) {
-        for (let x = 0; x < room.fieldWidth; x++) {
-            const hasBlock = player.blocks.has(`${x},${y}`);
-            const hasBonus = player.bonusBalls.some(b => b.gridX === x && b.gridY === y);
-            if (!hasBlock && !hasBonus) {
-                emptyCells.push({ x, y });
-            }
-        }
-    }
-
-    if (emptyCells.length > 0) {
-        const cell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-        player.bonusBalls.push({
-            gridX: cell.x,
-            gridY: cell.y,
-            x: cell.x * room.blockSize + room.blockSize / 2,
-            y: cell.y * room.blockSize + room.blockSize / 2,
-            id: `bonus_${Date.now()}_${Math.random()}`
-        });
-    }
-}
-
-// Check victory condition (all players finished)
-function checkBallzVictory(room) {
-    const alivePlayers = Array.from(room.players.values()).filter(p => !p.gameOver);
-
-    // All players lost - game over, show leaderboard
-    if (alivePlayers.length === 0 && room.players.size > 0) {
-        // Sort: score first (desc), then turnNumber (desc)
-        const sortedPlayers = Array.from(room.players.values())
-            .sort((a, b) => {
-                if (b.score !== a.score) return b.score - a.score;
-                return b.turnNumber - a.turnNumber;
-            });
-
-        room.winner = {
-            id: sortedPlayers[0].id,
-            name: sortedPlayers[0].name,
-            score: sortedPlayers[0].score,
-            turnNumber: sortedPlayers[0].turnNumber
-        };
-
-        // Full leaderboard
-        room.leaderboard = sortedPlayers.map((p, i) => ({
-            rank: i + 1,
-            id: p.id,
-            name: p.name,
-            color: p.color,
-            score: p.score,
-            turnNumber: p.turnNumber
-        }));
-
-        room.gameOver = true;
-    }
-}
+// ============================================================================
+// OLD Ballz v3.24.x functions REMOVED (480 lines)
+// See new v3.25.0 single-player implementation at line ~4440
+// ============================================================================
 
 // Update Pong game
 function updatePong(room) {
@@ -4447,6 +3957,492 @@ function checkCollisions(room) {
             }
         }
     }
+}
+
+// ==================== BALLZ v3.25.0 - Single Player ====================
+
+/**
+ * Ballz: Spawn initial blocks with relative coordinates
+ * Blocks use grid positions (0 to cols-1, 0 to rows-1)
+ */
+function ballzSpawnBlocks(player, room) {
+    const count = 1 + Math.floor(Math.random() * 5); // 1-5 blocks
+    const availableCols = [];
+
+    // Find empty columns in row 0
+    for (let x = 0; x < room.cols; x++) {
+        const hasBlock = player.blocks.some(b => b.gridX === x && b.gridY === 0);
+        if (!hasBlock) {
+            availableCols.push(x);
+        }
+    }
+
+    // Leave at least 2 empty columns
+    const maxSpawn = Math.max(0, availableCols.length - 2);
+    if (maxSpawn === 0) return;
+
+    // Shuffle and pick random columns
+    shuffle(availableCols);
+    const spawnCount = Math.min(count, maxSpawn);
+
+    for (let i = 0; i < spawnCount; i++) {
+        const gridX = availableCols[i];
+        const hp = ballzCalculateBlockHP(player.turnNumber, room);
+
+        player.blocks.push({
+            gridX: gridX,
+            gridY: 0,
+            hp: hp,
+            maxHp: hp
+        });
+    }
+}
+
+/**
+ * Calculate block HP based on turn number and settings
+ */
+function ballzCalculateBlockHP(turnNumber, room) {
+    const baseHP = 1 + Math.floor(turnNumber / room.hpIncreaseEveryN);
+    const cappedHP = Math.min(baseHP, room.maxBlockHP);
+
+    // Chance for lower HP
+    if (Math.random() * 100 < room.lowerHPChance && cappedHP > 1) {
+        return Math.max(1, cappedHP - Math.floor(Math.random() * 3 + 1));
+    }
+
+    return cappedHP;
+}
+
+/**
+ * Main update function for Ballz game
+ */
+function ballzUpdate(room) {
+    for (const player of room.players.values()) {
+        if (!player.alive || player.gameOver) continue;
+
+        ballzUpdatePlayer(room, player);
+    }
+}
+
+/**
+ * Update single player state machine
+ */
+function ballzUpdatePlayer(room, player) {
+    switch (player.turnState) {
+        case 'aiming':
+            ballzUpdateAiming(room, player);
+            break;
+        case 'charging':
+            ballzUpdateCharging(room, player);
+            break;
+        case 'launching':
+            ballzUpdateLaunching(room, player);
+            break;
+        case 'balls_in_flight':
+            ballzUpdatePhysics(room, player);
+            ballzCheckCollisions(room, player);
+            ballzCheckTurnComplete(room, player);
+            break;
+        case 'turn_complete':
+            ballzAdvanceTurn(room, player);
+            break;
+    }
+}
+
+/**
+ * AIMING state: Convert tilt to angle, check dead zones
+ * CRITICAL: NO aimSensitivity - strict equality check
+ */
+function ballzUpdateAiming(room, player) {
+    // Convert tilt (0-1) to angle (10° to 170°)
+    const minAngle = 10 * Math.PI / 180;
+    const maxAngle = 170 * Math.PI / 180;
+    player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
+
+    // Check dead zones
+    const deadZone = room.deadZoneSize;
+    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
+
+    if (player.isInDeadZone) {
+        // In dead zone - reset charge
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        player.lastTilt = player.tilt;
+        return;
+    }
+
+    // CRITICAL: Strict equality check - NO tolerance
+    // Player must hold perfectly still to start charging
+    if (player.lastTilt === null) {
+        player.lastTilt = player.tilt;
+        return;
+    }
+
+    if (player.tilt === player.lastTilt) {
+        // Perfectly still - start charging
+        if (!player.chargeStartTime) {
+            player.chargeStartTime = Date.now();
+            player.turnState = 'charging';
+        }
+    } else {
+        // Moved - reset
+        player.chargeStartTime = null;
+    }
+
+    player.lastTilt = player.tilt;
+}
+
+/**
+ * CHARGING state: Track charge progress
+ * CRITICAL: Strict movement check, dead zone resets charge
+ */
+function ballzUpdateCharging(room, player) {
+    const elapsed = Date.now() - player.chargeStartTime;
+    player.chargeProgress = Math.min(1, elapsed / room.chargeTime);
+
+    // Check dead zones
+    const deadZone = room.deadZoneSize;
+    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
+
+    if (player.isInDeadZone) {
+        // Moved into dead zone - reset
+        player.turnState = 'aiming';
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        return;
+    }
+
+    // CRITICAL: Strict equality - any movement resets
+    if (player.tilt !== player.lastTilt) {
+        // Moved - reset
+        player.turnState = 'aiming';
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        player.lastTilt = player.tilt;
+        return;
+    }
+
+    // Full charge - launch
+    if (player.chargeProgress >= 1) {
+        player.turnState = 'launching';
+        player.launchStartTime = Date.now();
+    }
+
+    player.lastTilt = player.tilt;
+}
+
+/**
+ * LAUNCHING state: Spawn balls sequentially with delay
+ */
+function ballzUpdateLaunching(room, player) {
+    const now = Date.now();
+    const elapsed = now - player.launchStartTime;
+    const shouldHaveLaunched = Math.floor(elapsed / room.ballLaunchDelay) + 1;
+    const launchedCount = player.balls.length;
+
+    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballCount) {
+        // Launch next ball
+        const launchX = player.launchX !== null ? player.launchX : 0.5; // Center = 0.5
+        const speed = room.ballSpeed / 100; // Convert to relative speed per frame
+
+        player.balls.push({
+            x: launchX, // Relative 0-1
+            y: 1.0, // Bottom of field
+            vx: Math.cos(player.aimAngle) * speed,
+            vy: -Math.sin(player.aimAngle) * speed, // Negative = up
+            active: true,
+            isFirst: launchedCount === 0
+        });
+    }
+
+    if (launchedCount >= player.ballCount) {
+        player.turnState = 'balls_in_flight';
+        player.firstBallReturned = false;
+    }
+}
+
+/**
+ * Update ball physics with relative coordinates
+ */
+function ballzUpdatePhysics(room, player) {
+    const ballRadius = 0.01; // 1% of field width
+
+    for (const ball of player.balls) {
+        if (!ball.active) continue;
+
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // Wall bounces (left/right)
+        if (ball.x <= ballRadius || ball.x >= 1 - ballRadius) {
+            ball.vx = -ball.vx;
+            ball.x = Math.max(ballRadius, Math.min(1 - ballRadius, ball.x));
+        }
+
+        // Top bounce
+        if (ball.y <= ballRadius) {
+            ball.vy = -ball.vy;
+            ball.y = ballRadius;
+        }
+
+        // Bottom return (ball reaches launch line)
+        if (ball.y >= 1.0) {
+            ball.active = false;
+            ball.y = 1.0;
+
+            // First ball sets new launch position
+            if (ball.isFirst && !player.firstBallReturned) {
+                player.launchX = ball.x;
+                player.firstBallReturned = true;
+            }
+        }
+    }
+}
+
+/**
+ * Check collisions between balls and blocks/bonuses
+ */
+function ballzCheckCollisions(room, player) {
+    const ballRadius = 0.01;
+    const blockWidth = 1.0 / room.cols;
+    const blockHeight = 1.0 / room.rows;
+
+    for (const ball of player.balls) {
+        if (!ball.active) continue;
+
+        // Block collisions
+        for (let i = player.blocks.length - 1; i >= 0; i--) {
+            const block = player.blocks[i];
+            const blockCenterX = (block.gridX + 0.5) * blockWidth;
+            const blockCenterY = (block.gridY + 0.5) * blockHeight;
+
+            if (ballzCheckBallBlockCollision(ball, blockCenterX, blockCenterY, blockWidth, blockHeight, ballRadius)) {
+                block.hp--;
+
+                if (block.hp <= 0) {
+                    player.blocks.splice(i, 1);
+                    player.score++;
+                }
+
+                ballzReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHeight);
+                break;
+            }
+        }
+
+        // Bonus ball pickups
+        for (let i = player.bonusBalls.length - 1; i >= 0; i--) {
+            const bonus = player.bonusBalls[i];
+            const bonusCenterX = (bonus.gridX + 0.5) * blockWidth;
+            const bonusCenterY = (bonus.gridY + 0.5) * blockHeight;
+
+            const dist = Math.hypot(ball.x - bonusCenterX, ball.y - bonusCenterY);
+            if (dist < ballRadius + 0.02) {
+                player.bonusBalls.splice(i, 1);
+                player.ballCount++;
+            }
+        }
+    }
+}
+
+/**
+ * AABB collision detection (relative coordinates)
+ */
+function ballzCheckBallBlockCollision(ball, blockCenterX, blockCenterY, blockWidth, blockHeight, ballRadius) {
+    const halfWidth = blockWidth / 2;
+    const halfHeight = blockHeight / 2;
+
+    const closestX = Math.max(blockCenterX - halfWidth, Math.min(ball.x, blockCenterX + halfWidth));
+    const closestY = Math.max(blockCenterY - halfHeight, Math.min(ball.y, blockCenterY + halfHeight));
+
+    const distX = ball.x - closestX;
+    const distY = ball.y - closestY;
+    const distSquared = distX * distX + distY * distY;
+
+    return distSquared < (ballRadius * ballRadius);
+}
+
+/**
+ * Reflect ball off block (simplified physics)
+ */
+function ballzReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHeight) {
+    const dx = ball.x - blockCenterX;
+    const dy = ball.y - blockCenterY;
+    const halfWidth = blockWidth / 2;
+    const halfHeight = blockHeight / 2;
+
+    const overlapX = halfWidth - Math.abs(dx);
+    const overlapY = halfHeight - Math.abs(dy);
+
+    if (overlapX < overlapY) {
+        ball.vx = -ball.vx;
+    } else {
+        ball.vy = -ball.vy;
+    }
+}
+
+/**
+ * Check if turn is complete (all balls returned)
+ */
+function ballzCheckTurnComplete(room, player) {
+    const allInactive = player.balls.every(b => !b.active);
+    if (allInactive && player.balls.length === player.ballCount) {
+        player.turnState = 'turn_complete';
+    }
+}
+
+/**
+ * Advance to next turn: descend blocks, spawn new, check game over
+ */
+function ballzAdvanceTurn(room, player) {
+    // Descend blocks
+    for (const block of player.blocks) {
+        block.gridY++;
+    }
+
+    // Descend bonuses
+    for (const bonus of player.bonusBalls) {
+        bonus.gridY++;
+    }
+
+    // Check game over (block reached bottom row)
+    const bottomRow = room.rows - 1;
+    for (const block of player.blocks) {
+        if (block.gridY >= bottomRow) {
+            player.gameOver = true;
+            player.alive = false;
+            room.gameOver = true;
+            room.winner = {
+                id: player.id,
+                name: player.name,
+                score: player.score,
+                turnNumber: player.turnNumber
+            };
+            return;
+        }
+    }
+
+    // Spawn new blocks
+    ballzSpawnBlocks(player, room);
+
+    // Maybe spawn bonus ball
+    if (Math.random() * 100 < room.bonusBallSpawnRate) {
+        ballzSpawnBonusBall(player, room);
+    }
+
+    // Reset for next turn
+    player.turnNumber++;
+    player.balls = [];
+    player.chargeStartTime = null;
+    player.chargeProgress = 0;
+    player.lastTilt = null;
+    player.turnState = 'aiming';
+}
+
+/**
+ * Spawn bonus ball in random empty cell
+ */
+function ballzSpawnBonusBall(player, room) {
+    const emptyCells = [];
+
+    for (let y = 1; y < room.rows - 2; y++) {
+        for (let x = 0; x < room.cols; x++) {
+            const hasBlock = player.blocks.some(b => b.gridX === x && b.gridY === y);
+            const hasBonus = player.bonusBalls.some(b => b.gridX === x && b.gridY === y);
+            if (!hasBlock && !hasBonus) {
+                emptyCells.push({ x, y });
+            }
+        }
+    }
+
+    if (emptyCells.length > 0) {
+        const cell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        player.bonusBalls.push({
+            gridX: cell.x,
+            gridY: cell.y
+        });
+    }
+}
+
+/**
+ * Simulate full trajectory with bounces for display
+ * Returns array of line segments: [{x1, y1, x2, y2}, ...]
+ */
+function ballzSimulateTrajectory(launchX, angle, cols, rows, maxSegments = 5) {
+    const segments = [];
+    const ballRadius = 0.01;
+    const blockWidth = 1.0 / cols;
+    const blockHeight = 1.0 / rows;
+
+    let x = launchX;
+    let y = 1.0;
+    let vx = Math.cos(angle) * 0.01; // Small step size for simulation
+    let vy = -Math.sin(angle) * 0.01;
+
+    let segmentCount = 0;
+    let segmentStartX = x;
+    let segmentStartY = y;
+    const maxSteps = 1000; // Prevent infinite loops
+
+    for (let step = 0; step < maxSteps && segmentCount < maxSegments; step++) {
+        x += vx;
+        y += vy;
+
+        let bounced = false;
+
+        // Wall bounces
+        if (x <= ballRadius || x >= 1 - ballRadius) {
+            vx = -vx;
+            x = Math.max(ballRadius, Math.min(1 - ballRadius, x));
+            bounced = true;
+        }
+
+        // Top bounce
+        if (y <= ballRadius) {
+            vy = -vy;
+            y = ballRadius;
+            bounced = true;
+        }
+
+        // Bottom return
+        if (y >= 1.0) {
+            segments.push({
+                x1: segmentStartX,
+                y1: segmentStartY,
+                x2: x,
+                y2: 1.0
+            });
+            break;
+        }
+
+        // If bounced, save segment and start new one
+        if (bounced) {
+            segments.push({
+                x1: segmentStartX,
+                y1: segmentStartY,
+                x2: x,
+                y2: y
+            });
+            segmentStartX = x;
+            segmentStartY = y;
+            segmentCount++;
+        }
+    }
+
+    // Add final segment if not bounced
+    if (segmentCount < maxSegments && y < 1.0) {
+        const finalLength = 0.15; // 15% of field
+        const endX = x + vx * finalLength / Math.abs(vy);
+        const endY = y + vy * finalLength / Math.abs(vy);
+
+        segments.push({
+            x1: segmentStartX,
+            y1: segmentStartY,
+            x2: endX,
+            y2: Math.max(0, endY)
+        });
+    }
+
+    return segments;
 }
 
 // Start server

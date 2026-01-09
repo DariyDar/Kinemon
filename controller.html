@@ -1423,19 +1423,8 @@
                         // Note: Buttons are NOT hidden for non-Ship games to prevent race conditions
                         // They start as display:none in HTML and are shown only for Ship games
 
-                        // Check if this player died (only for Snake, not Pong)
-                        if (data.gameState.gameType === 'snake') {
-                            const myPlayer = data.gameState.players.find(p => p.id === playerId);
-
-                            if (myPlayer && !myPlayer.alive) {
-                                // Show death screen
-                                document.getElementById('deathScore').textContent = myPlayer.score;
-                                showScreen('death');
-
-                                // Stop sending motion data while dead
-                                motionController.onTiltChange = null;
-                            }
-                        }
+                        // Auto-respawn feature: No death screen, player auto-respawns after 3s countdown
+                        // Death screen and manual respawn button removed
                     }
 
                     // Handle lobby countdown cancelled
@@ -1608,43 +1597,44 @@
             showScreen('room-input');
         });
 
-        document.getElementById('respawnBtn').addEventListener('click', () => {
-            // Request respawn from server
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'respawn',
-                    controlScheme: currentControlScheme
-                }));
-
-                // Return to controller screen
-                showScreen('controller');
-
-                // Show control selector again
-                document.getElementById('controlSelector').style.display = 'block';
-
-                // ALWAYS restart motion controller on respawn to ensure callback is set
-                // First stop if running
-                if (motionController.isRunning) {
-                    motionController.stop();
-                }
-
-                // Setup motion data callback BEFORE starting
-                motionController.onTiltChange = (normalized) => {
-                    tiltDisplay.textContent = normalized.toFixed(2);
-                    if (ws && ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({
-                            type: 'input',
-                            tilt: normalized
-                        }));
-                    }
-                };
-
-                // Now start motion controller
-                motionController.start().catch(err => {
-                    console.error('Failed to restart motion controller:', err);
-                });
-            }
-        });
+        // Respawn button removed - auto-respawn feature handles this automatically
+        // document.getElementById('respawnBtn').addEventListener('click', () => {
+        //     // Request respawn from server
+        //     if (ws && ws.readyState === WebSocket.OPEN) {
+        //         ws.send(JSON.stringify({
+        //             type: 'respawn',
+        //             controlScheme: currentControlScheme
+        //         }));
+        //
+        //         // Return to controller screen
+        //         showScreen('controller');
+        //
+        //         // Show control selector again
+        //         document.getElementById('controlSelector').style.display = 'block';
+        //
+        //         // ALWAYS restart motion controller on respawn to ensure callback is set
+        //         // First stop if running
+        //         if (motionController.isRunning) {
+        //             motionController.stop();
+        //         }
+        //
+        //         // Setup motion data callback BEFORE starting
+        //         motionController.onTiltChange = (normalized) => {
+        //             tiltDisplay.textContent = normalized.toFixed(2);
+        //             if (ws && ws.readyState === WebSocket.OPEN) {
+        //                 ws.send(JSON.stringify({
+        //                     type: 'input',
+        //                     tilt: normalized
+        //                 }));
+        //             }
+        //         };
+        //
+        //         // Now start motion controller
+        //         motionController.start().catch(err => {
+        //             console.error('Failed to restart motion controller:', err);
+        //         });
+        //     }
+        // });
 
         // Role selection logic for Ship game
         let currentRole = null;

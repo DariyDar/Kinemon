@@ -380,7 +380,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.ballSpeed = settings.ballSpeed || 5;
         room.chargeTime = settings.chargeTime || 2000; // milliseconds
         room.ballLaunchDelay = settings.ballLaunchDelay || 100; // milliseconds
-        room.deadZoneSize = settings.deadZoneSize || 0.05; // 5%
+        // CRITICAL FIX: Use !== undefined to allow 0 value (0% dead zone)
+        room.deadZoneSize = settings.deadZoneSize !== undefined ? settings.deadZoneSize : 0.05; // default 5%
         room.aimSensitivity = settings.aimSensitivity || 0.10; // 10%
 
         // CRITICAL: Shared seed for synchronized levels between players
@@ -2861,7 +2862,9 @@ function serializeGameState(room) {
             segments: p.segments,
             angle: p.angle,
             targetAngle: p.targetAngle || p.angle,  // For arrow_steering visualization
-            controlScheme: p.controlScheme  // For client-side rendering decisions
+            controlScheme: p.controlScheme,  // For client-side rendering decisions
+            respawnCountdown: p.respawnCountdown,  // Auto-respawn countdown
+            respawnPosition: p.respawnPosition  // Where to respawn
         }));
         state.pizzas = room.pizzas;
         state.segmentSize = room.segmentSize;
@@ -2917,6 +2920,36 @@ function gameLoop(roomId) {
 function updateSnake(room) {
     // Update each player
     for (const player of room.players.values()) {
+        // Handle respawn countdown for dead players
+        if (!player.alive && player.respawnCountdown !== undefined) {
+            player.respawnCountdown -= 1 / 60; // Countdown at 60 FPS
+
+            if (player.respawnCountdown <= 0) {
+                // Auto-respawn
+                player.alive = true;
+                player.score = 0; // Reset score
+                player.angle = 0;
+                player.targetAngle = 0;
+                player.headX = player.respawnPosition.x;
+                player.headY = player.respawnPosition.y;
+
+                // Reset segments
+                player.segments = [];
+                for (let i = 0; i < INITIAL_LENGTH; i++) {
+                    player.segments.push({
+                        x: player.headX - i * room.segmentSize,
+                        y: player.headY
+                    });
+                }
+
+                // Clear countdown
+                player.respawnCountdown = undefined;
+                player.respawnPosition = undefined;
+
+                console.log(`Player ${player.id} auto-respawned in room ${room.id}`);
+            }
+        }
+
         if (!player.alive) continue;
 
         // Calculate rotation from tilt with control mapping
@@ -4400,7 +4433,15 @@ function checkCollisions(room) {
                     player.alive = false;
                     dropPizzasFromSnake(room, player);
                     player.segments = [];  // Clear segments to prevent invisible collision
-                    console.log(`Player ${player.id} died (hit ${otherPlayer.id}) in room ${room.id}`);
+
+                    // Auto-respawn countdown (3 seconds)
+                    player.respawnCountdown = 3.0;
+                    player.respawnPosition = {
+                        x: Math.random() * room.canvas.width,
+                        y: Math.random() * room.canvas.height
+                    };
+
+                    console.log(`Player ${player.id} died (hit ${otherPlayer.id}) in room ${room.id} - respawning in 3s`);
                     break;
                 }
             }

@@ -2709,6 +2709,43 @@
                 ctx.textAlign = 'center';
                 ctx.fillText(player.name, head.x, head.y - segmentRadius - 5);
             }
+
+            // Draw respawn countdown for dead players
+            for (const player of gameState.players) {
+                if (player.alive || !player.respawnCountdown || !player.respawnPosition) continue;
+
+                const x = player.respawnPosition.x;
+                const y = player.respawnPosition.y;
+                const countdown = Math.ceil(player.respawnCountdown); // 3, 2, 1
+
+                // Pulsing glow effect
+                const pulseScale = 1 + Math.sin(Date.now() / 100) * 0.1;
+
+                // Draw glow circle
+                ctx.save();
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = player.color;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = player.color;
+                ctx.beginPath();
+                ctx.arc(x, y, 50 * pulseScale, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Draw countdown number
+                ctx.fillStyle = player.color;
+                ctx.font = 'bold 72px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = player.color;
+                ctx.fillText(countdown.toString(), x, y);
+                ctx.shadowBlur = 0;
+
+                // Draw player name below
+                ctx.font = 'bold 20px sans-serif';
+                ctx.fillText(player.name, x, y + 50);
+            }
         }
 
         function renderPushers() {
@@ -3576,39 +3613,56 @@
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const blockSize = gameState.blockSize || 50;
-            const launchLine = canvas.height - 40;
             const players = gameState.players || [];
+            const launchLine = canvas.height - 40;
 
-            // Layout: 1 player = full screen, 2 players = split left/right, 3 players = left/center/right
+            // CRITICAL: Calculate field dimensions based on player count
+            // Each player needs their own scaled field that fits in their portion of screen
+            let playerWidth, playerCount;
+
             if (players.length === 1) {
-                renderPlayerField(players[0], 0, 0, canvas.width, canvas.height, blockSize, launchLine);
+                playerWidth = canvas.width;
+                playerCount = 1;
             } else if (players.length === 2) {
-                const halfWidth = canvas.width / 2;
-                renderPlayerField(players[0], 0, 0, halfWidth, canvas.height, blockSize, launchLine);
-                renderPlayerField(players[1], halfWidth, 0, halfWidth, canvas.height, blockSize, launchLine);
+                playerWidth = canvas.width / 2;
+                playerCount = 2;
+            } else {
+                playerWidth = canvas.width / 3;
+                playerCount = 3;
+            }
+
+            // CRITICAL: Calculate blockSize that fits in player's width
+            // Server uses fieldWidth blocks, we need to fit them in playerWidth
+            const fieldWidth = gameState.fieldWidth || 7;
+            const blockSize = Math.floor(playerWidth / fieldWidth);
+
+            // Layout players
+            if (players.length === 1) {
+                renderPlayerField(players[0], 0, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
+            } else if (players.length === 2) {
+                renderPlayerField(players[0], 0, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
+                renderPlayerField(players[1], playerWidth, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
 
                 // Divider
                 ctx.strokeStyle = '#444';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.moveTo(halfWidth, 0);
-                ctx.lineTo(halfWidth, canvas.height);
+                ctx.moveTo(playerWidth, 0);
+                ctx.lineTo(playerWidth, canvas.height);
                 ctx.stroke();
             } else if (players.length === 3) {
-                const colWidth = canvas.width / 3;
-                renderPlayerField(players[0], 0, 0, colWidth, canvas.height, blockSize, launchLine);
-                renderPlayerField(players[1], colWidth, 0, colWidth, canvas.height, blockSize, launchLine);
-                renderPlayerField(players[2], colWidth * 2, 0, colWidth, canvas.height, blockSize, launchLine);
+                renderPlayerField(players[0], 0, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
+                renderPlayerField(players[1], playerWidth, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
+                renderPlayerField(players[2], playerWidth * 2, 0, playerWidth, canvas.height, blockSize, launchLine, fieldWidth);
 
                 // Dividers
                 ctx.strokeStyle = '#444';
                 ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.moveTo(colWidth, 0);
-                ctx.lineTo(colWidth, canvas.height);
-                ctx.moveTo(colWidth * 2, 0);
-                ctx.lineTo(colWidth * 2, canvas.height);
+                ctx.moveTo(playerWidth, 0);
+                ctx.lineTo(playerWidth, canvas.height);
+                ctx.moveTo(playerWidth * 2, 0);
+                ctx.lineTo(playerWidth * 2, canvas.height);
                 ctx.stroke();
             }
 
@@ -3642,13 +3696,18 @@
             ctx.globalAlpha = 1.0;
         }
 
-        function renderPlayerField(player, offsetX, offsetY, width, height, blockSize, launchLine) {
+        function renderPlayerField(player, offsetX, offsetY, width, height, blockSize, launchLine, fieldWidth) {
             ctx.save();
             ctx.translate(offsetX, offsetY);
 
             const uiHeight = 40; // UI bar height above field
             const fieldTop = uiHeight;
             const fieldHeight = height - uiHeight;
+
+            // CRITICAL: Calculate scale factor for coordinates
+            // Server generates coordinates for 50px blocks, we use dynamic blockSize
+            const serverBlockSize = 50;
+            const scale = blockSize / serverBlockSize;
 
             // UI bar (above field)
             ctx.fillStyle = '#1a1a1a';
@@ -3675,8 +3734,9 @@
             ctx.lineWidth = 3;
             ctx.strokeRect(0, 0, width, fieldHeight);
 
-            // Launch line
-            const adjustedLaunchLine = launchLine - fieldTop;
+            // Launch line (scale Y coordinate)
+            // No need to subtract fieldTop - we already translated by fieldTop
+            const adjustedLaunchLine = launchLine * scale;
             ctx.strokeStyle = '#666';
             ctx.lineWidth = 2;
             ctx.beginPath();
@@ -3684,39 +3744,45 @@
             ctx.lineTo(width, adjustedLaunchLine);
             ctx.stroke();
 
-            // Blocks (coordinates are absolute, need to adjust for field offset)
+            // Blocks (scale coordinates from server space to player space)
+            // No need to subtract fieldTop - we already translated by fieldTop
             for (const block of player.blocks || []) {
-                // Block coordinates are in absolute canvas space, translate to field space
-                const blockCopy = { ...block, y: block.y - fieldTop };
+                const blockCopy = {
+                    ...block,
+                    x: block.x * scale,
+                    y: block.y * scale
+                };
                 drawBlock(blockCopy, blockSize, player.color);
             }
 
-            // Bonus balls (coordinates are absolute, need to adjust for field offset)
+            // Bonus balls (scale coordinates)
             for (const bonus of player.bonusBalls || []) {
                 ctx.fillStyle = '#FFD700';
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(bonus.x, bonus.y - fieldTop, 10, 0, Math.PI * 2);
+                ctx.arc(bonus.x * scale, bonus.y * scale, 10, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.shadowBlur = 0;
             }
 
-            // Balls in flight (coordinates are absolute, need to adjust for field offset)
+            // Balls in flight (scale coordinates)
             for (const ball of player.balls || []) {
-                if (!ball.active && !ball.waiting) continue;
+                if (!ball.active) continue;
                 ctx.fillStyle = '#FFFFFF';
                 ctx.beginPath();
-                ctx.arc(ball.x, ball.y - fieldTop, 5, 0, Math.PI * 2);
+                ctx.arc(ball.x * scale, ball.y * scale, 5, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            // Launch ball (on launch line)
-            const launchX = player.launchX !== null ? player.launchX : width / 2;
-            ctx.fillStyle = '#FFFFFF';
-            ctx.beginPath();
-            ctx.arc(launchX, adjustedLaunchLine, 5, 0, Math.PI * 2);
-            ctx.fill();
+            // Launch ball (on launch line) - ONLY show when NOT launching or in flight
+            if (player.turnState !== 'launching' && player.turnState !== 'balls_in_flight') {
+                const launchX = player.launchX !== null ? player.launchX : width / 2;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.arc(launchX, adjustedLaunchLine, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
 
             // Aim line with charge effect
             if (player.turnState === 'aiming' || player.turnState === 'charging') {

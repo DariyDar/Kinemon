@@ -1396,10 +1396,6 @@
 
             console.log('Game settings:', gameSettings);
 
-            // Reset QR generation flags for new game
-            window.waitingQRCodeGenerated = false;
-            window.persistentQRGenerated = false;
-
             // Show connection screen and connect
             showScreen('connection');
 
@@ -1719,42 +1715,37 @@
 
                         console.log('QR Code URL:', qrData);
 
-                        // CRITICAL FIX (6th attempt - FINAL): Completely clear container with innerHTML
-                        // QRCode library creates both <canvas> and <img>, innerHTML removes ALL
-                        if (!window.waitingQRCodeGenerated) {
-                            console.log('✅ Generating waiting QR code (first time)');
+                        // CRITICAL FIX (7th attempt - FINAL FIX):
+                        // Root cause: QRCode library APPENDS elements, doesn't replace them
+                        // Solution: ALWAYS clear container before generating, regardless of flags
+                        const waitingQR = document.getElementById('waitingQRCode');
 
-                            const waitingQR = document.getElementById('waitingQRCode');
+                        // ALWAYS clear container FIRST (library appends, not replaces!)
+                        waitingQR.innerHTML = '';
 
-                            // NUCLEAR cleanup - innerHTML = '' removes EVERYTHING instantly
-                            waitingQR.innerHTML = '';
+                        // Adaptive QR size based on screen resolution
+                        const screenWidth = window.innerWidth;
+                        const screenHeight = window.innerHeight;
+                        let qrSize = 500; // Default for small screens (phones)
 
-                            // Adaptive QR size based on screen resolution
-                            const screenWidth = window.innerWidth;
-                            const screenHeight = window.innerHeight;
-                            let qrSize = 500; // Default for small screens (phones)
-
-                            if (screenWidth >= 2560 || screenHeight >= 1440) {
-                                qrSize = 250; // 4K projectors - very small
-                            } else if (screenWidth >= 1920 || screenHeight >= 1080) {
-                                qrSize = 300; // Full HD projectors - small
-                            } else if (screenWidth >= 1024 || screenHeight >= 768) {
-                                qrSize = 380; // Tablets/medium projectors
-                            }
-
-                            new QRCode(waitingQR, {
-                                text: qrData,
-                                width: qrSize,
-                                height: qrSize,
-                                colorDark: '#000000',
-                                colorLight: '#ffffff',
-                                correctLevel: QRCode.CorrectLevel.M
-                            });
-
-                            window.waitingQRCodeGenerated = true;
-                        } else {
-                            console.log('⚠️ Waiting QR code already generated, skipping duplicate');
+                        if (screenWidth >= 2560 || screenHeight >= 1440) {
+                            qrSize = 250; // 4K projectors - very small
+                        } else if (screenWidth >= 1920 || screenHeight >= 1080) {
+                            qrSize = 300; // Full HD projectors - small
+                        } else if (screenWidth >= 1024 || screenHeight >= 768) {
+                            qrSize = 380; // Tablets/medium projectors
                         }
+
+                        new QRCode(waitingQR, {
+                            text: qrData,
+                            width: qrSize,
+                            height: qrSize,
+                            colorDark: '#000000',
+                            colorLight: '#ffffff',
+                            correctLevel: QRCode.CorrectLevel.M
+                        });
+
+                        console.log('✅ Waiting QR code generated');
 
                         // Store QR data globally for later use (lobby/game screens)
                         window.persistentQRData = qrData;

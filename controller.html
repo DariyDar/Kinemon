@@ -1275,8 +1275,9 @@
                                         if (ws && ws.readyState === WebSocket.OPEN) {
                                             ws.send(JSON.stringify({ type: 'player_ready' }));
                                             isReady = true;
-                                            readyBtn.textContent = '❌ Отменить';
-                                            readyBtn.disabled = false; // Keep enabled for unready
+                                            // Show "waiting for others" state instead of "cancel"
+                                            readyBtn.textContent = '⏳ Ожидаем других игроков...';
+                                            readyBtn.disabled = true; // Disable while waiting
                                         } else {
                                             addDebugLog('❌ WebSocket не готов', 'error');
                                         }
@@ -1621,14 +1622,13 @@
                 // Show control selector again
                 document.getElementById('controlSelector').style.display = 'block';
 
-                // Restart motion controller if not running
-                if (!motionController.isRunning) {
-                    motionController.start().catch(err => {
-                        console.error('Failed to restart motion controller:', err);
-                    });
+                // ALWAYS restart motion controller on respawn to ensure callback is set
+                // First stop if running
+                if (motionController.isRunning) {
+                    motionController.stop();
                 }
 
-                // Resume sending motion data
+                // Setup motion data callback BEFORE starting
                 motionController.onTiltChange = (normalized) => {
                     tiltDisplay.textContent = normalized.toFixed(2);
                     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -1638,6 +1638,11 @@
                         }));
                     }
                 };
+
+                // Now start motion controller
+                motionController.start().catch(err => {
+                    console.error('Failed to restart motion controller:', err);
+                });
             }
         });
 

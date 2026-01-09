@@ -662,9 +662,15 @@
 
             // Send to server
             try {
-                const serverUrl = 'wss://kinemon.onrender.com' === ws?.url?.replace('wss://', 'https://').replace('/ws', '')
-                    ? 'https://kinemon.onrender.com'
-                    : 'http://localhost:8080';
+                // Determine server URL from WebSocket connection
+                let serverUrl = 'http://localhost:8080';
+                if (ws && ws.url) {
+                    if (ws.url.includes('kinemon.onrender.com')) {
+                        serverUrl = 'https://kinemon.onrender.com';
+                    } else if (ws.url.includes('localhost')) {
+                        serverUrl = 'http://localhost:8080';
+                    }
+                }
 
                 fetch(`${serverUrl}/api/log`, {
                     method: 'POST',

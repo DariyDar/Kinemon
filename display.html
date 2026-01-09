@@ -1826,6 +1826,11 @@
 
                         updatePlayerCount();
 
+                        // For non-Ship games: switch to game screen when first player joins
+                        if (gameType !== 'ship' && gameState.players.length > 0) {
+                            showScreen('game');
+                        }
+
                     } else if (data.type === 'update') {
                         gameState = data.gameState;
 

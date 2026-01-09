@@ -2035,7 +2035,10 @@ wss.on('connection', (ws) => {
                 const gameType = data.gameType || 'snake';
                 const sessionToken = data.sessionToken; // Optional: client sends token if reconnecting
 
+                console.log(`[JOIN] ============================================`);
                 console.log(`[JOIN] Received join request: room=${roomId}, gameType=${gameType}, player=${data.name}, token=${sessionToken ? sessionToken.substring(0, 8) + '...' : 'none'}`);
+                console.log(`[JOIN] Full join data:`, JSON.stringify(data));
+                console.log(`[JOIN] ============================================`);
 
                 // CHECK FOR RECONNECTION
                 if (sessionToken && disconnectedPlayers.has(sessionToken)) {
@@ -2251,6 +2254,12 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify(initMessage));
 
                 console.log(`[JOIN] Player ${playerId} joined room ${roomId} as ${player.name} (${room.gameType})`);
+
+                // Broadcast to all other clients in room (especially Display) that a player joined
+                broadcastToRoom(roomId, {
+                    type: 'init',
+                    gameState: serializeGameState(room)
+                });
 
             } else if (data.type === 'join_room') {
                 // Display wants to join existing room as spectator

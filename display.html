@@ -1815,6 +1815,12 @@
                         showScreen('settings');
 
                     } else if (data.type === 'init') {
+                        console.log('🔵 INIT received:', {
+                            gameType: gameType,
+                            playersCount: data.gameState?.players?.length,
+                            players: data.gameState?.players
+                        });
+
                         gameState = data.gameState;
 
                         // Update canvas size from server
@@ -1827,8 +1833,18 @@
                         updatePlayerCount();
 
                         // For non-Ship games: switch to game screen when first player joins
-                        if (gameType !== 'ship' && gameState.players.length > 0) {
+                        console.log('🔍 Check screen switch:', {
+                            gameType: gameType,
+                            isNotShip: gameType !== 'ship',
+                            playersLength: gameState.players?.length,
+                            willSwitch: gameType !== 'ship' && gameState.players?.length > 0
+                        });
+
+                        if (gameType !== 'ship' && gameState.players && gameState.players.length > 0) {
+                            console.log('✅ Switching to game screen');
                             showScreen('game');
+                        } else {
+                            console.log('❌ NOT switching to game screen');
                         }
 
                     } else if (data.type === 'update') {

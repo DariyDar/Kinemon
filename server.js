@@ -2239,6 +2239,15 @@ wss.on('connection', (ws) => {
                     gameStarted: room.gameStarted // Include gameStarted flag for reconnect handling
                 };
                 console.log(`[JOIN] Sending init message to ${player.name}:`, JSON.stringify(initMessage).substring(0, 100) + '...');
+
+                if (room.gameType === 'ballz') {
+                    console.log(`[BALLZ DEBUG] Init message for ${player.name}:`, {
+                        gameType: initMessage.gameState.gameType,
+                        playersCount: initMessage.gameState.players?.length,
+                        playerNames: initMessage.gameState.players?.map(p => p.name)
+                    });
+                }
+
                 ws.send(JSON.stringify(initMessage));
 
                 console.log(`[JOIN] Player ${playerId} joined room ${roomId} as ${player.name} (${room.gameType})`);

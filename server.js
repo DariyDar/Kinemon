@@ -3209,44 +3209,41 @@ function updateCharging(room, player) {
     player.lastTilt = player.tilt;
 }
 
-// State: LAUNCHING - Balls are being launched sequentially
+// State: LAUNCHING - Balls are being launched sequentially (5TH REWRITE - SIMPLE)
 function updateLaunching(room, player) {
     const now = Date.now();
 
-    // Check if it's time to launch next ball
-    if (player.balls.length < player.ballsThisTurn) {
-        const timeSinceLastLaunch = now - (player.lastBallLaunchTime || player.nextBallLaunchTime);
+    // Initialize on first entry to LAUNCHING state
+    if (!player.ballsLaunched) {
+        player.ballsLaunched = 0;
+        player.nextBallLaunchTime = now; // Launch first ball immediately
+    }
 
-        if (timeSinceLastLaunch >= room.ballLaunchDelay) {
-            // Launch next ball
-            const launchX = player.launchX !== null
-                ? player.launchX
-                : room.canvas.width / 2;
-            const launchY = room.canvas.height - 40;
+    // Time to launch next ball?
+    if (now >= player.nextBallLaunchTime && player.ballsLaunched < player.ballsThisTurn) {
+        const launchX = player.launchX !== null ? player.launchX : room.canvas.width / 2;
+        const launchY = room.canvas.height - 40;
 
-            const speed = room.ballSpeed;
-            const vx = Math.cos(player.aimAngle) * speed;
-            const vy = -Math.sin(player.aimAngle) * speed; // NEGATIVE because canvas Y grows downward
+        const speed = room.ballSpeed;
+        const vx = Math.cos(player.aimAngle) * speed;
+        const vy = -Math.sin(player.aimAngle) * speed;
 
-            // CRITICAL: Add ball but mark as NOT active until launch delay passes
-            // Ball starts as "waiting" and becomes active after its turn
-            player.balls.push({
-                x: launchX,
-                y: launchY,
-                vx: vx,
-                vy: vy,
-                active: false, // NOT active yet - will activate in physics update
-                waiting: true, // Waiting to launch
-                launchIndex: player.balls.length, // Use current length as index
-                launchTime: now // Timestamp when this ball should start moving
-            });
+        // SIMPLE: Create active ball immediately, no waiting state
+        player.balls.push({
+            x: launchX,
+            y: launchY,
+            vx: vx,
+            vy: vy,
+            active: true,
+            launchIndex: player.ballsLaunched
+        });
 
-            player.lastBallLaunchTime = now;
-        }
+        player.ballsLaunched++;
+        player.nextBallLaunchTime = now + room.ballLaunchDelay; // Schedule next ball
     }
 
     // All balls launched - switch to balls_in_flight
-    if (player.balls.length >= player.ballsThisTurn) {
+    if (player.ballsLaunched >= player.ballsThisTurn) {
         player.turnState = 'balls_in_flight';
     }
 }
@@ -3255,20 +3252,8 @@ function updateLaunching(room, player) {
 function updateBallPhysics(room, player) {
     const launchLine = room.canvas.height - 40;
     const ballRadius = 5;
-    const now = Date.now();
 
     for (const ball of player.balls) {
-        // CRITICAL: Activate waiting balls when their time comes
-        if (ball.waiting) {
-            const timeSinceLaunch = now - ball.launchTime;
-            if (timeSinceLaunch >= 0) {
-                ball.active = true;
-                ball.waiting = false;
-            } else {
-                continue; // Skip physics for balls still waiting
-            }
-        }
-
         if (!ball.active) continue;
 
         ball.x += ball.vx;
@@ -3309,8 +3294,8 @@ function updateBallPhysics(room, player) {
 
 // Check if turn is complete (all balls returned)
 function checkTurnComplete(room, player) {
-    const allInactive = player.balls.every(b => !b.active && !b.waiting);
-    const allLaunched = player.balls.length === player.ballsThisTurn;
+    const allInactive = player.balls.every(b => !b.active);
+    const allLaunched = player.ballsLaunched >= player.ballsThisTurn;
 
     if (allInactive && allLaunched) {
         player.turnState = 'turn_complete';
@@ -3436,6 +3421,7 @@ function advanceTurn(room, player) {
     // Reset for next turn
     player.turnNumber++;
     player.balls = [];
+    player.ballsLaunched = 0; // Reset launch counter
     player.firstBallTouched = false;
     player.newLaunchX = null;
     player.chargeStartTime = null;

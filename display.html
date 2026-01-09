@@ -1719,17 +1719,15 @@
 
                         console.log('QR Code URL:', qrData);
 
-                        // CRITICAL FIX: Prevent duplicate QR code generation
-                        // Only generate if not already generated
+                        // CRITICAL FIX (6th attempt - FINAL): Completely clear container with innerHTML
+                        // QRCode library creates both <canvas> and <img>, innerHTML removes ALL
                         if (!window.waitingQRCodeGenerated) {
                             console.log('✅ Generating waiting QR code (first time)');
 
                             const waitingQR = document.getElementById('waitingQRCode');
 
-                            // Aggressive cleanup - remove all child nodes
-                            while (waitingQR.firstChild) {
-                                waitingQR.removeChild(waitingQR.firstChild);
-                            }
+                            // NUCLEAR cleanup - innerHTML = '' removes EVERYTHING instantly
+                            waitingQR.innerHTML = '';
 
                             // Adaptive QR size based on screen resolution
                             const screenWidth = window.innerWidth;

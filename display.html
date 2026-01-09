@@ -387,13 +387,17 @@
                 margin: 20px auto !important;
             }
 
-            #waitingQRCode img, #waitingQRCode canvas {
+            #waitingQRCode img {
                 max-width: 100% !important;
                 max-height: 100% !important;
                 width: auto !important;
                 height: auto !important;
                 display: block !important;
                 margin: 0 auto !important;
+            }
+
+            #waitingQRCode canvas {
+                display: none !important; /* Canvas is only used for rendering, should be hidden */
             }
         }
 
@@ -1396,9 +1400,6 @@
 
             console.log('Game settings:', gameSettings);
 
-            // Reset debug counter
-            window.roomCreatedCount = 0;
-
             // Show connection screen and connect
             showScreen('connection');
 
@@ -1706,11 +1707,6 @@
                         // Room created, show QR code
                         roomId = data.roomId;
 
-                        // DEBUG: Track how many times this event fires
-                        if (!window.roomCreatedCount) window.roomCreatedCount = 0;
-                        window.roomCreatedCount++;
-                        console.log(`🔔 room_created event #${window.roomCreatedCount} - roomId: ${roomId}`);
-
                         roomCodeDisplay.textContent = roomId;
                         roomIdInfo.textContent = roomId;
 
@@ -1722,16 +1718,15 @@
 
                         console.log('QR Code URL:', qrData);
 
-                        // CRITICAL FIX (8th attempt - DEBUG):
-                        // Check child count before and after to diagnose the issue
+                        // CRITICAL FIX (9th attempt - FINAL):
+                        // Root cause: CSS was showing BOTH canvas AND img elements
+                        // QRCode library creates canvas (for rendering) + img (visible QR)
+                        // CSS at line 390 had "display: block !important" for BOTH
+                        // Solution: Hide canvas, only show img (fixed in CSS)
                         const waitingQR = document.getElementById('waitingQRCode');
-
-                        console.log(`🔍 BEFORE clear - childElementCount: ${waitingQR.childElementCount}`);
 
                         // ALWAYS clear container FIRST
                         waitingQR.innerHTML = '';
-
-                        console.log(`🧹 AFTER clear - childElementCount: ${waitingQR.childElementCount}`);
 
                         // Adaptive QR size based on screen resolution
                         const screenWidth = window.innerWidth;
@@ -1754,8 +1749,6 @@
                             colorLight: '#ffffff',
                             correctLevel: QRCode.CorrectLevel.M
                         });
-
-                        console.log(`✅ QR generated - childElementCount NOW: ${waitingQR.childElementCount}`);
 
                         // Store QR data globally for later use (lobby/game screens)
                         window.persistentQRData = qrData;
@@ -2005,7 +1998,7 @@
                         // Update persistent QR data
                         window.persistentQRData = qrData;
                         window.persistentQRGenerated = false;
-                        generatePersistentQR(); // Regenerate QR
+                        generatePersistentQR(qrData); // Regenerate QR with correct data
 
                         console.log(`QR code updated for new room ${data.roomId}, game ${data.gameType}`);
 

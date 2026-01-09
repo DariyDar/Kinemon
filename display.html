@@ -3611,6 +3611,35 @@
                 ctx.lineTo(colWidth * 2, canvas.height);
                 ctx.stroke();
             }
+
+            // Render visual effects
+            // Particles
+            for (const p of effects.particles) {
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+
+            // Flash
+            if (effects.flash.active) {
+                ctx.fillStyle = effects.flash.color;
+                ctx.globalAlpha = effects.flash.alpha;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
+
+            // Score animations
+            ctx.font = 'bold 24px sans-serif';
+            ctx.textAlign = 'center';
+            for (const anim of effects.scoreAnims) {
+                ctx.globalAlpha = anim.alpha;
+                ctx.fillStyle = anim.color;
+                ctx.fillText(anim.text, anim.x, anim.y);
+            }
+            ctx.globalAlpha = 1.0;
         }
 
         function renderPlayerField(player, offsetX, offsetY, width, height, blockSize, launchLine) {
@@ -3888,12 +3917,11 @@
                 ctx.textAlign = 'center';
                 ctx.fillText('БЛОКИРОВАНО', launchX, launchLine - 30);
             } else {
-                // Normal trajectory with animated dots
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 1;
-                const dotSpacing = 10;
-                const dotRadius = 1.5;
-                const animationOffset = (Date.now() / 50) % dotSpacing; // Running dots
+                // Normal trajectory with simple 2-frame dot animation
+                ctx.fillStyle = '#FFFFFF';
+                const dotSpacing = 8;
+                const dotRadius = 1; // 1px dots
+                const frame = Math.floor(Date.now() / 500) % 2; // Toggle every 0.5s
 
                 for (const seg of trajectory) {
                     const dx = seg.x2 - seg.x1;
@@ -3901,8 +3929,8 @@
                     const length = Math.hypot(dx, dy);
                     const steps = Math.floor(length / dotSpacing);
 
-                    for (let i = 0; i < steps; i++) {
-                        const t = ((i * dotSpacing + animationOffset) % length) / length;
+                    for (let i = frame; i < steps; i += 2) { // Every other dot based on frame
+                        const t = (i * dotSpacing) / length;
                         const x = seg.x1 + dx * t;
                         const y = seg.y1 + dy * t;
 

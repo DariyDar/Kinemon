@@ -2189,7 +2189,6 @@ wss.on('connection', (ws) => {
                     player.launchX = null; // null = center initially
                     player.aimAngle = 3 * Math.PI / 2; // 270° straight up
                     player.chargeStartTime = null;
-                    player.steadyAimStartTime = null;
                     player.chargeProgress = 0;
                     player.lastTilt = 0.5;
                     player.isInDeadZone = false;
@@ -3156,20 +3155,13 @@ function updateAiming(room, player) {
     const movementThreshold = 0.002;
 
     if (tiltDelta < movementThreshold) {
-        // Aim is steady - track how long it's been steady
-        if (!player.steadyAimStartTime) {
-            player.steadyAimStartTime = Date.now();
-        } else {
-            // Check if steady long enough to start charging (500ms minimum hold)
-            const steadyTime = Date.now() - player.steadyAimStartTime;
-            if (steadyTime >= 500 && !player.chargeStartTime) {
-                player.chargeStartTime = Date.now();
-                player.turnState = 'charging';
-            }
+        // Aim is steady - start charging IMMEDIATELY (no delay)
+        if (!player.chargeStartTime) {
+            player.chargeStartTime = Date.now();
+            player.turnState = 'charging';
         }
     } else {
-        // Aim moved - reset steady timer
-        player.steadyAimStartTime = null;
+        // Aim moved - reset charge
         player.chargeStartTime = null;
     }
 
@@ -3218,10 +3210,9 @@ function updateCharging(room, player) {
 // State: LAUNCHING - Balls are being launched sequentially
 function updateLaunching(room, player) {
     const now = Date.now();
-    const launchedCount = player.balls.length;
 
     // Check if it's time to launch next ball
-    if (launchedCount < player.ballsThisTurn) {
+    if (player.balls.length < player.ballsThisTurn) {
         const timeSinceLastLaunch = now - (player.lastBallLaunchTime || player.nextBallLaunchTime);
 
         if (timeSinceLastLaunch >= room.ballLaunchDelay) {
@@ -3241,7 +3232,7 @@ function updateLaunching(room, player) {
                 vx: vx,
                 vy: vy,
                 active: true,
-                launchIndex: launchedCount
+                launchIndex: player.balls.length // Use current length as index
             });
 
             player.lastBallLaunchTime = now;
@@ -3249,7 +3240,7 @@ function updateLaunching(room, player) {
     }
 
     // All balls launched - switch to balls_in_flight
-    if (launchedCount >= player.ballsThisTurn) {
+    if (player.balls.length >= player.ballsThisTurn) {
         player.turnState = 'balls_in_flight';
     }
 }
@@ -3278,6 +3269,7 @@ function updateBallPhysics(room, player) {
 
         // Bottom return (deactivate ball)
         if (ball.y >= launchLine) {
+            ball.y = launchLine; // Clamp to exact launch line position
             ball.active = false;
 
             // First ball sets new launch point

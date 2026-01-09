@@ -2016,6 +2016,11 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
 
+            // Log ALL incoming messages for debugging
+            if (data.type !== 'input' && data.type !== 'ping') {
+                console.log(`[WS] <<<< Received message type: ${data.type}`);
+            }
+
             if (data.type === 'create_room') {
                 // Create new room with game type and settings
                 const roomId = generateRoomId();
@@ -3999,8 +4004,11 @@ function ballzSpawnBlocks(player, room) {
     const maxSpawn = Math.max(0, availableCols.length - 2);
     if (maxSpawn === 0) return;
 
-    // Shuffle and pick random columns
-    shuffle(availableCols);
+    // Shuffle and pick random columns (Fisher-Yates shuffle)
+    for (let i = availableCols.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availableCols[i], availableCols[j]] = [availableCols[j], availableCols[i]];
+    }
     const spawnCount = Math.min(count, maxSpawn);
 
     for (let i = 0; i < spawnCount; i++) {

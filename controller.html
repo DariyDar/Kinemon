@@ -649,6 +649,41 @@
         // Load saved control preference from localStorage
         let currentControlScheme = localStorage.getItem('playerControlScheme') || 'arrow_instant';
 
+        // Centralized logging function - sends logs to server
+        function logToServer(level, message, data = null) {
+            // Also log locally
+            if (level === 'ERROR') {
+                console.error(message, data);
+            } else if (level === 'WARN') {
+                console.warn(message, data);
+            } else {
+                console.log(message, data);
+            }
+
+            // Send to server
+            try {
+                const serverUrl = 'wss://kinemon.onrender.com' === ws?.url?.replace('wss://', 'https://').replace('/ws', '')
+                    ? 'https://kinemon.onrender.com'
+                    : 'http://localhost:8080';
+
+                fetch(`${serverUrl}/api/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        clientType: 'controller',
+                        level: level,
+                        message: message,
+                        data: data
+                    })
+                }).catch(err => {
+                    // Silently fail if server is unreachable
+                    console.error('[LOG] Failed to send log to server:', err);
+                });
+            } catch (error) {
+                // Ignore errors in logging system
+            }
+        }
+
         const roomInputScreen = document.getElementById('roomInputScreen');
         const lobbyScreen = document.getElementById('lobbyScreen');
         const calibrationMinScreen = document.getElementById('calibrationMinScreen');
@@ -968,10 +1003,14 @@
                             const savedToken = localStorage.getItem('sessionToken');
                             if (savedToken) {
                                 joinMessage.sessionToken = savedToken;
-                                console.log('[RECONNECT] Attempting to reconnect with saved token');
+                                logToServer('INFO', '[RECONNECT] Attempting to reconnect with saved token');
                             }
 
-                            console.log('📤 Sending join with controlScheme:', currentControlScheme);
+                            logToServer('INFO', '📤 Sending join message', {
+                                controlScheme: currentControlScheme,
+                                gameType: gameType,
+                                roomId: roomId
+                            });
                             addDebugLog(`📤 Отправка join с controlScheme: ${currentControlScheme}`, 'info');
 
                             // Add team for pushers game

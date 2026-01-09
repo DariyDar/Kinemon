@@ -876,6 +876,41 @@
 
         let gameSettings = {}; // Store game settings
 
+        // Centralized logging function - sends logs to server
+        function logToServer(level, message, data = null) {
+            // Also log locally
+            if (level === 'ERROR') {
+                console.error(message, data);
+            } else if (level === 'WARN') {
+                console.warn(message, data);
+            } else {
+                console.log(message, data);
+            }
+
+            // Send to server
+            try {
+                const serverUrl = 'wss://kinemon.onrender.com' === ws?.url?.replace('wss://', 'https://').replace('/ws', '')
+                    ? 'https://kinemon.onrender.com'
+                    : 'http://localhost:8080';
+
+                fetch(`${serverUrl}/api/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        clientType: 'display',
+                        level: level,
+                        message: message,
+                        data: data
+                    })
+                }).catch(err => {
+                    // Silently fail if server is unreachable
+                    console.error('[LOG] Failed to send log to server:', err);
+                });
+            } catch (error) {
+                // Ignore errors in logging system
+            }
+        }
+
         // Live physics settings (Ship game only)
         let physicsSettings = {
             // Pump system parameters
@@ -1815,7 +1850,7 @@
                         showScreen('settings');
 
                     } else if (data.type === 'init') {
-                        console.log('🔵 INIT received:', {
+                        logToServer('INFO', '🔵 INIT received', {
                             gameType: gameType,
                             playersCount: data.gameState?.players?.length,
                             players: data.gameState?.players
@@ -1833,7 +1868,7 @@
                         updatePlayerCount();
 
                         // For non-Ship games: switch to game screen when first player joins
-                        console.log('🔍 Check screen switch:', {
+                        logToServer('INFO', '🔍 Check screen switch', {
                             gameType: gameType,
                             isNotShip: gameType !== 'ship',
                             playersLength: gameState.players?.length,
@@ -1841,10 +1876,10 @@
                         });
 
                         if (gameType !== 'ship' && gameState.players && gameState.players.length > 0) {
-                            console.log('✅ Switching to game screen');
+                            logToServer('INFO', '✅ Switching to game screen');
                             showScreen('game');
                         } else {
-                            console.log('❌ NOT switching to game screen');
+                            logToServer('INFO', '❌ NOT switching to game screen');
                         }
 
                     } else if (data.type === 'update') {
@@ -3665,6 +3700,10 @@ function renderBallz() {
     ctx.save();
     ctx.translate(offsetX, offsetY);
 
+    // UI overlay ABOVE the field (drawn before translating down)
+    const uiHeight = 40;
+    drawBallzUI(player, fieldWidth, -uiHeight); // Draw above field at y=-40
+
     // Field border
     ctx.strokeStyle = player.color || '#4CAF50';
     ctx.lineWidth = 3;
@@ -3725,13 +3764,7 @@ function renderBallz() {
         drawBallzAimLine(player, launchX, launchLineY, fieldWidth, fieldHeight, cols, rows);
     }
 
-    // UI overlay (top of field)
-    drawBallzUI(player, fieldWidth);
-
     ctx.restore();
-
-    // Render effects (particles, etc.)
-    renderEffects();
 }
 
 function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {
@@ -3851,31 +3884,31 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
     }
 }
 
-function drawBallzUI(player, fieldWidth) {
+function drawBallzUI(player, fieldWidth, yOffset = 0) {
     const uiHeight = 40;
 
     // UI background
     ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, fieldWidth, uiHeight);
+    ctx.fillRect(0, yOffset, fieldWidth, uiHeight);
 
     // Player name (left)
     ctx.fillStyle = player.color || '#4CAF50';
     ctx.font = 'bold 16px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText(player.name, 10, uiHeight / 2);
+    ctx.fillText(player.name, 10, yOffset + uiHeight / 2);
 
     // Ball count (center)
     ctx.fillStyle = '#FFD700';
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`x${player.ballCount}`, fieldWidth / 2, uiHeight / 2);
+    ctx.fillText(`x${player.ballCount}`, fieldWidth / 2, yOffset + uiHeight / 2);
 
     // Score (right)
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`${player.score}`, fieldWidth - 10, uiHeight / 2);
+    ctx.fillText(`${player.score}`, fieldWidth - 10, yOffset + uiHeight / 2);
 }
 
 function drawBallzGameOver(player) {

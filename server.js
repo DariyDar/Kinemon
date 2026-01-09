@@ -35,6 +35,41 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // Centralized logging endpoint
+    if (req.method === 'POST' && req.url === '/api/log') {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            try {
+                const logData = JSON.parse(body);
+                const clientType = logData.clientType || 'UNKNOWN';
+                const level = logData.level || 'INFO';
+                const message = logData.message || '';
+                const data = logData.data ? JSON.stringify(logData.data) : '';
+
+                // Format: [CLIENT-DISPLAY] or [CLIENT-CONTROLLER]
+                const prefix = `[CLIENT-${clientType.toUpperCase()}]`;
+                const timestamp = new Date().toISOString();
+
+                if (data) {
+                    console.log(`${timestamp} ${prefix} [${level}] ${message}`, data);
+                } else {
+                    console.log(`${timestamp} ${prefix} [${level}] ${message}`);
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (error) {
+                console.error('[SERVER] Error processing client log:', error);
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Invalid JSON' }));
+            }
+        });
+        return;
+    }
+
     let filePath = '.' + req.url;
     if (filePath === './') filePath = './index.html';
 

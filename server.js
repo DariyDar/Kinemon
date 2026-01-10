@@ -2724,9 +2724,12 @@ wss.on('connection', (ws) => {
 
                     // For Snake game: kill disconnected player's snake (no zombie snakes)
                     if (room.gameType === 'snake' && player.alive) {
+                        const starsDropped = player.score;
+                        dropPizzasFromSnake(room, player); // Drop stars like death
                         player.alive = false;
                         player.segments = []; // Clear segments to remove from display
-                        console.log(`[DISCONNECT] Snake for ${player.name} killed (no zombie snakes)`);
+                        player.score = 0; // Reset score to 0
+                        console.log(`[DISCONNECT] Snake for ${player.name} killed, dropped ${starsDropped} stars`);
                     }
 
                     // DO NOT DELETE PLAYER - keep them in room for reconnection
@@ -2989,6 +2992,9 @@ function gameLoop(roomId) {
 
 // Update Snake game
 function updateSnake(room) {
+    // Stop updating if game is over (prevents victory spam and freeze)
+    if (room.gameOver) return;
+
     // Update each player
     for (const player of room.players.values()) {
         // Handle respawn countdown for dead players
@@ -3986,9 +3992,9 @@ function checkCollisions(room) {
                 room.pizzas.splice(i, 1);
                 player.score++;
 
-                // Check for win condition
+                // Check for win condition (only if game not already over)
                 const winScore = room.settings.winScore || 50;
-                if (player.score >= winScore) {
+                if (player.score >= winScore && !room.gameOver) {
                     room.winner = player;
                     room.gameOver = true;
                     console.log(`${player.name} wins with ${winScore} pizzas!`);

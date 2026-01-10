@@ -460,12 +460,17 @@ function broadcastToRoom(roomId, message) {
 
 // Reset room for replay (same game type)
 function resetRoomForReplay(room, preserveRoles = true) {
+    console.log(`[DEBUG RESET] Starting reset for room ${room.id}, gameOver was: ${room.gameOver}`);
+
     // Reset general state
     room.gameOver = false;
     room.winner = null;
 
+    console.log(`[DEBUG RESET] After reset: gameOver = ${room.gameOver}, winner = ${room.winner}`);
+
     // Reset all player scores
     room.players.forEach(player => {
+        console.log(`[DEBUG RESET] Resetting player ${player.name}: score ${player.score} -> 0, alive: ${player.alive}`);
         player.score = 0;
     });
 
@@ -480,7 +485,7 @@ function resetRoomForReplay(room, preserveRoles = true) {
         resetShipGame(room, preserveRoles);
     }
 
-    console.log(`Room ${room.id} reset for replay (${room.gameType})`);
+    console.log(`Room ${room.id} reset for replay (${room.gameType}), gameOver=${room.gameOver}`);
 }
 
 // Reset Snake game state
@@ -2993,7 +2998,10 @@ function gameLoop(roomId) {
 // Update Snake game
 function updateSnake(room) {
     // Stop updating if game is over (prevents victory spam and freeze)
-    if (room.gameOver) return;
+    if (room.gameOver) {
+        console.log(`[DEBUG] updateSnake() skipped - game already over in room ${room.id}`);
+        return;
+    }
 
     // Update each player
     for (const player of room.players.values()) {
@@ -3029,143 +3037,10 @@ function updateSnake(room) {
 
         if (!player.alive) continue;
 
-        // Calculate rotation from tilt with control mapping
-        const circleRadius = 3 * room.segmentSize;
-        const maxRotationSpeed = room.moveSpeed / circleRadius;
-        // Use smoothedTilt to prevent jerky turning at calibration boundaries
-        const tiltDeviation = (player.smoothedTilt - 0.5) * 2; // -1 to 1
-
-        // Apply control mapping curve (per-player)
-        let mappedDeviation = tiltDeviation;
-
-        switch (player.controlScheme || room.controlMapping || 'rotation_smooth') {
-            case 'rotation_smooth':
-                // Improved rotation mode: smoothing + reduced sensitivity
-                const absSmooth = Math.abs(tiltDeviation);
-                if (absSmooth < 0.15) {
-                    // Small dead zone to filter sensor noise
-                    mappedDeviation = 0;
-                } else {
-                    // Smooth ramp from dead zone
-                    const normalized = (absSmooth - 0.15) / 0.85;
-                    // Quadratic curve for smooth control
-                    mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * 0.7);
-                }
-                break;
-
-            case 'rotation_linear':
-                // Original linear mode (kept for advanced players)
-                mappedDeviation = tiltDeviation;
-                break;
-
-            case 'center_straight':
-                // Center position = straight ahead, edges = turning
-                // Large dead zone in center (0.4-0.6 = straight)
-                if (Math.abs(tiltDeviation) < 0.4) {
-                    mappedDeviation = 0;
-                } else {
-                    // Remap edges to full range
-                    const sign = Math.sign(tiltDeviation);
-                    const absEdge = Math.abs(tiltDeviation);
-                    const normalized = (absEdge - 0.4) / 0.6; // 0 to 1
-                    mappedDeviation = sign * normalized;
-                }
-                break;
-
-            case 'nonlinear_a':
-                // Keep existing nonlinear_a (moderate curve)
-                const absA = Math.abs(tiltDeviation);
-                if (absA < 0.3) {
-                    mappedDeviation = 0;
-                } else {
-                    const normalized = (absA - 0.3) / 0.7;
-                    mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized);
-                }
-                break;
-
-            case 'nonlinear_b':
-                // Keep existing nonlinear_b (strong curve)
-                const absB = Math.abs(tiltDeviation);
-                if (absB < 0.4) {
-                    mappedDeviation = 0;
-                } else {
-                    const normalized = (absB - 0.4) / 0.6;
-                    mappedDeviation = Math.sign(tiltDeviation) * (normalized * normalized * normalized);
-                }
-                break;
-
-            case 'fixed_updown': {
-                // Fixed up-down control: absolute vertical intent
-                // Up tilt = move toward top of screen, down tilt = toward bottom
-                if (Math.abs(tiltDeviation) < 0.15) {
-                    mappedDeviation = 0;
-                    break;
-                }
-
-                // Determine if snake is facing right (0-180°) or left (180-360°)
-                const angle = ((player.angle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
-                const facingRight = angle < Math.PI;
-
-                // When facing right: up-tilt = turn CCW (negative), down-tilt = turn CW (positive)
-                // When facing left: REVERSE - up-tilt = turn CW (positive), down-tilt = turn CCW (negative)
-
-                const tiltMagnitude = Math.abs(tiltDeviation);
-                const normalizedTilt = (tiltMagnitude - 0.15) / 0.85;
-
-                if (facingRight) {
-                    // Moving right: normal behavior
-                    mappedDeviation = tiltDeviation * normalizedTilt;
-                } else {
-                    // Moving left: FLIP the tilt direction for instant flip
-                    mappedDeviation = -tiltDeviation * normalizedTilt;
-                }
-
-                break;
-            }
-
-            case 'arrow_steering': {
-                // Абсолютное управление направлением (как руль корабля) с плавным поворотом
-                // Use smoothedTilt to prevent jerky turning at calibration boundaries
-                player.targetAngle = player.smoothedTilt * 2 * Math.PI;
-
-                // Плавная интерполяция к целевому углу
-                let angleDiff = player.targetAngle - player.angle;
-
-                // Нормализация к [-π, π] (кратчайший путь)
-                while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-                while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-
-                // Интерполяция (15% за кадр)
-                player.angle += angleDiff * 0.15;
-
-                // Нормализация угла к [0, 2π]
-                player.angle = ((player.angle % (2 * Math.PI)) + (2 * Math.PI)) % (2 * Math.PI);
-
-                mappedDeviation = 0;
-                break;
-            }
-
-            case 'arrow_instant': {
-                // Послушная стрелка: мгновенный поворот по направлению наклона
-                // Use smoothedTilt to prevent jerky turning at calibration boundaries
-                player.targetAngle = player.smoothedTilt * 2 * Math.PI;
-
-                // Мгновенный поворот (змейка сразу смотрит туда куда указывает телефон)
-                player.angle = player.targetAngle;
-
-                mappedDeviation = 0;
-                break;
-            }
-
-            default:
-                // Default to rotation_smooth
-                mappedDeviation = tiltDeviation * 0.7;
-        }
-
-        const rotationSpeed = mappedDeviation * maxRotationSpeed * 2.4 * room.turnSpeedMultiplier;
-
-        // Update angle
-        player.angle += rotationSpeed;
+        // SIMPLIFIED: Only arrow_instant control (Послушная стрелка)
+        // Direct tilt-to-angle mapping with smoothing to prevent jumps
+        player.targetAngle = player.smoothedTilt * 2 * Math.PI;
+        player.angle = player.targetAngle; // Instant rotation
 
         // Move head
         player.headX += Math.cos(player.angle) * room.moveSpeed;
@@ -3994,10 +3869,12 @@ function checkCollisions(room) {
 
                 // Check for win condition (only if game not already over)
                 const winScore = room.settings.winScore || 50;
+                console.log(`[DEBUG VICTORY] Player ${player.name} score: ${player.score}/${winScore}, gameOver: ${room.gameOver}, alive players: ${Array.from(room.players.values()).filter(p => p.alive).length}`);
                 if (player.score >= winScore && !room.gameOver) {
                     room.winner = player;
                     room.gameOver = true;
                     console.log(`${player.name} wins with ${winScore} pizzas!`);
+                    console.log(`[DEBUG] Victory set - gameOver now true, updateSnake should stop next frame`);
                 }
             }
         }

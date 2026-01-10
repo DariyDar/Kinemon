@@ -3899,13 +3899,14 @@ function checkCollisions(room) {
         for (const otherPlayer of room.players.values()) {
             if (otherPlayer.id === player.id || !otherPlayer.alive) continue;
 
-            // Check if player's head hits other player's body
-            for (let i = 0; i < otherPlayer.segments.length; i++) {
+            // Check if player's head hits other player's body (SKIP HEAD - start from i=1)
+            // This prevents head-to-head collisions from triggering death
+            for (let i = 1; i < otherPlayer.segments.length; i++) {
                 const seg = otherPlayer.segments[i];
                 const dist = Math.hypot(head.x - seg.x, head.y - seg.y);
 
                 if (dist < room.segmentSize * 0.8) {
-                    // Player whose head collided dies
+                    // Player whose head collided with BODY dies
                     player.alive = false;
                     dropPizzasFromSnake(room, player);
                     player.segments = [];  // Clear segments to prevent invisible collision
@@ -3917,7 +3918,7 @@ function checkCollisions(room) {
                         y: Math.random() * room.canvas.height
                     };
 
-                    console.log(`Player ${player.id} died (hit ${otherPlayer.id}) in room ${room.id} - respawning in 3s`);
+                    console.log(`[COLLISION] ${player.name} died (head hit body segment ${i} of ${otherPlayer.name}) - respawning in 3s`);
                     break;
                 }
             }

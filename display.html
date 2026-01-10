@@ -1186,18 +1186,6 @@
                         </select>
                     </div>
                     <div class="setting-group">
-                        <label for="ballzDeadZone">Размер мёртвой зоны</label>
-                        <select id="ballzDeadZone">
-                            <option value="0">0% - Нет блокировки</option>
-                            <option value="0.01">1%</option>
-                            <option value="0.02">2%</option>
-                            <option value="0.05" selected>5% - По краям</option>
-                            <option value="0.10">10%</option>
-                            <option value="0.15">15%</option>
-                        </select>
-                        <div class="setting-info">В крайних положениях выстрел блокируется</div>
-                    </div>
-                    <div class="setting-group">
                         <label for="ballzChargeTime">Время зарядки</label>
                         <select id="ballzChargeTime">
                             <option value="1000">1 секунда</option>
@@ -1221,10 +1209,11 @@
                     <div class="setting-group">
                         <label for="ballzBallSpeed">Скорость шара</label>
                         <select id="ballzBallSpeed">
-                            <option value="3">Медленно</option>
-                            <option value="5" selected>Средне</option>
-                            <option value="7">Быстро</option>
-                            <option value="9">Очень быстро</option>
+                            <option value="0.5">Очень медленно</option>
+                            <option value="0.75">Медленно</option>
+                            <option value="1" selected>Средне</option>
+                            <option value="1.5">Быстро</option>
+                            <option value="2">Очень быстро</option>
                         </select>
                     </div>
                     <div class="setting-group">
@@ -1252,10 +1241,9 @@
                 gameSettings.hpIncreaseEveryN = parseInt(localStorage.getItem('ballzHPIncrease')) || 5;
                 gameSettings.maxBlockHP = parseInt(localStorage.getItem('ballzMaxHP')) || 50;
                 gameSettings.lowerHPChance = parseInt(localStorage.getItem('ballzLowerHPChance')) || 30;
-                gameSettings.deadZoneSize = parseFloat(localStorage.getItem('ballzDeadZone')) || 0.05;
                 gameSettings.chargeTime = parseInt(localStorage.getItem('ballzChargeTime')) || 2000;
                 gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.005;
-                gameSettings.ballSpeed = parseInt(localStorage.getItem('ballzBallSpeed')) || 1;
+                gameSettings.ballSpeed = parseFloat(localStorage.getItem('ballzBallSpeed')) || 1;
                 gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 100;
                 gameSettings.bonusBallSpawnRate = parseInt(localStorage.getItem('ballzBonusSpawnRate')) || 15;
 
@@ -1265,7 +1253,6 @@
                 document.getElementById('ballzHPIncrease').value = gameSettings.hpIncreaseEveryN;
                 document.getElementById('ballzMaxHP').value = gameSettings.maxBlockHP;
                 document.getElementById('ballzLowerHPChance').value = gameSettings.lowerHPChance;
-                document.getElementById('ballzDeadZone').value = gameSettings.deadZoneSize;
                 document.getElementById('ballzChargeTime').value = gameSettings.chargeTime;
                 document.getElementById('ballzAimSensitivity').value = gameSettings.aimSensitivity;
                 document.getElementById('ballzBallSpeed').value = gameSettings.ballSpeed;
@@ -1405,10 +1392,9 @@
                 gameSettings.hpIncreaseEveryN = parseInt(document.getElementById('ballzHPIncrease').value);
                 gameSettings.maxBlockHP = parseInt(document.getElementById('ballzMaxHP').value);
                 gameSettings.lowerHPChance = parseInt(document.getElementById('ballzLowerHPChance').value);
-                gameSettings.deadZoneSize = parseFloat(document.getElementById('ballzDeadZone').value);
                 gameSettings.chargeTime = parseInt(document.getElementById('ballzChargeTime').value);
                 gameSettings.aimSensitivity = parseFloat(document.getElementById('ballzAimSensitivity').value);
-                gameSettings.ballSpeed = parseInt(document.getElementById('ballzBallSpeed').value);
+                gameSettings.ballSpeed = parseFloat(document.getElementById('ballzBallSpeed').value);
                 gameSettings.ballLaunchDelay = parseInt(document.getElementById('ballzLaunchDelay').value);
                 gameSettings.bonusBallSpawnRate = parseInt(document.getElementById('ballzBonusSpawnRate').value);
                 localStorage.setItem('ballzFieldWidth', gameSettings.fieldWidth);
@@ -1416,7 +1402,6 @@
                 localStorage.setItem('ballzHPIncrease', gameSettings.hpIncreaseEveryN);
                 localStorage.setItem('ballzMaxHP', gameSettings.maxBlockHP);
                 localStorage.setItem('ballzLowerHPChance', gameSettings.lowerHPChance);
-                localStorage.setItem('ballzDeadZone', gameSettings.deadZoneSize);
                 localStorage.setItem('ballzChargeTime', gameSettings.chargeTime);
                 localStorage.setItem('ballzAimSensitivity', gameSettings.aimSensitivity);
                 localStorage.setItem('ballzBallSpeed', gameSettings.ballSpeed);
@@ -3772,6 +3757,9 @@ function renderBallz() {
     }
 
     ctx.restore();
+
+    // CRITICAL: Render particle effects
+    renderEffects();
 }
 
 function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {

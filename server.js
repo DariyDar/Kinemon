@@ -407,8 +407,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.maxBlockHP = settings.maxBlockHP || 50;
         room.lowerHPChance = settings.lowerHPChance || 30; // % chance for lower HP
 
-        // Ball physics
-        room.ballSpeed = settings.ballSpeed || 1; // 1=slow, 3=medium, 5=fast (default: slow)
+        // Ball physics (divided by 3 for smooth movement)
+        room.ballSpeed = (settings.ballSpeed || 1) / 3; // 0.33=very slow, 1=medium (default: 0.33)
         room.ballLaunchDelay = settings.ballLaunchDelay || 100; // ms between balls
         room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15; // % chance per turn
 
@@ -4117,28 +4117,13 @@ function ballzUpdatePlayer(room, player) {
  * CRITICAL FIX: Aiming is ALWAYS free, charging happens silently
  */
 function ballzUpdateAiming(room, player) {
-    // Convert tilt (0-1) to angle (10° to 170°)
-    // deadZoneSize=0 means full 180° range
-    const deadZone = room.deadZoneSize || 0;
+    // CRITICAL: Full 180° range (10° to 170°) - NO DEAD ZONES!
     const minAngle = 10 * Math.PI / 180;
     const maxAngle = 170 * Math.PI / 180;
     player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
 
-    // Check dead zones (only if enabled)
-    if (deadZone > 0) {
-        player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
-    } else {
-        // No dead zone - block only downward shooting (below 10° or above 170°)
-        player.isInDeadZone = false;
-    }
-
-    if (player.isInDeadZone) {
-        // In dead zone - reset charge
-        player.chargeStartTime = null;
-        player.chargeProgress = 0;
-        player.lastTilt = player.tilt;
-        return;
-    }
+    // Dead zone logic COMPLETELY REMOVED - player can aim anywhere
+    player.isInDeadZone = false;
 
     // Check if aim is steady (using very small threshold)
     if (player.lastTilt === null) {
@@ -4164,23 +4149,14 @@ function ballzUpdateAiming(room, player) {
 
 /**
  * CHARGING state: Track charge progress
- * CRITICAL: Strict movement check, dead zone resets charge
+ * NO DEAD ZONES - only movement sensitivity check
  */
 function ballzUpdateCharging(room, player) {
     const elapsed = Date.now() - player.chargeStartTime;
     player.chargeProgress = Math.min(1, elapsed / room.chargeTime);
 
-    // Check dead zones
-    const deadZone = room.deadZoneSize;
-    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
-
-    if (player.isInDeadZone) {
-        // Moved into dead zone - reset
-        player.turnState = 'aiming';
-        player.chargeStartTime = null;
-        player.chargeProgress = 0;
-        return;
-    }
+    // Dead zone check REMOVED - always false
+    player.isInDeadZone = false;
 
     // Check for movement (with threshold to ignore micro-vibrations)
     const tiltDelta = Math.abs(player.tilt - player.lastTilt);
@@ -4209,26 +4185,36 @@ function ballzUpdateCharging(room, player) {
  */
 function ballzUpdateLaunching(room, player) {
     const now = Date.now();
-    const elapsed = now - player.launchStartTime;
-    const shouldHaveLaunched = Math.floor(elapsed / room.ballLaunchDelay) + 1;
-    const launchedCount = player.balls.length;
 
-    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballsThisTurn) {
-        // Launch next ball
-        const launchX = player.launchX !== null ? player.launchX : 0.5; // Center = 0.5
-        const speed = room.ballSpeed / 100; // Convert to relative speed per frame
+    // Create all balls upfront but mark them as "waiting"
+    if (!player.ballsCreated) {
+        const launchX = player.launchX !== null ? player.launchX : 0.5;
+        const speed = room.ballSpeed / 100;
 
-        player.balls.push({
-            x: launchX, // Relative 0-1
-            y: 1.0, // Bottom of field
-            vx: Math.cos(player.aimAngle) * speed,
-            vy: -Math.sin(player.aimAngle) * speed, // Negative = up
-            active: true,
-            isFirst: launchedCount === 0
-        });
+        for (let i = 0; i < player.ballsThisTurn; i++) {
+            player.balls.push({
+                x: launchX,
+                y: 0.95, // CRITICAL: Launch from visible line (95%), not bottom (1.0)!
+                vx: Math.cos(player.aimAngle) * speed,
+                vy: -Math.sin(player.aimAngle) * speed,
+                active: false, // Not active yet!
+                launchTime: player.launchStartTime + i * room.ballLaunchDelay, // Staggered launch
+                isFirst: i === 0
+            });
+        }
+        player.ballsCreated = true;
     }
 
-    if (launchedCount >= player.ballsThisTurn) {
+    // Activate balls when their time comes
+    for (const ball of player.balls) {
+        if (!ball.active && now >= ball.launchTime) {
+            ball.active = true;
+        }
+    }
+
+    // Check if all balls are launched
+    const allLaunched = player.balls.every(b => b.active);
+    if (allLaunched) {
         player.turnState = 'balls_in_flight';
         player.firstBallReturned = false;
     }
@@ -4428,6 +4414,7 @@ function ballzAdvanceTurn(room, player) {
     // Reset for next turn
     player.turnNumber++;
     player.balls = [];
+    player.ballsCreated = false; // CRITICAL: Reset for next launch
     player.chargeStartTime = null;
     player.chargeProgress = 0;
     player.lastTilt = null;

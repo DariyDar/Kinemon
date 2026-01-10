@@ -2215,6 +2215,7 @@ wss.on('connection', (ws) => {
                     // Ballz v3.25.0: Single-player arcade
                     player.score = 0;
                     player.ballCount = 1;
+                    player.ballsThisTurn = 1; // Track balls for THIS turn (before bonuses)
                     player.turnNumber = 0;
                     player.alive = true;
                     player.gameOver = false;
@@ -4173,9 +4174,10 @@ function ballzUpdateCharging(room, player) {
         return;
     }
 
-    // CRITICAL: Strict equality - any movement resets
-    if (player.tilt !== player.lastTilt) {
-        // Moved - reset
+    // Check for movement (with threshold to ignore micro-vibrations)
+    const tiltDelta = Math.abs(player.tilt - player.lastTilt);
+    if (tiltDelta >= room.aimSensitivity) {
+        // Moved too much - reset
         player.turnState = 'aiming';
         player.chargeStartTime = null;
         player.chargeProgress = 0;
@@ -4187,6 +4189,8 @@ function ballzUpdateCharging(room, player) {
     if (player.chargeProgress >= 1) {
         player.turnState = 'launching';
         player.launchStartTime = Date.now();
+        // Save ball count at turn start (before bonuses are collected)
+        player.ballsThisTurn = player.ballCount;
     }
 
     player.lastTilt = player.tilt;
@@ -4346,7 +4350,7 @@ function ballzReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHei
  */
 function ballzCheckTurnComplete(room, player) {
     const allInactive = player.balls.every(b => !b.active);
-    if (allInactive && player.balls.length === player.ballCount) {
+    if (allInactive && player.balls.length === player.ballsThisTurn) {
         player.turnState = 'turn_complete';
     }
 }

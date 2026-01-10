@@ -1210,13 +1210,13 @@
                     <div class="setting-group">
                         <label for="ballzAimSensitivity">Чувствительность прицела</label>
                         <select id="ballzAimSensitivity">
-                            <option value="0.005">Минимальная</option>
-                            <option value="0.01">Очень низкая</option>
-                            <option value="0.02" selected>Низкая</option>
-                            <option value="0.05">Средняя</option>
-                            <option value="0.10">Высокая</option>
+                            <option value="0.001">Супер-низкая (0.1%)</option>
+                            <option value="0.002">Очень низкая (0.2%)</option>
+                            <option value="0.005" selected>Низкая (0.5%)</option>
+                            <option value="0.01">Средняя (1%)</option>
+                            <option value="0.02">Высокая (2%)</option>
                         </select>
-                        <div class="setting-info">Насколько легко сбивается зарядка</div>
+                        <div class="setting-info">Насколько легко сбивается зарядка при движении</div>
                     </div>
                     <div class="setting-group">
                         <label for="ballzBallSpeed">Скорость шара</label>
@@ -1254,8 +1254,8 @@
                 gameSettings.lowerHPChance = parseInt(localStorage.getItem('ballzLowerHPChance')) || 30;
                 gameSettings.deadZoneSize = parseFloat(localStorage.getItem('ballzDeadZone')) || 0.05;
                 gameSettings.chargeTime = parseInt(localStorage.getItem('ballzChargeTime')) || 2000;
-                gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.02;
-                gameSettings.ballSpeed = parseInt(localStorage.getItem('ballzBallSpeed')) || 5;
+                gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.005;
+                gameSettings.ballSpeed = parseInt(localStorage.getItem('ballzBallSpeed')) || 1;
                 gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 100;
                 gameSettings.bonusBallSpawnRate = parseInt(localStorage.getItem('ballzBonusSpawnRate')) || 15;
 
@@ -3724,14 +3724,15 @@ function renderBallz() {
     ctx.lineTo(fieldWidth, launchLineY);
     ctx.stroke();
 
-    // Blocks (relative gridX, gridY)
+    // Blocks (relative gridX, gridY) - SQUARE blocks!
     const blockWidth = fieldWidth / cols;
     const blockHeight = fieldHeight / rows;
+    const blockSize = Math.min(blockWidth, blockHeight); // Square size
 
     for (const block of player.blocks || []) {
         const x = block.gridX * blockWidth + blockWidth / 2;
         const y = block.gridY * blockHeight + blockHeight / 2;
-        drawBallzBlock(x, y, blockWidth, blockHeight, block.hp, block.maxHp);
+        drawBallzBlock(x, y, blockSize, blockSize, block.hp, block.maxHp);
     }
 
     // Bonus balls
@@ -3807,79 +3808,174 @@ function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {
 
 function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, cols, rows) {
     const angle = player.aimAngle;
+    const blockWidth = fieldWidth / cols;
+    const blockHeight = fieldHeight / rows;
 
-    // Line length: 3x longer (600px instead of 200px)
-    const lineLength = 600;
-    const endX = launchX + Math.cos(angle) * lineLength;
-    const endY = launchY + -Math.sin(angle) * lineLength;
+    // Calculate trajectory with reflections
+    const trajectory = calculateBallzTrajectory(
+        launchX, launchY, angle,
+        fieldWidth, fieldHeight,
+        player.blocks || [],
+        blockWidth, blockHeight
+    );
 
-    // Dead zone check
-    if (player.isInDeadZone) {
-        // Red blocked line
-        ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 3;
-        ctx.globalAlpha = 0.5;
-        ctx.setLineDash([5, 10]);
-        ctx.beginPath();
-        ctx.moveTo(launchX, launchY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.globalAlpha = 1.0;
-
-        // "BLOCKED" text
-        ctx.fillStyle = '#FF0000';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('BLOCKED', launchX, launchY - 30);
-        return;
-    }
-
-    // Simple static dotted line (no animation)
-    ctx.strokeStyle = '#FFFFFF';
+    // Draw trajectory segments
+    const color = player.isInDeadZone ? '#FF0000' : '#FFFFFF';
+    ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.5;
     ctx.setLineDash([5, 10]);
     ctx.beginPath();
-    ctx.moveTo(launchX, launchY);
-    ctx.lineTo(endX, endY);
+
+    if (trajectory.length > 0) {
+        ctx.moveTo(trajectory[0].x, trajectory[0].y);
+        for (let i = 1; i < trajectory.length; i++) {
+            ctx.lineTo(trajectory[i].x, trajectory[i].y);
+        }
+    }
+
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1.0;
 
-    // Charge effect (fill line)
-    if (player.turnState === 'charging' && player.chargeProgress > 0) {
-        const progressX = launchX + (endX - launchX) * player.chargeProgress;
-        const progressY = launchY + (endY - launchY) * player.chargeProgress;
-
-        // Gradient: green → yellow → red
-        const gradient = ctx.createLinearGradient(launchX, launchY, progressX, progressY);
-        const progress = player.chargeProgress;
-        if (progress < 0.5) {
-            gradient.addColorStop(0, '#00FF00');
-            gradient.addColorStop(1, '#FFFF00');
-        } else {
-            gradient.addColorStop(0, '#FFFF00');
-            gradient.addColorStop(1, '#FF0000');
+    // Charge effect (fill line along trajectory)
+    if (player.turnState === 'charging' && player.chargeProgress > 0 && !player.isInDeadZone) {
+        // Calculate total trajectory length
+        let totalLength = 0;
+        for (let i = 1; i < trajectory.length; i++) {
+            const dx = trajectory[i].x - trajectory[i-1].x;
+            const dy = trajectory[i].y - trajectory[i-1].y;
+            totalLength += Math.sqrt(dx * dx + dy * dy);
         }
 
-        ctx.strokeStyle = gradient;
+        // Find point at chargeProgress along trajectory
+        const targetLength = totalLength * player.chargeProgress;
+        let currentLength = 0;
+        let endX = launchX, endY = launchY;
+
+        for (let i = 1; i < trajectory.length; i++) {
+            const dx = trajectory[i].x - trajectory[i-1].x;
+            const dy = trajectory[i].y - trajectory[i-1].y;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            if (currentLength + segmentLength >= targetLength) {
+                const t = (targetLength - currentLength) / segmentLength;
+                endX = trajectory[i-1].x + dx * t;
+                endY = trajectory[i-1].y + dy * t;
+                break;
+            }
+
+            currentLength += segmentLength;
+        }
+
+        // Draw charged portion
+        const progress = player.chargeProgress;
+        let chargeColor;
+        if (progress < 0.33) chargeColor = '#00FF00';
+        else if (progress < 0.66) chargeColor = '#FFFF00';
+        else chargeColor = '#FF0000';
+
+        ctx.strokeStyle = chargeColor;
         ctx.lineWidth = 4;
         ctx.shadowBlur = 10;
-        ctx.shadowColor = '#FFFFFF';
+        ctx.shadowColor = chargeColor;
         ctx.beginPath();
+
         ctx.moveTo(launchX, launchY);
-        ctx.lineTo(progressX, progressY);
+        currentLength = 0;
+        for (let i = 1; i < trajectory.length; i++) {
+            const dx = trajectory[i].x - trajectory[i-1].x;
+            const dy = trajectory[i].y - trajectory[i-1].y;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            if (currentLength + segmentLength >= targetLength) {
+                ctx.lineTo(endX, endY);
+                break;
+            }
+
+            ctx.lineTo(trajectory[i].x, trajectory[i].y);
+            currentLength += segmentLength;
+        }
+
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Pulsing indicator
         const pulseSize = 5 + Math.sin(Date.now() / 100) * 2;
-        ctx.fillStyle = progress >= 1 ? '#00FF00' : '#FFFF00';
+        ctx.fillStyle = chargeColor;
         ctx.beginPath();
-        ctx.arc(progressX, progressY, pulseSize, 0, Math.PI * 2);
+        ctx.arc(endX, endY, pulseSize, 0, Math.PI * 2);
         ctx.fill();
     }
+}
+
+// Calculate ball trajectory with reflections
+function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight, blocks, blockWidth, blockHeight) {
+    const trajectory = [{x: startX, y: startY}];
+    let x = startX, y = startY;
+    let vx = Math.cos(angle);
+    let vy = -Math.sin(angle);
+    const step = 5; // pixels per step
+    const maxSteps = 200; // max trajectory length
+    const ballRadius = 5;
+
+    for (let i = 0; i < maxSteps; i++) {
+        x += vx * step;
+        y += vy * step;
+
+        // Left/right wall bounce
+        if (x <= ballRadius) {
+            x = ballRadius;
+            vx = Math.abs(vx);
+        } else if (x >= fieldWidth - ballRadius) {
+            x = fieldWidth - ballRadius;
+            vx = -Math.abs(vx);
+        }
+
+        // Top wall bounce
+        if (y <= ballRadius) {
+            y = ballRadius;
+            vy = Math.abs(vy);
+        }
+
+        // Bottom - stop trajectory
+        if (y >= fieldHeight * 0.95) {
+            trajectory.push({x, y: fieldHeight * 0.95});
+            break;
+        }
+
+        // Check block collisions (simple AABB)
+        for (const block of blocks) {
+            const blockCenterX = block.gridX * blockWidth + blockWidth / 2;
+            const blockCenterY = block.gridY * blockHeight + blockHeight / 2;
+            const blockSize = Math.min(blockWidth, blockHeight);
+            const halfSize = blockSize / 2;
+
+            if (x >= blockCenterX - halfSize - ballRadius &&
+                x <= blockCenterX + halfSize + ballRadius &&
+                y >= blockCenterY - halfSize - ballRadius &&
+                y <= blockCenterY + halfSize + ballRadius) {
+
+                // Simple bounce - reverse velocity
+                const dx = x - blockCenterX;
+                const dy = y - blockCenterY;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    vx = -vx;
+                } else {
+                    vy = -vy;
+                }
+
+                // Push ball out of block
+                x += vx * step * 2;
+                y += vy * step * 2;
+                break;
+            }
+        }
+
+        trajectory.push({x, y});
+    }
+
+    return trajectory;
 }
 
 function drawBallzUI(player, fieldWidth, yOffset = 0) {

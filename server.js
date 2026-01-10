@@ -408,13 +408,14 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.lowerHPChance = settings.lowerHPChance || 30; // % chance for lower HP
 
         // Ball physics
-        room.ballSpeed = settings.ballSpeed || 3; // 1=slow, 5=fast
+        room.ballSpeed = settings.ballSpeed || 1; // 1=slow, 3=medium, 5=fast (default: slow)
         room.ballLaunchDelay = settings.ballLaunchDelay || 100; // ms between balls
         room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15; // % chance per turn
 
         // Controls
         room.chargeTime = settings.chargeTime || 2000; // ms to full charge
         room.deadZoneSize = settings.deadZoneSize !== undefined ? settings.deadZoneSize : 0.05; // 5% default
+        room.aimSensitivity = settings.aimSensitivity !== undefined ? settings.aimSensitivity : 0.005; // 0.5% default
 
         // NO multiplayer - single player only
         room.maxPlayers = 1;
@@ -4112,18 +4113,24 @@ function ballzUpdatePlayer(room, player) {
 }
 
 /**
- * AIMING state: Convert tilt to angle, check dead zones
- * CRITICAL: NO aimSensitivity - strict equality check
+ * AIMING state: Free aiming, silent charging in background
+ * CRITICAL FIX: Aiming is ALWAYS free, charging happens silently
  */
 function ballzUpdateAiming(room, player) {
     // Convert tilt (0-1) to angle (10° to 170°)
+    // deadZoneSize=0 means full 180° range
+    const deadZone = room.deadZoneSize || 0;
     const minAngle = 10 * Math.PI / 180;
     const maxAngle = 170 * Math.PI / 180;
     player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
 
-    // Check dead zones
-    const deadZone = room.deadZoneSize;
-    player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
+    // Check dead zones (only if enabled)
+    if (deadZone > 0) {
+        player.isInDeadZone = player.tilt < deadZone || player.tilt > (1 - deadZone);
+    } else {
+        // No dead zone - block only downward shooting (below 10° or above 170°)
+        player.isInDeadZone = false;
+    }
 
     if (player.isInDeadZone) {
         // In dead zone - reset charge
@@ -4133,21 +4140,22 @@ function ballzUpdateAiming(room, player) {
         return;
     }
 
-    // CRITICAL: Strict equality check - NO tolerance
-    // Player must hold perfectly still to start charging
+    // Check if aim is steady (using very small threshold)
     if (player.lastTilt === null) {
         player.lastTilt = player.tilt;
         return;
     }
 
-    if (player.tilt === player.lastTilt) {
-        // Perfectly still - start charging
+    const tiltDelta = Math.abs(player.tilt - player.lastTilt);
+
+    if (tiltDelta < room.aimSensitivity) {
+        // Aim is steady - start charging silently
         if (!player.chargeStartTime) {
             player.chargeStartTime = Date.now();
             player.turnState = 'charging';
         }
     } else {
-        // Moved - reset
+        // Moved - reset charge (but keep aiming free)
         player.chargeStartTime = null;
     }
 
@@ -4205,7 +4213,7 @@ function ballzUpdateLaunching(room, player) {
     const shouldHaveLaunched = Math.floor(elapsed / room.ballLaunchDelay) + 1;
     const launchedCount = player.balls.length;
 
-    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballCount) {
+    if (launchedCount < shouldHaveLaunched && launchedCount < player.ballsThisTurn) {
         // Launch next ball
         const launchX = player.launchX !== null ? player.launchX : 0.5; // Center = 0.5
         const speed = room.ballSpeed / 100; // Convert to relative speed per frame
@@ -4220,7 +4228,7 @@ function ballzUpdateLaunching(room, player) {
         });
     }
 
-    if (launchedCount >= player.ballCount) {
+    if (launchedCount >= player.ballsThisTurn) {
         player.turnState = 'balls_in_flight';
         player.firstBallReturned = false;
     }
@@ -4285,8 +4293,25 @@ function ballzCheckCollisions(room, player) {
                 block.hp--;
 
                 if (block.hp <= 0) {
+                    // Block destroyed - big particle burst
                     player.blocks.splice(i, 1);
                     player.score++;
+                    broadcastEffect(room.id, 'particle', {
+                        x: ball.x, y: ball.y,
+                        color: player.color,
+                        count: 12
+                    });
+                    broadcastEffect(room.id, 'flash', {
+                        color: player.color,
+                        intensity: 0.2
+                    });
+                } else {
+                    // Block hit - small particles
+                    broadcastEffect(room.id, 'particle', {
+                        x: ball.x, y: ball.y,
+                        color: '#FFFFFF',
+                        count: 4
+                    });
                 }
 
                 ballzReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHeight);
@@ -4304,6 +4329,12 @@ function ballzCheckCollisions(room, player) {
             if (dist < ballRadius + 0.02) {
                 player.bonusBalls.splice(i, 1);
                 player.ballCount++;
+                // Golden particle effect
+                broadcastEffect(room.id, 'particle', {
+                    x: bonusCenterX, y: bonusCenterY,
+                    color: '#FFD700',
+                    count: 8
+                });
             }
         }
     }

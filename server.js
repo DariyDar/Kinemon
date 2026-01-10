@@ -500,6 +500,10 @@ function resetSnakeGame(room) {
                 y: player.headY
             });
         }
+
+        // CRITICAL: Clear respawn countdown from previous game
+        player.respawnCountdown = undefined;
+        player.respawnPosition = undefined;
     });
 
     // Respawn pizzas
@@ -2160,6 +2164,7 @@ wss.on('connection', (ws) => {
                     color: getRandomColor(room),  // Pass room to ensure unique colors
                     score: 0,
                     tilt: 0.5,
+                    smoothedTilt: 0.5, // Exponentially smoothed tilt to prevent jerky turning
                     ws: ws,
                     sessionToken: newSessionToken // Store session token on player for reconnection
                 };
@@ -2374,7 +2379,17 @@ wss.on('connection', (ws) => {
                     if (player) {
                         // For Pong/Ballz, always update. For Snake/Ship, only if alive.
                         if (room.gameType === 'pong' || room.gameType === 'ballz' || player.alive) {
+                            // Store raw tilt
                             player.tilt = data.tilt;
+
+                            // Apply exponential smoothing to prevent jerky turning (Snake issue fix)
+                            // Smoothing factor: 0.3 = smooth, 0.7 = responsive (30% new, 70% old)
+                            const smoothingFactor = 0.3;
+                            if (player.smoothedTilt === undefined) {
+                                player.smoothedTilt = data.tilt; // First frame - no smoothing
+                            } else {
+                                player.smoothedTilt = smoothingFactor * data.tilt + (1 - smoothingFactor) * player.smoothedTilt;
+                            }
                         }
                     }
                 }
@@ -2707,6 +2722,13 @@ wss.on('connection', (ws) => {
                         }
                     }
 
+                    // For Snake game: kill disconnected player's snake (no zombie snakes)
+                    if (room.gameType === 'snake' && player.alive) {
+                        player.alive = false;
+                        player.segments = []; // Clear segments to remove from display
+                        console.log(`[DISCONNECT] Snake for ${player.name} killed (no zombie snakes)`);
+                    }
+
                     // DO NOT DELETE PLAYER - keep them in room for reconnection
                     // Player will be auto-removed after 60s grace period if they don't reconnect
                     // Autopilot will continue controlling their role
@@ -3004,7 +3026,8 @@ function updateSnake(room) {
         // Calculate rotation from tilt with control mapping
         const circleRadius = 3 * room.segmentSize;
         const maxRotationSpeed = room.moveSpeed / circleRadius;
-        const tiltDeviation = (player.tilt - 0.5) * 2; // -1 to 1
+        // Use smoothedTilt to prevent jerky turning at calibration boundaries
+        const tiltDeviation = (player.smoothedTilt - 0.5) * 2; // -1 to 1
 
         // Apply control mapping curve (per-player)
         let mappedDeviation = tiltDeviation;
@@ -3096,8 +3119,8 @@ function updateSnake(room) {
 
             case 'arrow_steering': {
                 // Абсолютное управление направлением (как руль корабля) с плавным поворотом
-                // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
-                player.targetAngle = player.tilt * 2 * Math.PI;
+                // Use smoothedTilt to prevent jerky turning at calibration boundaries
+                player.targetAngle = player.smoothedTilt * 2 * Math.PI;
 
                 // Плавная интерполяция к целевому углу
                 let angleDiff = player.targetAngle - player.angle;
@@ -3118,8 +3141,8 @@ function updateSnake(room) {
 
             case 'arrow_instant': {
                 // Послушная стрелка: мгновенный поворот по направлению наклона
-                // tilt can be -0.3 to 1.3 (30% overflow beyond calibrated range)
-                player.targetAngle = player.tilt * 2 * Math.PI;
+                // Use smoothedTilt to prevent jerky turning at calibration boundaries
+                player.targetAngle = player.smoothedTilt * 2 * Math.PI;
 
                 // Мгновенный поворот (змейка сразу смотрит туда куда указывает телефон)
                 player.angle = player.targetAngle;

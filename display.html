@@ -3709,15 +3709,14 @@ function renderBallz() {
     ctx.lineTo(fieldWidth, launchLineY);
     ctx.stroke();
 
-    // Blocks (relative gridX, gridY) - SQUARE blocks!
+    // Blocks (relative gridX, gridY) - RECTANGLES to match collision!
     const blockWidth = fieldWidth / cols;
     const blockHeight = fieldHeight / rows;
-    const blockSize = Math.min(blockWidth, blockHeight); // Square size
 
     for (const block of player.blocks || []) {
         const x = block.gridX * blockWidth + blockWidth / 2;
         const y = block.gridY * blockHeight + blockHeight / 2;
-        drawBallzBlock(x, y, blockSize, blockSize, block.hp, block.maxHp);
+        drawBallzBlock(x, y, blockWidth, blockHeight, block.hp, block.maxHp);
     }
 
     // Bonus balls
@@ -3948,17 +3947,17 @@ function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight
             break;
         }
 
-        // Check block collisions (simple AABB)
+        // Check block collisions (AABB with rectangles)
         for (const block of blocks) {
             const blockCenterX = block.gridX * blockWidth + blockWidth / 2;
             const blockCenterY = block.gridY * blockHeight + blockHeight / 2;
-            const blockSize = Math.min(blockWidth, blockHeight);
-            const halfSize = blockSize / 2;
+            const halfWidth = blockWidth / 2;
+            const halfHeight = blockHeight / 2;
 
-            if (x >= blockCenterX - halfSize - ballRadius &&
-                x <= blockCenterX + halfSize + ballRadius &&
-                y >= blockCenterY - halfSize - ballRadius &&
-                y <= blockCenterY + halfSize + ballRadius) {
+            if (x >= blockCenterX - halfWidth - ballRadius &&
+                x <= blockCenterX + halfWidth + ballRadius &&
+                y >= blockCenterY - halfHeight - ballRadius &&
+                y <= blockCenterY + halfHeight + ballRadius) {
 
                 // Simple bounce - reverse velocity
                 const dx = x - blockCenterX;

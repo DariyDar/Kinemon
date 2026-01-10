@@ -2372,8 +2372,8 @@ wss.on('connection', (ws) => {
                 if (room) {
                     const player = room.players.get(ws.playerId);
                     if (player) {
-                        // For Pong, always update. For Snake, only if alive.
-                        if (room.gameType === 'pong' || player.alive) {
+                        // For Pong/Ballz, always update. For Snake/Ship, only if alive.
+                        if (room.gameType === 'pong' || room.gameType === 'ballz' || player.alive) {
                             player.tilt = data.tilt;
                         }
                     }

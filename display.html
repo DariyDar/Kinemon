@@ -3758,8 +3758,24 @@ function renderBallz() {
 
     ctx.restore();
 
-    // CRITICAL: Render particle effects
-    renderEffects();
+    // Render visual effects (particles, score animations)
+    for (const p of effects.particles) {
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    for (const anim of effects.scoreAnims) {
+        ctx.globalAlpha = anim.alpha;
+        ctx.fillStyle = anim.color;
+        ctx.fillText(anim.text, anim.x, anim.y);
+    }
+
+    ctx.globalAlpha = 1.0;
 }
 
 function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {

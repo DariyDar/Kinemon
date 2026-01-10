@@ -4244,10 +4244,10 @@ function ballzUpdatePhysics(room, player) {
             ball.y = ballRadius;
         }
 
-        // Bottom return (ball reaches launch line)
-        if (ball.y >= 1.0) {
+        // Bottom return (ball reaches launch line at 95%)
+        if (ball.y >= 0.95) {
             ball.active = false;
-            ball.y = 1.0;
+            ball.y = 0.95; // Stop exactly on launch line
 
             // First ball sets new launch position
             if (ball.isFirst && !player.firstBallReturned) {
@@ -4283,7 +4283,7 @@ function ballzCheckCollisions(room, player) {
                     player.blocks.splice(i, 1);
                     player.score++;
                     broadcastEffect(room.id, 'particle', {
-                        x: ball.x, y: ball.y,
+                        x: blockCenterX, y: blockCenterY,
                         color: player.color,
                         count: 12
                     });
@@ -4294,7 +4294,7 @@ function ballzCheckCollisions(room, player) {
                 } else {
                     // Block hit - small particles
                     broadcastEffect(room.id, 'particle', {
-                        x: ball.x, y: ball.y,
+                        x: blockCenterX, y: blockCenterY,
                         color: '#FFFFFF',
                         count: 4
                     });

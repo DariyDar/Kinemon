@@ -730,6 +730,55 @@
         <!-- Game Display -->
         <canvas id="gameCanvas" width="600" height="800"></canvas>
 
+        <!-- Pong Score Display (left and right of canvas) -->
+        <div id="pongScores" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: none;
+            pointer-events: none;
+            z-index: 500;
+        ">
+            <!-- Left Player -->
+            <div id="pongLeftPlayer" style="
+                position: absolute;
+                left: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+            ">
+                <div id="pongLeftName" style="
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                "></div>
+                <div id="pongLeftScore" style="
+                    font-size: 80px;
+                    font-weight: bold;
+                "></div>
+            </div>
+
+            <!-- Right Player -->
+            <div id="pongRightPlayer" style="
+                position: absolute;
+                right: 20px;
+                top: 50%;
+                transform: translateY(-50%);
+                text-align: right;
+            ">
+                <div id="pongRightName" style="
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                "></div>
+                <div id="pongRightScore" style="
+                    font-size: 80px;
+                    font-weight: bold;
+                "></div>
+            </div>
+        </div>
+
         <!-- Persistent QR Code (bottom-left corner) -->
         <div id="persistentQRDisplay" style="
             position: fixed;
@@ -2463,6 +2512,12 @@
                 return;
             }
 
+            // Manage Pong score display visibility
+            const pongScores = document.getElementById('pongScores');
+            if (pongScores) {
+                pongScores.style.display = gameState.gameType === 'pong' ? 'block' : 'none';
+            }
+
             if (gameState.gameType === 'pong') {
                 renderPong();
             } else if (gameState.gameType === 'pushers') {
@@ -2644,34 +2699,6 @@
 
             ctx.restore();
 
-            // Draw scores and names OUTSIDE field (not affected by shake)
-            const leftPlayer = gameState.players.find(p => p.side === 'left');
-            const rightPlayer = gameState.players.find(p => p.side === 'right');
-
-            if (leftPlayer) {
-                // Left player (Blue) - name and score OUTSIDE left edge
-                ctx.fillStyle = leftPlayer.color;
-                ctx.font = 'bold 28px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText(leftPlayer.name, 20, 40);
-
-                // Huge score number
-                ctx.font = 'bold 100px sans-serif';
-                ctx.fillText(leftPlayer.score.toString(), 20, 140);
-            }
-
-            if (rightPlayer) {
-                // Right player (Red) - name and score OUTSIDE right edge
-                ctx.fillStyle = rightPlayer.color;
-                ctx.font = 'bold 28px sans-serif';
-                ctx.textAlign = 'right';
-                ctx.fillText(rightPlayer.name, canvas.width - 20, 40);
-
-                // Huge score number
-                ctx.font = 'bold 100px sans-serif';
-                ctx.fillText(rightPlayer.score.toString(), canvas.width - 20, 140);
-            }
-
             // Render visual effects
             // Particles
             for (const p of effects.particles) {
@@ -2700,6 +2727,9 @@
                 ctx.fillText(anim.text, anim.x, anim.y);
             }
             ctx.globalAlpha = 1.0;
+
+            // Update HTML score display
+            updatePongScoreDisplay();
         }
 
         function renderSnake() {
@@ -2879,6 +2909,36 @@
                 // Draw player name below
                 ctx.font = 'bold 20px sans-serif';
                 ctx.fillText(player.name, x, y + 50);
+            }
+        }
+
+        function updatePongScoreDisplay() {
+            const pongScores = document.getElementById('pongScores');
+            if (!pongScores || !gameState.players) return;
+
+            const leftPlayer = gameState.players.find(p => p.side === 'left');
+            const rightPlayer = gameState.players.find(p => p.side === 'right');
+
+            if (leftPlayer) {
+                const leftName = document.getElementById('pongLeftName');
+                const leftScore = document.getElementById('pongLeftScore');
+                if (leftName && leftScore) {
+                    leftName.textContent = leftPlayer.name;
+                    leftName.style.color = leftPlayer.color;
+                    leftScore.textContent = leftPlayer.score;
+                    leftScore.style.color = leftPlayer.color;
+                }
+            }
+
+            if (rightPlayer) {
+                const rightName = document.getElementById('pongRightName');
+                const rightScore = document.getElementById('pongRightScore');
+                if (rightName && rightScore) {
+                    rightName.textContent = rightPlayer.name;
+                    rightName.style.color = rightPlayer.color;
+                    rightScore.textContent = rightPlayer.score;
+                    rightScore.style.color = rightPlayer.color;
+                }
             }
         }
 

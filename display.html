@@ -2551,68 +2551,22 @@
         }
 
         function renderPong() {
-            // Clear canvas
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Define game field boundaries (leave space for scores on sides)
-            const fieldMargin = 150; // Space on left/right for scores
-            const fieldX = fieldMargin;
-            const fieldY = 0;
-            const fieldWidth = canvas.width - fieldMargin * 2;
-            const fieldHeight = canvas.height;
-
-            // Draw scores OUTSIDE field (left and right margins)
-            const leftPlayer = gameState.players.find(p => p.side === 'left');
-            const rightPlayer = gameState.players.find(p => p.side === 'right');
-
-            if (leftPlayer) {
-                // Left player (Blue) - in left margin
-                ctx.fillStyle = leftPlayer.color;
-                ctx.font = 'bold 24px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(leftPlayer.name, fieldMargin / 2, 50);
-
-                // Huge score number
-                ctx.font = 'bold 80px sans-serif';
-                ctx.fillText(leftPlayer.score.toString(), fieldMargin / 2, 150);
-            }
-
-            if (rightPlayer) {
-                // Right player (Red) - in right margin
-                ctx.fillStyle = rightPlayer.color;
-                ctx.font = 'bold 24px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(rightPlayer.name, canvas.width - fieldMargin / 2, 50);
-
-                // Huge score number
-                ctx.font = 'bold 80px sans-serif';
-                ctx.fillText(rightPlayer.score.toString(), canvas.width - fieldMargin / 2, 150);
-            }
-
-            // Draw field border
-            ctx.strokeStyle = '#444';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(fieldX, fieldY, fieldWidth, fieldHeight);
-
-            // Apply screen shake ONLY to field content
+            // Apply screen shake
             ctx.save();
-            ctx.translate(fieldX, fieldY); // Translate to field origin
             if (effects.screenShake.active) {
                 ctx.translate(effects.screenShake.offsetX, effects.screenShake.offsetY);
             }
 
-            // Clip to field area
-            ctx.beginPath();
-            ctx.rect(0, 0, fieldWidth, fieldHeight);
-            ctx.clip();
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw center line (relative to field)
+            // Draw center line
             ctx.strokeStyle = '#333';
             ctx.setLineDash([5, 15]);
             ctx.beginPath();
-            ctx.moveTo(fieldWidth / 2, 0);
-            ctx.lineTo(fieldWidth / 2, fieldHeight);
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
             ctx.stroke();
             ctx.setLineDash([]);
 
@@ -2621,11 +2575,11 @@
                 ctx.fillStyle = '#FFF';
                 ctx.font = 'bold 36px sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText('Ожидание второго игрока...', fieldWidth / 2, fieldHeight / 2);
+                ctx.fillText('Ожидание второго игрока...', canvas.width / 2, canvas.height / 2);
 
                 ctx.font = '20px sans-serif';
                 ctx.fillStyle = '#888';
-                ctx.fillText(`Подключено: ${gameState.players.length}/2`, fieldWidth / 2, fieldHeight / 2 + 50);
+                ctx.fillText(`Подключено: ${gameState.players.length}/2`, canvas.width / 2, canvas.height / 2 + 50);
             }
 
             // Draw ball (hide during celebration blink)
@@ -2646,34 +2600,77 @@
             // SLOW-MO OVERLAY during goal celebration
             if (gameState.goalCelebration) {
                 const elapsed = Date.now() - gameState.goalCelebration.startTime;
+                const progress = Math.min(1, elapsed / gameState.goalCelebration.duration);
 
-                // Field fills with SCORER's color (who scored the goal)
-                const scorerColor = gameState.goalCelebration.scoringPlayer?.color || '#FFFFFF';
+                // Dark overlay with pulsing effect
+                const pulseAlpha = 0.3 + Math.sin(elapsed / 100) * 0.1;
+                ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Extract RGB from hex color for alpha overlay
-                const r = parseInt(scorerColor.slice(1, 3), 16);
-                const g = parseInt(scorerColor.slice(3, 5), 16);
-                const b = parseInt(scorerColor.slice(5, 7), 16);
+                // Radial gradient effect from center
+                const gradient = ctx.createRadialGradient(
+                    canvas.width / 2, canvas.height / 2, 0,
+                    canvas.width / 2, canvas.height / 2, canvas.width / 2
+                );
+                const victimColor = gameState.goalCelebration.victimPlayer?.color || '#FFFFFF';
+                gradient.addColorStop(0, `${victimColor}00`); // Transparent center
+                gradient.addColorStop(0.5, `${victimColor}20`); // Semi-transparent
+                gradient.addColorStop(1, `${victimColor}40`); // More opaque at edges
 
-                // Pulsing alpha effect
-                const pulseAlpha = 0.5 + Math.sin(elapsed / 150) * 0.15; // 50-65% opacity pulse
-                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${pulseAlpha})`;
-                ctx.fillRect(0, 0, fieldWidth, fieldHeight);
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                 // SLOW-MO text
                 ctx.fillStyle = '#FFFFFF';
-                ctx.font = 'bold 80px sans-serif';
+                ctx.font = 'bold 60px sans-serif';
                 ctx.textAlign = 'center';
-                ctx.globalAlpha = 1.0;
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = 4;
-                ctx.strokeText('ГОООЛ!', fieldWidth / 2, fieldHeight / 2);
-                ctx.fillText('ГОООЛ!', fieldWidth / 2, fieldHeight / 2);
+                ctx.globalAlpha = 0.8;
+                ctx.fillText('ГОООЛ!', canvas.width / 2, canvas.height / 2 - 50);
+
+                // Progress bar
+                const barWidth = 400;
+                const barHeight = 10;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = canvas.height / 2 + 30;
+
+                ctx.fillStyle = '#333';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                ctx.fillStyle = victimColor;
+                ctx.fillRect(barX, barY, barWidth * progress, barHeight);
 
                 ctx.globalAlpha = 1.0;
             }
 
             ctx.restore();
+
+            // Draw scores and names OUTSIDE field (not affected by shake)
+            const leftPlayer = gameState.players.find(p => p.side === 'left');
+            const rightPlayer = gameState.players.find(p => p.side === 'right');
+
+            if (leftPlayer) {
+                // Left player (Blue) - name and score OUTSIDE left edge
+                ctx.fillStyle = leftPlayer.color;
+                ctx.font = 'bold 28px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(leftPlayer.name, 20, 40);
+
+                // Huge score number
+                ctx.font = 'bold 100px sans-serif';
+                ctx.fillText(leftPlayer.score.toString(), 20, 140);
+            }
+
+            if (rightPlayer) {
+                // Right player (Red) - name and score OUTSIDE right edge
+                ctx.fillStyle = rightPlayer.color;
+                ctx.font = 'bold 28px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(rightPlayer.name, canvas.width - 20, 40);
+
+                // Huge score number
+                ctx.font = 'bold 100px sans-serif';
+                ctx.fillText(rightPlayer.score.toString(), canvas.width - 20, 140);
+            }
 
             // Render visual effects
             // Particles

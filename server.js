@@ -3298,10 +3298,7 @@ function updatePong(room) {
 
         if (player.side === 'left') {
             // Left paddle collision
-            // CRITICAL: Ball must be (1) moving toward paddle (speedX < 0),
-            // (2) overlapping paddle hitbox, AND (3) in front of paddle (not behind)
             if (room.ball.x - room.ball.radius < player.paddleX + paddleWidth &&
-                room.ball.x > player.paddleX && // Ball center must be to the right of paddle (not behind)
                 room.ball.y > player.paddleY &&
                 room.ball.y < player.paddleY + room.paddleSize &&
                 room.ball.speedX < 0) {
@@ -3321,10 +3318,7 @@ function updatePong(room) {
             }
         } else {
             // Right paddle collision
-            // CRITICAL: Ball must be (1) moving toward paddle (speedX > 0),
-            // (2) overlapping paddle hitbox, AND (3) in front of paddle (not behind)
             if (room.ball.x + room.ball.radius > player.paddleX &&
-                room.ball.x < player.paddleX + paddleWidth && // Ball center must be to the left of paddle (not behind)
                 room.ball.y > player.paddleY &&
                 room.ball.y < player.paddleY + room.paddleSize &&
                 room.ball.speedX > 0) {

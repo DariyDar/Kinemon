@@ -2305,7 +2305,20 @@
         function handleEffect(effectType, data) {
             switch (effectType) {
                 case 'particle':
-                    spawnParticles(data.x, data.y, data.color, data.count || 15);
+                    // For Ballz, data.x and data.y are relative (0-1), need conversion
+                    // Store field dimensions for conversion (set in drawBallzGame)
+                    if (gameType === 'ballz' && window.ballzFieldDimensions) {
+                        const fieldWidth = window.ballzFieldDimensions.fieldWidth;
+                        const fieldHeight = window.ballzFieldDimensions.fieldHeight;
+                        const offsetX = window.ballzFieldDimensions.offsetX;
+                        const offsetY = window.ballzFieldDimensions.offsetY;
+                        // Convert relative to pixel coordinates
+                        const pixelX = data.x * fieldWidth + offsetX;
+                        const pixelY = data.y * fieldHeight + offsetY;
+                        spawnParticles(pixelX, pixelY, data.color, data.count || 15);
+                    } else {
+                        spawnParticles(data.x, data.y, data.color, data.count || 15);
+                    }
                     break;
                 case 'flash':
                     triggerFlash(data.color, data.intensity || 0.3);
@@ -3684,6 +3697,7 @@ function renderBallz() {
     const aspectRatio = gameState.aspectRatio || 0.75; // 3:4 default
     const cols = gameState.cols || 7;
     const rows = gameState.rows || 14;
+    const ballSpeed = gameState.ballSpeed || 0.33; // For trajectory calculation
 
     // Adaptive canvas sizing
     let fieldWidth, fieldHeight;
@@ -3700,6 +3714,14 @@ function renderBallz() {
     // Center the field
     const offsetX = (canvas.width - fieldWidth) / 2;
     const offsetY = (canvas.height - fieldHeight) / 2;
+
+    // Store dimensions globally for particle effects coordinate conversion
+    window.ballzFieldDimensions = {
+        fieldWidth: fieldWidth,
+        fieldHeight: fieldHeight,
+        offsetX: offsetX,
+        offsetY: offsetY
+    };
 
     ctx.save();
     ctx.translate(offsetX, offsetY);
@@ -3765,7 +3787,7 @@ function renderBallz() {
         ctx.fill();
 
         // Aim line with charge effect
-        drawBallzAimLine(player, launchX, launchLineY, fieldWidth, fieldHeight, cols, rows);
+        drawBallzAimLine(player, launchX, launchLineY, fieldWidth, fieldHeight, cols, rows, ballSpeed);
     }
 
     ctx.restore();
@@ -3822,7 +3844,7 @@ function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {
     ctx.fillText(hp, centerX, centerY);
 }
 
-function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, cols, rows) {
+function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, cols, rows, ballSpeed) {
     const angle = player.aimAngle;
     const blockWidth = fieldWidth / cols;
     const blockHeight = fieldHeight / rows;
@@ -3832,7 +3854,8 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
         launchX, launchY, angle,
         fieldWidth, fieldHeight,
         player.blocks || [],
-        blockWidth, blockHeight
+        blockWidth, blockHeight,
+        ballSpeed || 0.33 // Default ballSpeed if not provided
     );
 
     // Draw trajectory segments
@@ -3926,18 +3949,19 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
 }
 
 // Calculate ball trajectory with reflections
-function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight, blocks, blockWidth, blockHeight) {
+function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight, blocks, blockWidth, blockHeight, ballSpeed = 0.33) {
     const trajectory = [{x: startX, y: startY}];
     let x = startX, y = startY;
-    let vx = Math.cos(angle);
-    let vy = -Math.sin(angle);
-    const step = 5; // pixels per step
-    const maxSteps = 200; // max trajectory length
-    const ballRadius = 5;
+    // CRITICAL: Match server physics! speed = ballSpeed / 100, then multiply by direction
+    const speed = ballSpeed / 100;
+    let vx = Math.cos(angle) * speed * fieldWidth; // Convert to pixels per frame
+    let vy = -Math.sin(angle) * speed * fieldHeight; // Convert to pixels per frame
+    const maxSteps = 1000; // max trajectory length
+    const ballRadius = fieldWidth * 0.01; // Match server: 1% of field width
 
     for (let i = 0; i < maxSteps; i++) {
-        x += vx * step;
-        y += vy * step;
+        x += vx;
+        y += vy;
 
         // Left/right wall bounce
         if (x <= ballRadius) {
@@ -3972,7 +3996,7 @@ function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight
                 y >= blockCenterY - halfHeight - ballRadius &&
                 y <= blockCenterY + halfHeight + ballRadius) {
 
-                // Simple bounce - reverse velocity
+                // Simple bounce - reverse velocity (match server logic)
                 const dx = x - blockCenterX;
                 const dy = y - blockCenterY;
                 if (Math.abs(dx) > Math.abs(dy)) {
@@ -3982,8 +4006,8 @@ function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight
                 }
 
                 // Push ball out of block
-                x += vx * step * 2;
-                y += vy * step * 2;
+                x += vx * 2;
+                y += vy * 2;
                 break;
             }
         }

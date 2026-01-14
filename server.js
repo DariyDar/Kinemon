@@ -401,8 +401,11 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
 
         // Gameplay settings
         room.cols = settings.cols || 7; // Grid columns (7 default)
-        room.rows = settings.rows || 14; // Grid rows (14 default)
         room.aspectRatio = settings.aspectRatio || 0.75; // Width/Height = 3:4
+        // CRITICAL: Calculate rows to make square blocks!
+        // For square blocks: blockWidth_rel / blockHeight_rel = aspectRatio
+        // (1/cols) / (1/rows) = aspectRatio  =>  rows = cols / aspectRatio
+        room.rows = settings.rows || Math.round(room.cols / room.aspectRatio); // Auto-calculate for square blocks
 
         // HP progression
         room.hpIncreaseEveryN = settings.hpIncreaseEveryN || 5; // HP+1 every N turns
@@ -411,7 +414,7 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
 
         // Ball physics (divided by 3 for smooth movement)
         room.ballSpeed = (settings.ballSpeed || 1) / 3; // 0.33=very slow, 1=medium (default: 0.33)
-        room.ballLaunchDelay = settings.ballLaunchDelay || 100; // ms between balls
+        room.ballLaunchDelay = settings.ballLaunchDelay || 10; // ms between balls (0.01s)
         room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15; // % chance per turn
 
         // Controls
@@ -2936,6 +2939,7 @@ function serializeGameState(room) {
         state.cols = room.cols;
         state.rows = room.rows;
         state.aspectRatio = room.aspectRatio;
+        state.ballSpeed = room.ballSpeed; // For trajectory calculation
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id,
             name: p.name,
@@ -4499,16 +4503,17 @@ function ballzSpawnBonusBall(player, room) {
  * Simulate full trajectory with bounces for display
  * Returns array of line segments: [{x1, y1, x2, y2}, ...]
  */
-function ballzSimulateTrajectory(launchX, angle, cols, rows, maxSegments = 5) {
+function ballzSimulateTrajectory(launchX, angle, cols, rows, maxSegments = 5, ballSpeed = 1) {
     const segments = [];
     const ballRadius = 0.01;
     const blockWidth = 1.0 / cols;
     const blockHeight = 1.0 / rows;
 
     let x = launchX;
-    let y = 1.0;
-    let vx = Math.cos(angle) * 0.01; // Small step size for simulation
-    let vy = -Math.sin(angle) * 0.01;
+    let y = 0.95; // CRITICAL: Match actual ball launch position!
+    const speed = ballSpeed / 100; // CRITICAL: Match actual ball speed!
+    let vx = Math.cos(angle) * speed;
+    let vy = -Math.sin(angle) * speed;
 
     let segmentCount = 0;
     let segmentStartX = x;

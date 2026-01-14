@@ -744,37 +744,48 @@
             <!-- Left Player -->
             <div id="pongLeftPlayer" style="
                 position: absolute;
-                left: 20px;
+                left: 0;
                 top: 50%;
                 transform: translateY(-50%);
+                width: calc((100vw - 600px) / 2);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
             ">
                 <div id="pongLeftName" style="
-                    font-size: 24px;
+                    font-size: 2vw;
                     font-weight: bold;
-                    margin-bottom: 10px;
+                    margin-bottom: 1vh;
                 "></div>
                 <div id="pongLeftScore" style="
-                    font-size: 80px;
+                    font-size: 12vw;
                     font-weight: bold;
+                    line-height: 1;
                 "></div>
             </div>
 
             <!-- Right Player -->
             <div id="pongRightPlayer" style="
                 position: absolute;
-                right: 20px;
+                right: 0;
                 top: 50%;
                 transform: translateY(-50%);
-                text-align: right;
+                width: calc((100vw - 600px) / 2);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
             ">
                 <div id="pongRightName" style="
-                    font-size: 24px;
+                    font-size: 2vw;
                     font-weight: bold;
-                    margin-bottom: 10px;
+                    margin-bottom: 1vh;
                 "></div>
                 <div id="pongRightScore" style="
-                    font-size: 80px;
+                    font-size: 12vw;
                     font-weight: bold;
+                    line-height: 1;
                 "></div>
             </div>
         </div>

@@ -1043,17 +1043,28 @@
                         </select>
                         <div class="setting-info">Количество очков для победы</div>
                     </div>
+                    <div class="setting-group">
+                        <label for="pongBotDifficulty">Сложность бота</label>
+                        <select id="pongBotDifficulty">
+                            <option value="easy">Лёгкий</option>
+                            <option value="medium" selected>Средний</option>
+                            <option value="hard">Сложный</option>
+                        </select>
+                        <div class="setting-info">Уровень сложности бота для одиночной игры</div>
+                    </div>
                 `;
                 // Load saved settings
                 gameSettings.ballSpeed = parseInt(localStorage.getItem('pongBallSpeed')) || 3;
                 gameSettings.paddleSize = parseInt(localStorage.getItem('pongPaddleSize')) || 2;
                 gameSettings.speedIncrease = parseInt(localStorage.getItem('pongSpeedIncrease')) || 2;
                 gameSettings.winScore = parseInt(localStorage.getItem('pongWinScore')) || 11;
+                gameSettings.botDifficulty = localStorage.getItem('pongBotDifficulty') || 'medium';
 
                 document.getElementById('pongBallSpeed').value = gameSettings.ballSpeed;
                 document.getElementById('pongPaddleSize').value = gameSettings.paddleSize;
                 document.getElementById('pongSpeedIncrease').value = gameSettings.speedIncrease;
                 document.getElementById('pongWinScore').value = gameSettings.winScore;
+                document.getElementById('pongBotDifficulty').value = gameSettings.botDifficulty;
 
             } else if (gameType === 'pushers') {
                 gameTitle.textContent = '🔲 Настройки Толкатели';
@@ -1368,10 +1379,12 @@
                 gameSettings.paddleSize = parseInt(document.getElementById('pongPaddleSize').value);
                 gameSettings.speedIncrease = parseInt(document.getElementById('pongSpeedIncrease').value);
                 gameSettings.winScore = parseInt(document.getElementById('pongWinScore').value);
+                gameSettings.botDifficulty = document.getElementById('pongBotDifficulty').value;
                 localStorage.setItem('pongBallSpeed', gameSettings.ballSpeed);
                 localStorage.setItem('pongPaddleSize', gameSettings.paddleSize);
                 localStorage.setItem('pongSpeedIncrease', gameSettings.speedIncrease);
                 localStorage.setItem('pongWinScore', gameSettings.winScore);
+                localStorage.setItem('pongBotDifficulty', gameSettings.botDifficulty);
             } else if (gameType === 'pushers') {
                 gameSettings.winScore = parseInt(document.getElementById('pushersWinScore').value);
                 gameSettings.singleSquare = document.getElementById('pushersSingleSquare').value === 'true';

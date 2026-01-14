@@ -252,6 +252,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.winScore = settings.winScore || 11;
         room.speedIncrease = settings.speedIncrease || 2; // 1=5%, 2=15%, 3=30% per hit
         room.gameStarted = false; // Game starts when 2 players join
+        room.botDifficulty = settings.botDifficulty || 'medium'; // 'easy', 'medium', 'hard'
+        room.bot = null; // Will be created when first human player joins
     } else if (gameType === 'pushers') {
         // Pushers: team-based square pushing game
         room.canvas = { width: PUSHERS_FIELD_SIZE, height: PUSHERS_FIELD_SIZE };
@@ -2278,10 +2280,34 @@ wss.on('connection', (ws) => {
                 ws.playerId = playerId;
                 ws.roomId = roomId;
 
-                // For Pong: start game when 2 players join
-                if (room.gameType === 'pong' && room.players.size === 2) {
-                    room.gameStarted = true;
-                    console.log(`Pong game starting in room ${roomId} with 2 players`);
+                // For Pong: bot and game start logic
+                if (room.gameType === 'pong') {
+                    // Count only human players (exclude bot)
+                    const humanPlayers = Array.from(room.players.values()).filter(p => !p.isBot);
+
+                    if (humanPlayers.length === 1) {
+                        // First human player joined - create bot opponent
+                        createBotPlayer(room);
+                        room.gameStarted = true;  // Start game with bot
+                        console.log(`[BOT] Pong game starting in room ${roomId} with player vs bot (${room.botDifficulty})`);
+                    } else if (humanPlayers.length === 2) {
+                        // Second human player joined - remove bot and reset game
+                        removeBotPlayer(room);
+
+                        // Reset scores
+                        for (const p of room.players.values()) {
+                            p.score = 0;
+                        }
+
+                        // Reset ball
+                        resetBall(room);
+
+                        room.gameStarted = true;
+                        room.gameOver = false;
+                        room.winner = null;
+
+                        console.log(`[BOT] Second player joined room ${roomId} - removed bot, reset game for PvP`);
+                    }
                 }
 
                 // Send initial state to new player (with session token)
@@ -3083,8 +3109,124 @@ function updateSnake(room) {
 // See new v3.25.0 single-player implementation at line ~4440
 // ============================================================================
 
+// Create bot player for Pong (single-player mode)
+function createBotPlayer(room) {
+    const botId = 'bot-' + Date.now();
+    const bot = {
+        id: botId,
+        name: 'Бот',
+        color: '#888888',  // Gray color for bot
+        score: 0,
+        tilt: 0.5,
+        paddleY: room.canvas.height / 2 - room.paddleSize / 2,
+        paddleX: room.canvas.width - 30,  // Bot always on right side
+        side: 'right',
+        alive: true,
+        isBot: true,  // Mark as bot for serialization
+        ws: null,     // Bot has no websocket
+        sessionToken: null
+    };
+
+    room.bot = bot;
+    room.players.set(botId, bot);
+
+    console.log(`[BOT] Created bot player for room ${room.id} with difficulty: ${room.botDifficulty}`);
+
+    return bot;
+}
+
+// Remove bot player from room
+function removeBotPlayer(room) {
+    if (room.bot) {
+        room.players.delete(room.bot.id);
+        console.log(`[BOT] Removed bot player from room ${room.id}`);
+        room.bot = null;
+    }
+}
+
+// Bot AI for Pong - three difficulty levels
+function updateBotAI(room, bot) {
+    // Bot only moves when game is started
+    if (!room.gameStarted) {
+        return;
+    }
+
+    // Difficulty parameters
+    const difficultySettings = {
+        easy: {
+            reactionSpeed: 0.08,     // Slow reaction (8% movement per frame)
+            tracking: 0.6,           // 60% accuracy - bot aims for 60% correct position
+            reactionDelay: 8,        // Updates every 8 frames (~133ms at 60fps)
+            errorMargin: 60          // Aims ±60px from ball randomly
+        },
+        medium: {
+            reactionSpeed: 0.15,     // Medium reaction (15% movement per frame)
+            tracking: 0.85,          // 85% accuracy
+            reactionDelay: 4,        // Updates every 4 frames (~67ms)
+            errorMargin: 30          // Aims ±30px from ball
+        },
+        hard: {
+            reactionSpeed: 0.25,     // Fast reaction (25% movement per frame)
+            tracking: 0.98,          // 98% accuracy - almost perfect
+            reactionDelay: 2,        // Updates every 2 frames (~33ms)
+            errorMargin: 10          // Aims ±10px from ball
+        }
+    };
+
+    const difficulty = difficultySettings[room.botDifficulty] || difficultySettings.medium;
+
+    // Initialize bot tracking state
+    if (!bot.aiState) {
+        bot.aiState = {
+            targetY: bot.paddleY,
+            frameCounter: 0,
+            currentError: 0
+        };
+    }
+
+    bot.aiState.frameCounter++;
+
+    // Update target position at intervals (simulates reaction delay)
+    if (bot.aiState.frameCounter % difficulty.reactionDelay === 0) {
+        // Predict where ball will be
+        let targetBallY = room.ball.y;
+
+        // Add tracking accuracy - bot doesn't perfectly track ball
+        if (Math.random() > difficulty.tracking) {
+            // Random error based on difficulty
+            bot.aiState.currentError = (Math.random() - 0.5) * difficulty.errorMargin * 2;
+        } else {
+            bot.aiState.currentError *= 0.8; // Decay error when tracking well
+        }
+
+        targetBallY += bot.aiState.currentError;
+
+        // Target center of paddle to ball position
+        bot.aiState.targetY = targetBallY - room.paddleSize / 2;
+
+        // Clamp target
+        bot.aiState.targetY = Math.max(0, Math.min(room.canvas.height - room.paddleSize, bot.aiState.targetY));
+    }
+
+    // Move towards target with reaction speed
+    const delta = bot.aiState.targetY - bot.paddleY;
+    bot.paddleY += delta * difficulty.reactionSpeed;
+
+    // Clamp final position
+    bot.paddleY = Math.max(0, Math.min(room.canvas.height - room.paddleSize, bot.paddleY));
+
+    // Update tilt for serialization (reverse calculation from paddleY)
+    bot.tilt = 1 - (bot.paddleY / (room.canvas.height - room.paddleSize));
+    bot.tilt = Math.max(0, Math.min(1, bot.tilt));
+}
+
 // Update Pong game
 function updatePong(room) {
+    // Update bot AI if present
+    if (room.bot && room.bot.alive) {
+        updateBotAI(room, room.bot);
+    }
+
     // Update paddle positions based on tilt
     for (const player of room.players.values()) {
         // Map tilt (0-1) to paddle Y position

@@ -416,8 +416,8 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.lowerHPChance = settings.lowerHPChance || 30; // % chance for lower HP
 
         // Ball physics (divided by 3 for smooth movement)
-        room.ballSpeed = (settings.ballSpeed || 1) / 3; // 0.33=very slow, 1=medium (default: 0.33)
-        room.ballLaunchDelay = settings.ballLaunchDelay || 10; // ms between balls (0.01s)
+        room.ballSpeed = (settings.ballSpeed || 2) / 3; // 0.67=slow, 1.33=medium, 2=very fast (default: 0.67)
+        room.ballLaunchDelay = settings.ballLaunchDelay || 150; // ms between balls (default: 0.15s)
         room.bonusBallSpawnRate = settings.bonusBallSpawnRate || 15; // % chance per turn
 
         // Controls

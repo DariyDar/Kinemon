@@ -1280,19 +1280,19 @@
                     <div class="setting-group">
                         <label for="ballzBallSpeed">Скорость шара</label>
                         <select id="ballzBallSpeed">
-                            <option value="1" selected>Медленно</option>
-                            <option value="1.5">Немного быстрее</option>
-                            <option value="2">Средне</option>
-                            <option value="2.5">Быстро</option>
-                            <option value="3">Очень быстро</option>
+                            <option value="2">Медленно</option>
+                            <option value="3">Немного быстрее</option>
+                            <option value="4" selected>Средне</option>
+                            <option value="5">Быстро</option>
+                            <option value="6">Очень быстро</option>
                         </select>
                     </div>
                     <div class="setting-group">
                         <label for="ballzLaunchDelay">Задержка между шарами</label>
                         <select id="ballzLaunchDelay">
-                            <option value="50">50 мс</option>
-                            <option value="100" selected>100 мс</option>
-                            <option value="150">150 мс</option>
+                            <option value="100">100 мс (Быстро)</option>
+                            <option value="150" selected>150 мс (Средне) - рекомендуется</option>
+                            <option value="200">200 мс (Медленно)</option>
                         </select>
                     </div>
                     <div class="setting-group">
@@ -1314,8 +1314,8 @@
                 gameSettings.lowerHPChance = parseInt(localStorage.getItem('ballzLowerHPChance')) || 30;
                 gameSettings.chargeTime = parseInt(localStorage.getItem('ballzChargeTime')) || 2000;
                 gameSettings.aimSensitivity = parseFloat(localStorage.getItem('ballzAimSensitivity')) || 0.005;
-                gameSettings.ballSpeed = parseFloat(localStorage.getItem('ballzBallSpeed')) || 1;
-                gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 100;
+                gameSettings.ballSpeed = parseFloat(localStorage.getItem('ballzBallSpeed')) || 2;
+                gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 150;
                 gameSettings.bonusBallSpawnRate = parseInt(localStorage.getItem('ballzBonusSpawnRate')) || 15;
 
                 // Apply to form
@@ -4006,7 +4006,27 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
 
     if (trajectory.length > 0) {
         ctx.moveTo(trajectory[0].x, trajectory[0].y);
+
+        let accumulatedLength = 0;
+        const maxLength = canvas.height * 2;  // 2 screen heights
+
         for (let i = 1; i < trajectory.length; i++) {
+            const dx = trajectory[i].x - trajectory[i-1].x;
+            const dy = trajectory[i].y - trajectory[i-1].y;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            accumulatedLength += segmentLength;
+
+            if (accumulatedLength > maxLength) {
+                // Interpolate final point to cut exactly at maxLength
+                const excess = accumulatedLength - maxLength;
+                const ratio = (segmentLength - excess) / segmentLength;
+                const finalX = trajectory[i-1].x + dx * ratio;
+                const finalY = trajectory[i-1].y + dy * ratio;
+                ctx.lineTo(finalX, finalY);
+                break;
+            }
+
             ctx.lineTo(trajectory[i].x, trajectory[i].y);
         }
     }

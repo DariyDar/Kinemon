@@ -3014,8 +3014,13 @@ function gameLoop(roomId) {
     }
 
     // Throttle broadcasts to 30 FPS (every 33ms) to reduce network load
+    // EXCEPT during Ballz ball launching - send immediately to show sequential launch
     const now = Date.now();
-    if (!room.lastBroadcast || now - room.lastBroadcast >= 33) {
+    const isLaunching = room.gameType === 'ballz' &&
+                        Array.from(room.players.values()).some(p => p.turnState === 'launching');
+    const throttleDelay = isLaunching ? 0 : 33; // No throttle during ball launch
+
+    if (!room.lastBroadcast || now - room.lastBroadcast >= throttleDelay) {
         room.lastBroadcast = now;
 
         // Broadcast game state to all clients in this room

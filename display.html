@@ -2597,35 +2597,80 @@
                 ctx.fillRect(player.paddleX, player.paddleY, paddleWidth, gameState.paddleSize);
             }
 
-            // Draw scores and names on field sides
+            // SLOW-MO OVERLAY during goal celebration
+            if (gameState.goalCelebration) {
+                const elapsed = Date.now() - gameState.goalCelebration.startTime;
+                const progress = Math.min(1, elapsed / gameState.goalCelebration.duration);
+
+                // Dark overlay with pulsing effect
+                const pulseAlpha = 0.3 + Math.sin(elapsed / 100) * 0.1;
+                ctx.fillStyle = `rgba(0, 0, 0, ${pulseAlpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Radial gradient effect from center
+                const gradient = ctx.createRadialGradient(
+                    canvas.width / 2, canvas.height / 2, 0,
+                    canvas.width / 2, canvas.height / 2, canvas.width / 2
+                );
+                const victimColor = gameState.goalCelebration.victimPlayer?.color || '#FFFFFF';
+                gradient.addColorStop(0, `${victimColor}00`); // Transparent center
+                gradient.addColorStop(0.5, `${victimColor}20`); // Semi-transparent
+                gradient.addColorStop(1, `${victimColor}40`); // More opaque at edges
+
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // SLOW-MO text
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 60px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = 0.8;
+                ctx.fillText('ГОООЛ!', canvas.width / 2, canvas.height / 2 - 50);
+
+                // Progress bar
+                const barWidth = 400;
+                const barHeight = 10;
+                const barX = (canvas.width - barWidth) / 2;
+                const barY = canvas.height / 2 + 30;
+
+                ctx.fillStyle = '#333';
+                ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                ctx.fillStyle = victimColor;
+                ctx.fillRect(barX, barY, barWidth * progress, barHeight);
+
+                ctx.globalAlpha = 1.0;
+            }
+
+            ctx.restore();
+
+            // Draw scores and names OUTSIDE field (not affected by shake)
             const leftPlayer = gameState.players.find(p => p.side === 'left');
             const rightPlayer = gameState.players.find(p => p.side === 'right');
 
             if (leftPlayer) {
-                // Left player (Blue) - name and score
+                // Left player (Blue) - name and score OUTSIDE left edge
                 ctx.fillStyle = leftPlayer.color;
-                ctx.font = 'bold 32px sans-serif';
+                ctx.font = 'bold 28px sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(leftPlayer.name, 40, 60);
+                ctx.fillText(leftPlayer.name, 20, 40);
 
                 // Huge score number
-                ctx.font = 'bold 120px sans-serif';
-                ctx.fillText(leftPlayer.score.toString(), 40, 180);
+                ctx.font = 'bold 100px sans-serif';
+                ctx.fillText(leftPlayer.score.toString(), 20, 140);
             }
 
             if (rightPlayer) {
-                // Right player (Red) - name and score
+                // Right player (Red) - name and score OUTSIDE right edge
                 ctx.fillStyle = rightPlayer.color;
-                ctx.font = 'bold 32px sans-serif';
+                ctx.font = 'bold 28px sans-serif';
                 ctx.textAlign = 'right';
-                ctx.fillText(rightPlayer.name, canvas.width - 40, 60);
+                ctx.fillText(rightPlayer.name, canvas.width - 20, 40);
 
                 // Huge score number
-                ctx.font = 'bold 120px sans-serif';
-                ctx.fillText(rightPlayer.score.toString(), canvas.width - 40, 180);
+                ctx.font = 'bold 100px sans-serif';
+                ctx.fillText(rightPlayer.score.toString(), canvas.width - 20, 140);
             }
-
-            ctx.restore();
 
             // Render visual effects
             // Particles

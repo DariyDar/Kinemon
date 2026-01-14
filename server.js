@@ -3340,22 +3340,24 @@ function updatePong(room) {
 
     // Score points
     if (room.ball.x < 0) {
-        // Right player scores
+        // Right player scores (LEFT player is VICTIM - ball went through LEFT wall)
         const players = Array.from(room.players.values());
         const rightPlayer = players.find(p => p.side === 'right');
-        if (rightPlayer) {
+        const leftPlayer = players.find(p => p.side === 'left'); // VICTIM
+        if (rightPlayer && leftPlayer) {
             rightPlayer.score++;
-            console.log(`${rightPlayer.name} scored! Score: ${players[0]?.score || 0} - ${rightPlayer.score}`);
+            console.log(`${rightPlayer.name} scored! Score: ${leftPlayer.score} - ${rightPlayer.score}`);
 
-            // DRAMATIC GOAL CELEBRATION - 10x particles, huge flash, slow-mo
+            // DRAMATIC GOAL CELEBRATION - victim's color "blood" at wall impact
+            // Particles at LEFT WALL where ball crossed (victim's territory)
             broadcastEffect(room.id, 'particle', {
-                x: room.canvas.width / 2,
-                y: room.canvas.height / 2,
-                color: rightPlayer.color,
+                x: 0, // LEFT wall
+                y: room.ball.y, // Ball's Y position when it crossed
+                color: leftPlayer.color, // VICTIM's color (like blood)
                 count: 200  // 10x particles!
             });
-            broadcastEffect(room.id, 'flash', { color: rightPlayer.color, intensity: 0.6 }); // 2x intensity
-            broadcastEffect(room.id, 'shake', { intensity: 8 }); // 2x shake
+            broadcastEffect(room.id, 'flash', { color: leftPlayer.color, intensity: 0.8 }); // Victim's color flash
+            broadcastEffect(room.id, 'shake', { intensity: 10 });
 
             // Check for win condition
             if (rightPlayer.score >= room.winScore) {
@@ -3365,11 +3367,12 @@ function updatePong(room) {
                 return; // Don't reset ball, game is over
             }
 
-            // Start goal celebration (slow-mo with 3 blinks = ~1 second)
+            // Start LONG slow-mo celebration (2 seconds)
             room.goalCelebration = {
                 startTime: Date.now(),
-                duration: 900, // 3 blinks × 300ms
+                duration: 2000, // 2 seconds slow-mo
                 scoringPlayer: rightPlayer,
+                victimPlayer: leftPlayer,
                 ballVisible: true,
                 blinkCount: 0
             };
@@ -3379,22 +3382,24 @@ function updatePong(room) {
             room.ball.y = room.canvas.height / 2;
         }
     } else if (room.ball.x > room.canvas.width) {
-        // Left player scores
+        // Left player scores (RIGHT player is VICTIM - ball went through RIGHT wall)
         const players = Array.from(room.players.values());
         const leftPlayer = players.find(p => p.side === 'left');
-        if (leftPlayer) {
+        const rightPlayer = players.find(p => p.side === 'right'); // VICTIM
+        if (leftPlayer && rightPlayer) {
             leftPlayer.score++;
-            console.log(`${leftPlayer.name} scored! Score: ${leftPlayer.score} - ${players[1]?.score || 0}`);
+            console.log(`${leftPlayer.name} scored! Score: ${leftPlayer.score} - ${rightPlayer.score}`);
 
-            // DRAMATIC GOAL CELEBRATION - 10x particles, huge flash, slow-mo
+            // DRAMATIC GOAL CELEBRATION - victim's color "blood" at wall impact
+            // Particles at RIGHT WALL where ball crossed (victim's territory)
             broadcastEffect(room.id, 'particle', {
-                x: room.canvas.width / 2,
-                y: room.canvas.height / 2,
-                color: leftPlayer.color,
+                x: room.canvas.width, // RIGHT wall
+                y: room.ball.y, // Ball's Y position when it crossed
+                color: rightPlayer.color, // VICTIM's color (like blood)
                 count: 200  // 10x particles!
             });
-            broadcastEffect(room.id, 'flash', { color: leftPlayer.color, intensity: 0.6 }); // 2x intensity
-            broadcastEffect(room.id, 'shake', { intensity: 8 }); // 2x shake
+            broadcastEffect(room.id, 'flash', { color: rightPlayer.color, intensity: 0.8 }); // Victim's color flash
+            broadcastEffect(room.id, 'shake', { intensity: 10 });
 
             // Check for win condition
             if (leftPlayer.score >= room.winScore) {
@@ -3404,11 +3409,12 @@ function updatePong(room) {
                 return; // Don't reset ball, game is over
             }
 
-            // Start goal celebration (slow-mo with 3 blinks = ~1 second)
+            // Start LONG slow-mo celebration (2 seconds)
             room.goalCelebration = {
                 startTime: Date.now(),
-                duration: 900, // 3 blinks × 300ms
+                duration: 2000, // 2 seconds slow-mo
                 scoringPlayer: leftPlayer,
+                victimPlayer: rightPlayer,
                 ballVisible: true,
                 blinkCount: 0
             };

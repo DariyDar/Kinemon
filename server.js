@@ -254,6 +254,9 @@ function createRoom(roomId, gameType = 'snake', settings = {}) {
         room.gameStarted = false; // Game starts when 2 players join
         room.botDifficulty = settings.botDifficulty || 'medium'; // 'easy', 'medium', 'hard'
         room.bot = null; // Will be created when first human player joins
+
+        // Goal celebration state
+        room.goalCelebration = null; // {startTime, duration, scoringPlayer, ballVisible, blinkCount}
     } else if (gameType === 'pushers') {
         // Pushers: team-based square pushing game
         room.canvas = { width: PUSHERS_FIELD_SIZE, height: PUSHERS_FIELD_SIZE };
@@ -2186,6 +2189,9 @@ wss.on('connection', (ws) => {
                     player.paddleX = isPlayer1 ? 20 : room.canvas.width - 30;
                     player.side = isPlayer1 ? 'left' : 'right';
                     player.alive = true; // Pong players are always alive (no death mechanic)
+
+                    // FIXED COLORS: Left player = Blue, Right player = Red
+                    player.color = isPlayer1 ? '#2196F3' : '#F44336';
                 } else if (room.gameType === 'pushers') {
                     // Pushers: axis-locked movement
                     const team = data.team || 'White';
@@ -2819,6 +2825,7 @@ function serializeGameState(room) {
         state.winScore = room.winScore;
         state.gameStarted = room.gameStarted;
         state.gameOver = room.gameOver;
+        state.goalCelebration = room.goalCelebration; // Slow-mo celebration state
         state.winner = room.winner ? {
             id: room.winner.id,
             name: room.winner.name,
@@ -3116,10 +3123,18 @@ function updateSnake(room) {
 // Create bot player for Pong (single-player mode)
 function createBotPlayer(room) {
     const botId = 'bot-' + Date.now();
+
+    // Bot name based on difficulty
+    const botNames = {
+        easy: 'Лёгкий бот',
+        medium: 'Средний бот',
+        hard: 'Сложный бот'
+    };
+
     const bot = {
         id: botId,
-        name: 'Бот',
-        color: '#888888',  // Gray color for bot
+        name: botNames[room.botDifficulty] || 'Средний бот',
+        color: '#F44336',  // Red color (right side)
         score: 0,
         tilt: 0.5,
         paddleY: room.canvas.height / 2 - room.paddleSize / 2,
@@ -3226,6 +3241,24 @@ function updateBotAI(room, bot) {
 
 // Update Pong game
 function updatePong(room) {
+    // Handle goal celebration (slow-mo with particles)
+    if (room.goalCelebration) {
+        const elapsed = Date.now() - room.goalCelebration.startTime;
+
+        if (elapsed < room.goalCelebration.duration) {
+            // Still in celebration - don't update ball, just animate
+            const blinkInterval = 300; // 300ms per blink
+            const blinkPhase = Math.floor(elapsed / blinkInterval) % 2;
+            room.goalCelebration.ballVisible = (blinkPhase === 0);
+            return; // Skip ball update during celebration
+        } else {
+            // Celebration over - reset ball and clear celebration
+            room.goalCelebration = null;
+            resetBall(room);
+            return;
+        }
+    }
+
     // Update bot AI if present
     if (room.bot && room.bot.alive) {
         updateBotAI(room, room.bot);
@@ -3314,16 +3347,15 @@ function updatePong(room) {
             rightPlayer.score++;
             console.log(`${rightPlayer.name} scored! Score: ${players[0]?.score || 0} - ${rightPlayer.score}`);
 
-            // Visual effects for scoring
-            broadcastEffect(room.id, 'particle', { x: room.ball.x, y: room.ball.y, color: rightPlayer.color, count: 20 });
-            broadcastEffect(room.id, 'flash', { color: rightPlayer.color, intensity: 0.3 });
-            broadcastEffect(room.id, 'shake', { intensity: 4 });
-            broadcastEffect(room.id, 'scoreAnim', {
-                x: room.canvas.width - 100,
-                y: 30,
-                text: '+1',
-                color: rightPlayer.color
+            // DRAMATIC GOAL CELEBRATION - 10x particles, huge flash, slow-mo
+            broadcastEffect(room.id, 'particle', {
+                x: room.canvas.width / 2,
+                y: room.canvas.height / 2,
+                color: rightPlayer.color,
+                count: 200  // 10x particles!
             });
+            broadcastEffect(room.id, 'flash', { color: rightPlayer.color, intensity: 0.6 }); // 2x intensity
+            broadcastEffect(room.id, 'shake', { intensity: 8 }); // 2x shake
 
             // Check for win condition
             if (rightPlayer.score >= room.winScore) {
@@ -3332,8 +3364,20 @@ function updatePong(room) {
                 console.log(`${rightPlayer.name} wins the game!`);
                 return; // Don't reset ball, game is over
             }
+
+            // Start goal celebration (slow-mo with 3 blinks = ~1 second)
+            room.goalCelebration = {
+                startTime: Date.now(),
+                duration: 900, // 3 blinks × 300ms
+                scoringPlayer: rightPlayer,
+                ballVisible: true,
+                blinkCount: 0
+            };
+
+            // Position ball at center for blinking animation
+            room.ball.x = room.canvas.width / 2;
+            room.ball.y = room.canvas.height / 2;
         }
-        resetBall(room);
     } else if (room.ball.x > room.canvas.width) {
         // Left player scores
         const players = Array.from(room.players.values());
@@ -3342,16 +3386,15 @@ function updatePong(room) {
             leftPlayer.score++;
             console.log(`${leftPlayer.name} scored! Score: ${leftPlayer.score} - ${players[1]?.score || 0}`);
 
-            // Visual effects for scoring
-            broadcastEffect(room.id, 'particle', { x: room.ball.x, y: room.ball.y, color: leftPlayer.color, count: 20 });
-            broadcastEffect(room.id, 'flash', { color: leftPlayer.color, intensity: 0.3 });
-            broadcastEffect(room.id, 'shake', { intensity: 4 });
-            broadcastEffect(room.id, 'scoreAnim', {
-                x: 100,
-                y: 30,
-                text: '+1',
-                color: leftPlayer.color
+            // DRAMATIC GOAL CELEBRATION - 10x particles, huge flash, slow-mo
+            broadcastEffect(room.id, 'particle', {
+                x: room.canvas.width / 2,
+                y: room.canvas.height / 2,
+                color: leftPlayer.color,
+                count: 200  // 10x particles!
             });
+            broadcastEffect(room.id, 'flash', { color: leftPlayer.color, intensity: 0.6 }); // 2x intensity
+            broadcastEffect(room.id, 'shake', { intensity: 8 }); // 2x shake
 
             // Check for win condition
             if (leftPlayer.score >= room.winScore) {
@@ -3360,8 +3403,20 @@ function updatePong(room) {
                 console.log(`${leftPlayer.name} wins the game!`);
                 return; // Don't reset ball, game is over
             }
+
+            // Start goal celebration (slow-mo with 3 blinks = ~1 second)
+            room.goalCelebration = {
+                startTime: Date.now(),
+                duration: 900, // 3 blinks × 300ms
+                scoringPlayer: leftPlayer,
+                ballVisible: true,
+                blinkCount: 0
+            };
+
+            // Position ball at center for blinking animation
+            room.ball.x = room.canvas.width / 2;
+            room.ball.y = room.canvas.height / 2;
         }
-        resetBall(room);
     }
 }
 

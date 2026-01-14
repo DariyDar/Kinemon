@@ -2582,8 +2582,8 @@
                 ctx.fillText(`Подключено: ${gameState.players.length}/2`, canvas.width / 2, canvas.height / 2 + 50);
             }
 
-            // Draw ball
-            if (gameState.ball) {
+            // Draw ball (hide during celebration blink)
+            if (gameState.ball && (!gameState.goalCelebration || gameState.goalCelebration.ballVisible)) {
                 ctx.fillStyle = '#FFF';
                 ctx.beginPath();
                 ctx.arc(gameState.ball.x, gameState.ball.y, gameState.ball.radius, 0, Math.PI * 2);
@@ -2595,12 +2595,34 @@
             for (const player of gameState.players) {
                 ctx.fillStyle = player.color;
                 ctx.fillRect(player.paddleX, player.paddleY, paddleWidth, gameState.paddleSize);
+            }
 
-                // Draw player name above paddle
-                ctx.font = 'bold 16px sans-serif';
-                ctx.textAlign = 'center';
-                const nameX = player.side === 'left' ? player.paddleX + paddleWidth / 2 + 30 : player.paddleX + paddleWidth / 2 - 30;
-                ctx.fillText(player.name, nameX, 30);
+            // Draw scores and names on field sides
+            const leftPlayer = gameState.players.find(p => p.side === 'left');
+            const rightPlayer = gameState.players.find(p => p.side === 'right');
+
+            if (leftPlayer) {
+                // Left player (Blue) - name and score
+                ctx.fillStyle = leftPlayer.color;
+                ctx.font = 'bold 32px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(leftPlayer.name, 40, 60);
+
+                // Huge score number
+                ctx.font = 'bold 120px sans-serif';
+                ctx.fillText(leftPlayer.score.toString(), 40, 180);
+            }
+
+            if (rightPlayer) {
+                // Right player (Red) - name and score
+                ctx.fillStyle = rightPlayer.color;
+                ctx.font = 'bold 32px sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(rightPlayer.name, canvas.width - 40, 60);
+
+                // Huge score number
+                ctx.font = 'bold 120px sans-serif';
+                ctx.fillText(rightPlayer.score.toString(), canvas.width - 40, 180);
             }
 
             ctx.restore();

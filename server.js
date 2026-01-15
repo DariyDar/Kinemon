@@ -2694,6 +2694,31 @@ wss.on('connection', (ws) => {
 
                     console.log(`[REPLAY] Migrated to ${data.gameType}, new room: ${result.newRoomId}`);
                 }
+            } else if (data.type === 'ballz_turn_complete' && ws.roomId) {
+                // Ballz: Client finished turn, update server state and start new turn
+                const room = rooms.get(ws.roomId);
+                if (room && room.gameType === 'ballz') {
+                    const player = Array.from(room.players.values())[0]; // Single player game
+                    if (player) {
+                        // Update server state from client
+                        player.blocks = data.blocks || [];
+                        player.bonusBalls = data.bonusBalls || [];
+                        player.ballCount = data.ballCount || 1;
+                        player.score = data.score || 0;
+                        player.launchX = data.launchX !== undefined ? data.launchX : 0.5;
+
+                        console.log(`[BALLZ] Turn complete: score=${player.score}, balls=${player.ballCount}, blocks=${player.blocks.length}`);
+
+                        // Start new turn (move blocks down, generate new row)
+                        ballzStartNewTurn(room, player);
+
+                        // Send new turn state to client
+                        ws.send(JSON.stringify({
+                            type: 'ballz_new_turn',
+                            gameState: serializeGameState(room)
+                        }));
+                    }
+                }
             }
         } catch (error) {
             console.error('Error processing message:', error);
@@ -2947,18 +2972,21 @@ function serializeGameState(room) {
         state.rows = room.rows;
         state.aspectRatio = room.aspectRatio;
         state.ballSpeed = room.ballSpeed; // For trajectory calculation
+        state.ballLaunchDelay = room.ballLaunchDelay; // For client-side ball launching
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id,
             name: p.name,
             color: p.color,
             score: p.score,
             ballCount: p.ballCount,
+            ballsThisTurn: p.ballsThisTurn, // For client-side launching
             alive: p.alive,
             turnState: p.turnState,
             aimAngle: p.aimAngle,
             chargeProgress: p.chargeProgress,
             isInDeadZone: p.isInDeadZone,
             launchX: p.launchX,
+            launchStartTime: p.launchStartTime, // For client-side timing
             balls: p.balls, // Already relative coordinates
             blocks: p.blocks, // Already array with gridX, gridY
             bonusBalls: p.bonusBalls,
@@ -4212,6 +4240,8 @@ function ballzUpdate(room) {
 
 /**
  * Update single player state machine
+ * NOTE: After 'charging' completes, physics is handled CLIENT-SIDE!
+ * Server only handles: aiming, charging, and receiving turn_complete from client
  */
 function ballzUpdatePlayer(room, player) {
     switch (player.turnState) {
@@ -4221,16 +4251,12 @@ function ballzUpdatePlayer(room, player) {
         case 'charging':
             ballzUpdateCharging(room, player);
             break;
+        // Client-side states - server just waits for 'ballz_turn_complete' message
         case 'launching':
-            ballzUpdateLaunching(room, player);
-            break;
         case 'balls_in_flight':
-            ballzUpdatePhysics(room, player);
-            ballzCheckCollisions(room, player);
-            ballzCheckTurnComplete(room, player);
-            break;
         case 'turn_complete':
-            ballzAdvanceTurn(room, player);
+            // Physics handled on client - do nothing here
+            // Client will send 'ballz_turn_complete' when done
             break;
     }
 }
@@ -4292,12 +4318,16 @@ function ballzUpdateCharging(room, player) {
         return;
     }
 
-    // Full charge - launch
+    // Full charge - switch to launching (client will handle the rest)
     if (player.chargeProgress >= 1) {
         player.turnState = 'launching';
         player.launchStartTime = Date.now();
         // Save ball count at turn start (before bonuses are collected)
         player.ballsThisTurn = player.ballCount;
+        // Clear balls array - client will create them
+        player.balls = [];
+        player.ballsCreated = false;
+        player.firstBallReturned = false;
     }
 
     player.lastTilt = player.tilt;

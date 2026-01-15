@@ -1005,6 +1005,9 @@
             scoreAnims: []
         };
 
+        // Client-side particle effects for Ballz (separate from server-synced effects)
+        let localParticleEffects = [];
+
         // Detect available viewport dimensions
         function getAvailableCanvasDimensions() {
             const availableWidth = window.innerWidth;
@@ -1990,6 +1993,19 @@
                         }
                     } else if (data.type === 'effect') {
                         handleEffect(data.effectType, data.data);
+                    } else if (data.type === 'ballz_new_turn') {
+                        // Ballz: Server sent new turn state after we completed our turn
+                        console.log('[BALLZ] Received new turn from server');
+                        gameState = data.gameState;
+
+                        // Reset client-side state for new turn
+                        const player = gameState.players && gameState.players[0];
+                        if (player) {
+                            player.clientBallsCreated = false;
+                            player.turnCompleteSent = false;
+                            // Clear local effects for new turn
+                            localParticleEffects = [];
+                        }
                     } else if (data.type === 'lobby_countdown') {
                         // Show countdown on lobby screen
                         const lobbyCountdownDisplay = document.getElementById('lobbyCountdownDisplay');
@@ -3816,6 +3832,261 @@
 
         // ==================== BALLZ v3.25.0 - Single Player ====================
 
+        // ========== CLIENT-SIDE PHYSICS (v3.27.7) ==========
+        // All ball physics is handled on the client for smooth animation
+
+        /**
+         * Client-side ball launching with proper timing
+         * Creates balls with staggered launch times and activates them sequentially
+         */
+        function clientBallzLaunching(player) {
+            const now = Date.now();
+            const ballLaunchDelay = gameState.ballLaunchDelay || 150;
+            const ballSpeed = gameState.ballSpeed || 0.67;
+
+            // Create all balls upfront but mark them as "waiting"
+            if (!player.clientBallsCreated) {
+                const launchX = player.launchX !== null ? player.launchX : 0.5;
+                const speed = ballSpeed / 100;
+
+                // Clear any existing balls
+                player.balls = [];
+
+                for (let i = 0; i < player.ballsThisTurn; i++) {
+                    player.balls.push({
+                        x: launchX,
+                        y: 0.95,
+                        vx: Math.cos(player.aimAngle) * speed,
+                        vy: -Math.sin(player.aimAngle) * speed,
+                        active: false,
+                        launchTime: player.launchStartTime + i * ballLaunchDelay,
+                        isFirst: i === 0
+                    });
+                }
+                player.clientBallsCreated = true;
+                player.firstBallReturned = false;
+            }
+
+            // Activate balls when their time comes (CLIENT-SIDE TIMING!)
+            for (const ball of player.balls) {
+                if (!ball.active && now >= ball.launchTime) {
+                    ball.active = true;
+                }
+            }
+
+            // Check if all balls are launched -> transition to flying state
+            const allLaunched = player.balls.every(b => b.active);
+            if (allLaunched) {
+                player.turnState = 'balls_in_flight';
+            }
+        }
+
+        /**
+         * Client-side ball physics - movement and wall bounces
+         */
+        function clientBallzPhysics(player) {
+            const ballRadius = 0.01; // 1% of field width
+
+            for (const ball of player.balls) {
+                if (!ball.active) continue;
+
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+
+                // Wall bounces (left/right)
+                if (ball.x <= ballRadius || ball.x >= 1 - ballRadius) {
+                    ball.vx = -ball.vx;
+                    ball.x = Math.max(ballRadius, Math.min(1 - ballRadius, ball.x));
+                }
+
+                // Top bounce
+                if (ball.y <= ballRadius) {
+                    ball.vy = -ball.vy;
+                    ball.y = ballRadius;
+                }
+
+                // Bottom return (ball reaches launch line at 95%)
+                if (ball.y >= 0.95) {
+                    ball.active = false;
+                    ball.y = 0.95;
+
+                    // First ball sets new launch position
+                    if (ball.isFirst && !player.firstBallReturned) {
+                        player.launchX = ball.x;
+                        player.firstBallReturned = true;
+                    }
+                }
+            }
+        }
+
+        /**
+         * Client-side collision detection with blocks and bonus balls
+         */
+        function clientBallzCollisions(player, cols, rows, fieldWidth, fieldHeight) {
+            const ballRadius = 0.01;
+            const blockWidth = 1.0 / cols;
+            const blockHeight = 1.0 / rows;
+
+            for (const ball of player.balls) {
+                if (!ball.active) continue;
+
+                // Block collisions
+                for (let i = player.blocks.length - 1; i >= 0; i--) {
+                    const block = player.blocks[i];
+                    const blockCenterX = (block.gridX + 0.5) * blockWidth;
+                    const blockCenterY = (block.gridY + 0.5) * blockHeight;
+
+                    if (clientCheckBallBlockCollision(ball, blockCenterX, blockCenterY, blockWidth, blockHeight, ballRadius)) {
+                        block.hp--;
+
+                        if (block.hp <= 0) {
+                            // Block destroyed
+                            player.blocks.splice(i, 1);
+                            player.score++;
+                            // Create particle effect locally
+                            createLocalParticleEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, player.color || '#4CAF50', 12);
+                        } else {
+                            // Block hit - small particles
+                            createLocalParticleEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, '#FFFFFF', 4);
+                        }
+
+                        clientReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHeight);
+                        break;
+                    }
+                }
+
+                // Bonus ball pickups
+                for (let i = player.bonusBalls.length - 1; i >= 0; i--) {
+                    const bonus = player.bonusBalls[i];
+                    const bonusCenterX = (bonus.gridX + 0.5) * blockWidth;
+                    const bonusCenterY = (bonus.gridY + 0.5) * blockHeight;
+
+                    const dist = Math.hypot(ball.x - bonusCenterX, ball.y - bonusCenterY);
+                    if (dist < ballRadius + 0.02) {
+                        player.bonusBalls.splice(i, 1);
+                        player.ballCount++;
+                        // Golden particle effect
+                        createLocalParticleEffect(bonusCenterX * fieldWidth, bonusCenterY * fieldHeight, '#FFD700', 8);
+                        break;
+                    }
+                }
+            }
+        }
+
+        /**
+         * AABB collision detection (relative coordinates)
+         */
+        function clientCheckBallBlockCollision(ball, blockCenterX, blockCenterY, blockWidth, blockHeight, ballRadius) {
+            const halfWidth = blockWidth / 2;
+            const halfHeight = blockHeight / 2;
+
+            const closestX = Math.max(blockCenterX - halfWidth, Math.min(ball.x, blockCenterX + halfWidth));
+            const closestY = Math.max(blockCenterY - halfHeight, Math.min(ball.y, blockCenterY + halfHeight));
+
+            const distX = ball.x - closestX;
+            const distY = ball.y - closestY;
+            const distSquared = distX * distX + distY * distY;
+
+            return distSquared < (ballRadius * ballRadius);
+        }
+
+        /**
+         * Reflect ball off block (simplified physics)
+         */
+        function clientReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHeight) {
+            const dx = ball.x - blockCenterX;
+            const dy = ball.y - blockCenterY;
+            const halfWidth = blockWidth / 2;
+            const halfHeight = blockHeight / 2;
+
+            const overlapX = halfWidth - Math.abs(dx);
+            const overlapY = halfHeight - Math.abs(dy);
+
+            if (overlapX < overlapY) {
+                ball.vx = -ball.vx;
+            } else {
+                ball.vy = -ball.vy;
+            }
+        }
+
+        /**
+         * Check if turn is complete (all balls returned)
+         */
+        function clientCheckTurnComplete(player) {
+            if (!player.balls || player.balls.length === 0) return false;
+            const allInactive = player.balls.every(b => !b.active);
+            return allInactive && player.balls.length === player.ballsThisTurn;
+        }
+
+        /**
+         * Create local particle effect (client-side only)
+         */
+        function createLocalParticleEffect(x, y, color, count) {
+            // Add to local effects array for rendering
+            if (!window.localBallzEffects) {
+                window.localBallzEffects = [];
+            }
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 3;
+                window.localBallzEffects.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: color,
+                    life: 1.0,
+                    decay: 0.02 + Math.random() * 0.02
+                });
+            }
+        }
+
+        /**
+         * Update and render local particle effects
+         */
+        function updateAndRenderLocalEffects(ctx) {
+            if (!window.localBallzEffects) return;
+
+            for (let i = window.localBallzEffects.length - 1; i >= 0; i--) {
+                const p = window.localBallzEffects[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1; // Gravity
+                p.life -= p.decay;
+
+                if (p.life <= 0) {
+                    window.localBallzEffects.splice(i, 1);
+                    continue;
+                }
+
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+
+        /**
+         * Send turn complete to server and request new turn
+         */
+        function sendBallzTurnComplete(player) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'ballz_turn_complete',
+                    blocks: player.blocks,
+                    bonusBalls: player.bonusBalls,
+                    ballCount: player.ballCount,
+                    score: player.score,
+                    launchX: player.launchX
+                }));
+                console.log('[BALLZ] Sent turn_complete to server');
+            }
+        }
+
+        // ========== END CLIENT-SIDE PHYSICS ==========
+
 function renderBallz() {
     // Black background
     ctx.fillStyle = '#000';
@@ -3860,6 +4131,24 @@ function renderBallz() {
         offsetX: offsetX,
         offsetY: offsetY
     };
+
+    // ========== CLIENT-SIDE GAME LOOP ==========
+    // Process physics BEFORE rendering (only during launching/flying states)
+    if (player.turnState === 'launching') {
+        clientBallzLaunching(player);
+    } else if (player.turnState === 'balls_in_flight') {
+        clientBallzPhysics(player);
+        clientBallzCollisions(player, cols, rows, fieldWidth, fieldHeight);
+
+        // Check if turn is complete (all balls returned)
+        if (clientCheckTurnComplete(player)) {
+            sendBallzTurnComplete(player);
+        }
+    }
+
+    // Update and render local particle effects
+    updateAndRenderLocalEffects(ctx, offsetX, offsetY);
+    // ========== END CLIENT-SIDE GAME LOOP ==========
 
     ctx.save();
     ctx.translate(offsetX, offsetY);

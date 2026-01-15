@@ -1950,7 +1950,22 @@
                         }
 
                     } else if (data.type === 'update') {
-                        gameState = data.gameState;
+                        // For Ballz: preserve local state during client-side physics
+                        const oldPlayer = gameState?.players?.[0];
+                        const isClientSidePhysics = gameState?.gameType === 'ballz' &&
+                            oldPlayer &&
+                            (oldPlayer.turnState === 'launching' || oldPlayer.turnState === 'balls_in_flight');
+
+                        if (isClientSidePhysics) {
+                            // Only update non-physics fields from server, keep local balls/blocks/score
+                            const newState = data.gameState;
+                            // Keep the local player state, only update game-level fields
+                            gameState.gameOver = newState.gameOver;
+                            gameState.winner = newState.winner;
+                            // DON'T update players - client is managing physics
+                        } else {
+                            gameState = data.gameState;
+                        }
 
                         // Update canvas size if it changed
                         if (gameState.canvas && (canvas.width !== gameState.canvas.width || canvas.height !== gameState.canvas.height)) {

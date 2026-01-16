@@ -2710,7 +2710,7 @@ wss.on('connection', (ws) => {
                         console.log(`[BALLZ] Turn complete: score=${player.score}, balls=${player.ballCount}, blocks=${player.blocks.length}`);
 
                         // Start new turn (move blocks down, generate new row)
-                        ballzStartNewTurn(room, player);
+                        ballzAdvanceTurn(room, player);
 
                         // Send new turn state to client
                         ws.send(JSON.stringify({

@@ -557,7 +557,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.12</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.13</div>
         </div>
 
         <!-- Connection Screen -->
@@ -786,6 +786,46 @@
                     font-size: 12vw;
                     font-weight: bold;
                     line-height: 1;
+                "></div>
+            </div>
+        </div>
+
+        <!-- Ballz Score Display (left side like Pong) -->
+        <div id="ballzScoreDisplay" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: calc((100vw - 600px) / 2);
+            display: none;
+            pointer-events: none;
+            z-index: 500;
+        ">
+            <div style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                text-align: center;
+            ">
+                <div id="ballzPlayerName" style="
+                    font-size: 2vw;
+                    font-weight: bold;
+                    margin-bottom: 1vh;
+                    color: #4CAF50;
+                "></div>
+                <div id="ballzPlayerScore" style="
+                    font-size: 10vw;
+                    font-weight: bold;
+                    line-height: 1;
+                    color: #FFFFFF;
+                    text-shadow: 0 0 20px rgba(255,255,255,0.5);
+                "></div>
+                <div id="ballzBallCount" style="
+                    font-size: 3vw;
+                    font-weight: bold;
+                    margin-top: 2vh;
+                    color: #FFD700;
                 "></div>
             </div>
         </div>
@@ -2575,6 +2615,12 @@
                 pongScores.style.display = gameState.gameType === 'pong' ? 'block' : 'none';
             }
 
+            // Manage Ballz score display visibility
+            const ballzScoreDisplay = document.getElementById('ballzScoreDisplay');
+            if (ballzScoreDisplay) {
+                ballzScoreDisplay.style.display = gameState.gameType === 'ballz' ? 'block' : 'none';
+            }
+
             if (gameState.gameType === 'pong') {
                 renderPong();
             } else if (gameState.gameType === 'pushers') {
@@ -3919,7 +3965,7 @@
          * Client-side ball physics - movement and wall bounces
          */
         function clientBallzPhysics(player) {
-            const ballRadius = 0.01; // 1% of field width
+            const ballRadius = 0.02; // 2% of field width (doubled)
 
             for (const ball of player.balls) {
                 if (!ball.active) continue;
@@ -3957,9 +4003,16 @@
          * Client-side collision detection with blocks and bonus balls
          */
         function clientBallzCollisions(player, cols, rows, fieldWidth, fieldHeight) {
-            const ballRadius = 0.01;
+            const ballRadius = 0.02; // Doubled from 0.01
             const blockWidth = 1.0 / cols;
             const blockHeight = 1.0 / rows;
+
+            // Helper to get block color (same as in drawBallzBlock)
+            function getBlockColor(hp, maxHp) {
+                const ratio = Math.min(1, (hp - 1) / Math.max(1, maxHp - 1));
+                const hue = 270 - ratio * 270;
+                return `hsl(${hue}, 100%, 55%)`;
+            }
 
             for (const ball of player.balls) {
                 if (!ball.active) continue;
@@ -3971,17 +4024,24 @@
                     const blockCenterY = (block.gridY + 0.5) * blockHeight;
 
                     if (clientCheckBallBlockCollision(ball, blockCenterX, blockCenterY, blockWidth, blockHeight, ballRadius)) {
+                        // Get block color BEFORE reducing HP
+                        const blockColor = getBlockColor(block.hp, block.maxHp);
                         block.hp--;
 
+                        // Add shake effect
+                        block.shakeTime = 1.0;
+
                         if (block.hp <= 0) {
-                            // Block destroyed
+                            // Block destroyed - intense effect!
                             player.blocks.splice(i, 1);
                             player.score++;
-                            // Create particle effect locally
-                            createLocalParticleEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, player.color || '#4CAF50', 12);
+                            // More particles, larger, block color
+                            createLocalParticleEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, blockColor, 20, true);
+                            // Add flash effect
+                            createFlashEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, blockColor);
                         } else {
-                            // Block hit - small particles
-                            createLocalParticleEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, '#FFFFFF', 4);
+                            // Block hit - particles of block color
+                            createLocalParticleEffect(blockCenterX * fieldWidth, blockCenterY * fieldHeight, blockColor, 6, false);
                         }
 
                         clientReflectBall(ball, blockCenterX, blockCenterY, blockWidth, blockHeight);
@@ -4000,7 +4060,7 @@
                         player.bonusBalls.splice(i, 1);
                         player.ballCount++;
                         // Golden particle effect
-                        createLocalParticleEffect(bonusCenterX * fieldWidth, bonusCenterY * fieldHeight, '#FFD700', 8);
+                        createLocalParticleEffect(bonusCenterX * fieldWidth, bonusCenterY * fieldHeight, '#FFD700', 10, true);
                         break;
                     }
                 }
@@ -4054,15 +4114,16 @@
 
         /**
          * Create local particle effect (client-side only)
+         * @param intense - if true, larger and faster particles (for block destruction)
          */
-        function createLocalParticleEffect(x, y, color, count) {
-            // Add to local effects array for rendering
+        function createLocalParticleEffect(x, y, color, count, intense = false) {
             if (!window.localBallzEffects) {
                 window.localBallzEffects = [];
             }
             for (let i = 0; i < count; i++) {
                 const angle = Math.random() * Math.PI * 2;
-                const speed = 2 + Math.random() * 3;
+                const speed = intense ? (4 + Math.random() * 5) : (2 + Math.random() * 3);
+                const size = intense ? (4 + Math.random() * 4) : (2 + Math.random() * 2);
                 window.localBallzEffects.push({
                     x: x,
                     y: y,
@@ -4070,22 +4131,74 @@
                     vy: Math.sin(angle) * speed,
                     color: color,
                     life: 1.0,
-                    decay: 0.02 + Math.random() * 0.02
+                    decay: intense ? (0.015 + Math.random() * 0.015) : (0.02 + Math.random() * 0.02),
+                    size: size
                 });
             }
+        }
+
+        /**
+         * Create flash effect for block destruction
+         */
+        function createFlashEffect(x, y, color) {
+            if (!window.localBallzFlashes) {
+                window.localBallzFlashes = [];
+            }
+            window.localBallzFlashes.push({
+                x: x,
+                y: y,
+                color: color,
+                radius: 5,
+                maxRadius: 40,
+                life: 1.0
+            });
         }
 
         /**
          * Update and render local particle effects
          */
         function updateAndRenderLocalEffects(ctx) {
+            // Render flash effects first (behind particles)
+            if (window.localBallzFlashes) {
+                for (let i = window.localBallzFlashes.length - 1; i >= 0; i--) {
+                    const f = window.localBallzFlashes[i];
+                    f.radius += 4;
+                    f.life -= 0.12;
+
+                    if (f.life <= 0) {
+                        window.localBallzFlashes.splice(i, 1);
+                        continue;
+                    }
+
+                    // Draw expanding ring
+                    ctx.globalAlpha = f.life * 0.6;
+                    ctx.strokeStyle = f.color;
+                    ctx.lineWidth = 3;
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = f.color;
+                    ctx.beginPath();
+                    ctx.arc(f.x, f.y, f.radius, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    // Inner flash
+                    ctx.globalAlpha = f.life * 0.4;
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(f.x, f.y, f.radius * 0.3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            // Render particles
             if (!window.localBallzEffects) return;
 
             for (let i = window.localBallzEffects.length - 1; i >= 0; i--) {
                 const p = window.localBallzEffects[i];
                 p.x += p.vx;
                 p.y += p.vy;
-                p.vy += 0.1; // Gravity
+                p.vy += 0.15; // Gravity
                 p.life -= p.decay;
 
                 if (p.life <= 0) {
@@ -4095,9 +4208,12 @@
 
                 ctx.globalAlpha = p.life;
                 ctx.fillStyle = p.color;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = p.color;
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, p.size || 3, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.shadowBlur = 0;
             }
             ctx.globalAlpha = 1.0;
         }
@@ -4136,6 +4252,21 @@ function renderBallz() {
     // v3.25.0: Single player only
     const player = gameState.players && gameState.players[0];
     if (!player) return;
+
+    // Update Ballz score display (HTML element on left side)
+    const ballzPlayerName = document.getElementById('ballzPlayerName');
+    const ballzPlayerScore = document.getElementById('ballzPlayerScore');
+    const ballzBallCount = document.getElementById('ballzBallCount');
+    if (ballzPlayerName) {
+        ballzPlayerName.textContent = player.name || 'Player';
+        ballzPlayerName.style.color = player.color || '#4CAF50';
+    }
+    if (ballzPlayerScore) {
+        ballzPlayerScore.textContent = player.score || 0;
+    }
+    if (ballzBallCount) {
+        ballzBallCount.textContent = `x${player.ballCount || 1}`;
+    }
 
     // Game over screen
     if (player.gameOver) {
@@ -4222,7 +4353,7 @@ function renderBallz() {
     for (const block of player.blocks || []) {
         const x = block.gridX * blockWidth + blockWidth / 2;
         const y = block.gridY * blockHeight + blockHeight / 2;
-        drawBallzBlock(x, y, blockWidth, blockHeight, block.hp, block.maxHp);
+        drawBallzBlock(x, y, blockWidth, blockHeight, block.hp, block.maxHp, block);
     }
 
     // Bonus balls
@@ -4238,24 +4369,50 @@ function renderBallz() {
         ctx.shadowBlur = 0;
     }
 
-    // Flying balls (relative 0-1 coordinates)
+    // Flying balls with Trail + Glow effects (relative 0-1 coordinates)
+    const ballRenderRadius = 10; // Doubled from 5
     for (const ball of player.balls || []) {
         if (!ball.active) continue;
         const x = ball.x * fieldWidth;
         const y = ball.y * fieldHeight;
+
+        // Trail effect - store and draw previous positions
+        if (!ball.trail) ball.trail = [];
+        ball.trail.push({x: ball.x, y: ball.y});
+        if (ball.trail.length > 8) ball.trail.shift();
+
+        // Draw trail (fading)
+        for (let i = 0; i < ball.trail.length - 1; i++) {
+            const alpha = (i / ball.trail.length) * 0.4;
+            const size = ballRenderRadius * (i / ball.trail.length) * 0.8;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(ball.trail[i].x * fieldWidth, ball.trail[i].y * fieldHeight, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+
+        // Main ball with glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#FFFFFF';
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.arc(x, y, ballRenderRadius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
     }
 
     // Launch ball (when aiming, charging, or waiting for new turn)
     if (player.turnState === 'aiming' || player.turnState === 'charging' || player.turnState === 'waiting_new_turn') {
         const launchX = player.launchX !== null ? player.launchX * fieldWidth : fieldWidth / 2;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#FFFFFF';
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
-        ctx.arc(launchX, launchLineY, 5, 0, Math.PI * 2);
+        ctx.arc(launchX, launchLineY, ballRenderRadius, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
 
         // Aim line with charge effect
         drawBallzAimLine(player, launchX, launchLineY, fieldWidth, fieldHeight, cols, rows, ballSpeed);
@@ -4283,36 +4440,52 @@ function renderBallz() {
     ctx.globalAlpha = 1.0;
 }
 
-function drawBallzBlock(centerX, centerY, width, height, hp, maxHp) {
+function drawBallzBlock(centerX, centerY, width, height, hp, maxHp, block) {
     const halfW = width / 2;
     const halfH = height / 2;
 
-    // HP-based color
-    let color;
-    if (hp <= 5) color = '#4CAF50'; // Green (1-5)
-    else if (hp <= 10) color = '#2196F3'; // Blue (6-10)
-    else if (hp <= 20) color = '#9C27B0'; // Purple (11-20)
-    else if (hp <= 30) color = '#FF9800'; // Orange (21-30)
-    else if (hp <= 50) color = '#F44336'; // Red (31-50)
-    else color = '#B71C1C'; // Dark red (51+)
+    // Rainbow neon color based on HP ratio (violet HP=1 -> red HP=maxHP)
+    const ratio = Math.min(1, (hp - 1) / Math.max(1, maxHp - 1));
+    // Hue: 270 (violet) -> 0 (red)
+    const hue = 270 - ratio * 270;
+    const color = `hsl(${hue}, 100%, 55%)`;
+
+    // Shake effect
+    let offsetX = 0, offsetY = 0;
+    if (block && block.shakeTime && block.shakeTime > 0) {
+        const intensity = block.shakeTime * 4;
+        offsetX = (Math.random() - 0.5) * intensity;
+        offsetY = (Math.random() - 0.5) * intensity;
+        block.shakeTime -= 0.15;
+    }
+
+    const drawX = centerX + offsetX;
+    const drawY = centerY + offsetY;
+
+    // Neon glow effect
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = color;
 
     // Block fill
     ctx.fillStyle = color;
-    ctx.globalAlpha = 0.8;
-    ctx.fillRect(centerX - halfW, centerY - halfH, width, height);
+    ctx.globalAlpha = 0.9;
+    ctx.fillRect(drawX - halfW, drawY - halfH, width, height);
     ctx.globalAlpha = 1.0;
 
-    // Border
+    // Border with glow
     ctx.strokeStyle = '#FFF';
     ctx.lineWidth = 2;
-    ctx.strokeRect(centerX - halfW, centerY - halfH, width, height);
+    ctx.strokeRect(drawX - halfW, drawY - halfH, width, height);
+
+    // Reset shadow
+    ctx.shadowBlur = 0;
 
     // HP text
     ctx.fillStyle = '#FFF';
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(hp, centerX, centerY);
+    ctx.fillText(hp, drawX, drawY);
 }
 
 function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, cols, rows, ballSpeed) {
@@ -4528,7 +4701,7 @@ function calculateBallzTrajectory(startX, startY, angle, fieldWidth, fieldHeight
     let vx = Math.cos(angle) * speed * fieldWidth; // Convert to pixels per frame
     let vy = -Math.sin(angle) * speed * fieldHeight; // Convert to pixels per frame
     const maxSteps = 1000; // max trajectory length
-    const ballRadius = fieldWidth * 0.01; // Match server: 1% of field width
+    const ballRadius = fieldWidth * 0.02; // 2% of field width (doubled)
 
     for (let i = 0; i < maxSteps; i++) {
         x += vx;

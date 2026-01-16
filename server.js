@@ -2973,6 +2973,7 @@ function serializeGameState(room) {
         state.aspectRatio = room.aspectRatio;
         state.ballSpeed = room.ballSpeed; // For trajectory calculation
         state.ballLaunchDelay = room.ballLaunchDelay; // For client-side ball launching
+        state.maxBlockHP = room.maxBlockHP; // For color gradient calculation
         state.players = Array.from(room.players.values()).map(p => ({
             id: p.id,
             name: p.name,

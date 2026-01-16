@@ -557,7 +557,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.13</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.14</div>
         </div>
 
         <!-- Connection Screen -->
@@ -4009,7 +4009,8 @@
 
             // Helper to get block color (same as in drawBallzBlock)
             function getBlockColor(hp, maxHp) {
-                const ratio = Math.min(1, (hp - 1) / Math.max(1, maxHp - 1));
+                const globalMaxHP = (gameState && gameState.maxBlockHP) || 50;
+                const ratio = Math.min(1, (hp - 1) / Math.max(1, globalMaxHP - 1));
                 const hue = 270 - ratio * 270;
                 return `hsl(${hue}, 100%, 55%)`;
             }
@@ -4444,8 +4445,10 @@ function drawBallzBlock(centerX, centerY, width, height, hp, maxHp, block) {
     const halfW = width / 2;
     const halfH = height / 2;
 
-    // Rainbow neon color based on HP ratio (violet HP=1 -> red HP=maxHP)
-    const ratio = Math.min(1, (hp - 1) / Math.max(1, maxHp - 1));
+    // Rainbow neon color based on HP (violet HP=1 -> red HP=globalMaxHP)
+    // Use global maxBlockHP setting for consistent color distribution
+    const globalMaxHP = (gameState && gameState.maxBlockHP) || 50;
+    const ratio = Math.min(1, (hp - 1) / Math.max(1, globalMaxHP - 1));
     // Hue: 270 (violet) -> 0 (red)
     const hue = 270 - ratio * 270;
     const color = `hsl(${hue}, 100%, 55%)`;

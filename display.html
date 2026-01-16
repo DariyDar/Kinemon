@@ -557,7 +557,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.10</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.11</div>
         </div>
 
         <!-- Connection Screen -->
@@ -4164,6 +4164,9 @@ function renderBallz() {
     // Process physics BEFORE rendering (only during launching/flying states)
     if (player.turnState === 'launching') {
         clientBallzLaunching(player);
+        // CRITICAL: Also run physics for already-active balls during launching!
+        clientBallzPhysics(player);
+        clientBallzCollisions(player, cols, rows, fieldWidth, fieldHeight);
     } else if (player.turnState === 'balls_in_flight') {
         clientBallzPhysics(player);
         clientBallzCollisions(player, cols, rows, fieldWidth, fieldHeight);
@@ -4313,61 +4316,61 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
         ballSpeed || 0.33 // Default ballSpeed if not provided
     );
 
-    // Draw trajectory segments
+    // Draw trajectory segments with fade after 3 bounces
     const color = player.isInDeadZone ? '#FF0000' : '#FFFFFF';
-    ctx.strokeStyle = color;
+    const maxBounces = 3;  // Full opacity until 3 bounces
+    const fadeSegments = 3; // Fade over next 3 segments after maxBounces
+
     ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.5;
     ctx.setLineDash([5, 10]);
-    ctx.beginPath();
 
     if (trajectory.length > 0) {
-        ctx.moveTo(trajectory[0].x, trajectory[0].y);
-
-        let accumulatedLength = 0;
-        const maxLength = canvas.height * 2;  // 2 screen heights
-
+        // Draw each segment with appropriate alpha
         for (let i = 1; i < trajectory.length; i++) {
-            const dx = trajectory[i].x - trajectory[i-1].x;
-            const dy = trajectory[i].y - trajectory[i-1].y;
-            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+            const bounceIndex = i - 1; // 0 = first segment (no bounce yet)
 
-            accumulatedLength += segmentLength;
-
-            if (accumulatedLength > maxLength) {
-                // Interpolate final point to cut exactly at maxLength
-                const excess = accumulatedLength - maxLength;
-                const ratio = (segmentLength - excess) / segmentLength;
-                const finalX = trajectory[i-1].x + dx * ratio;
-                const finalY = trajectory[i-1].y + dy * ratio;
-                ctx.lineTo(finalX, finalY);
-                break;
+            // Calculate alpha based on bounce count
+            let alpha;
+            if (bounceIndex < maxBounces) {
+                alpha = 0.5; // Full visibility for first 3 bounces
+            } else {
+                // Fade out over next segments
+                const fadeProgress = (bounceIndex - maxBounces) / fadeSegments;
+                alpha = Math.max(0, 0.5 * (1 - fadeProgress));
             }
 
+            if (alpha <= 0) break; // Stop drawing when fully faded
+
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = alpha;
+            ctx.beginPath();
+            ctx.moveTo(trajectory[i-1].x, trajectory[i-1].y);
             ctx.lineTo(trajectory[i].x, trajectory[i].y);
+            ctx.stroke();
         }
     }
 
-    ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1.0;
 
-    // Charge effect (fill line along trajectory)
+    // Charge effect (fill line along trajectory) - limited to first 3 bounces
     if (player.turnState === 'charging' && player.chargeProgress > 0 && !player.isInDeadZone) {
-        // Calculate total trajectory length
+        // Calculate trajectory length for first 3 bounces only
+        const maxChargeSegments = Math.min(trajectory.length, maxBounces + 1); // +1 for initial segment
         let totalLength = 0;
-        for (let i = 1; i < trajectory.length; i++) {
+        for (let i = 1; i < maxChargeSegments; i++) {
             const dx = trajectory[i].x - trajectory[i-1].x;
             const dy = trajectory[i].y - trajectory[i-1].y;
             totalLength += Math.sqrt(dx * dx + dy * dy);
         }
 
-        // Find point at chargeProgress along trajectory
+        // Find point at chargeProgress along trajectory (limited to 3 bounces)
         const targetLength = totalLength * player.chargeProgress;
         let currentLength = 0;
         let endX = launchX, endY = launchY;
+        let endSegment = 0;
 
-        for (let i = 1; i < trajectory.length; i++) {
+        for (let i = 1; i < maxChargeSegments; i++) {
             const dx = trajectory[i].x - trajectory[i-1].x;
             const dy = trajectory[i].y - trajectory[i-1].y;
             const segmentLength = Math.sqrt(dx * dx + dy * dy);
@@ -4376,10 +4379,12 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
                 const t = (targetLength - currentLength) / segmentLength;
                 endX = trajectory[i-1].x + dx * t;
                 endY = trajectory[i-1].y + dy * t;
+                endSegment = i;
                 break;
             }
 
             currentLength += segmentLength;
+            endSegment = i;
         }
 
         // Draw charged portion
@@ -4397,7 +4402,7 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
 
         ctx.moveTo(launchX, launchY);
         currentLength = 0;
-        for (let i = 1; i < trajectory.length; i++) {
+        for (let i = 1; i < maxChargeSegments; i++) {
             const dx = trajectory[i].x - trajectory[i-1].x;
             const dy = trajectory[i].y - trajectory[i-1].y;
             const segmentLength = Math.sqrt(dx * dx + dy * dy);

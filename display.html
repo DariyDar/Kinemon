@@ -557,7 +557,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.22.0</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.9</div>
         </div>
 
         <!-- Connection Screen -->
@@ -1954,7 +1954,9 @@
                         const oldPlayer = gameState?.players?.[0];
                         const isClientSidePhysics = gameState?.gameType === 'ballz' &&
                             oldPlayer &&
-                            (oldPlayer.turnState === 'launching' || oldPlayer.turnState === 'balls_in_flight');
+                            (oldPlayer.turnState === 'launching' ||
+                             oldPlayer.turnState === 'balls_in_flight' ||
+                             oldPlayer.turnState === 'waiting_new_turn');
 
                         if (isClientSidePhysics) {
                             // Only update non-physics fields from server, keep local balls/blocks/score
@@ -3867,6 +3869,9 @@
                 // Clear any existing balls
                 player.balls = [];
 
+                // Use LOCAL time for ball launching (not server time!)
+                const localLaunchTime = Date.now();
+
                 for (let i = 0; i < player.ballsThisTurn; i++) {
                     player.balls.push({
                         x: launchX,
@@ -3874,12 +3879,13 @@
                         vx: Math.cos(player.aimAngle) * speed,
                         vy: -Math.sin(player.aimAngle) * speed,
                         active: false,
-                        launchTime: player.launchStartTime + i * ballLaunchDelay,
+                        launchTime: localLaunchTime + i * ballLaunchDelay,  // Local timing!
                         isFirst: i === 0
                     });
                 }
                 player.clientBallsCreated = true;
                 player.firstBallReturned = false;
+                player.turnCompleteSent = false;  // Reset flag for new turn
             }
 
             // Activate balls when their time comes (CLIENT-SIDE TIMING!)
@@ -4087,6 +4093,10 @@
          * Send turn complete to server and request new turn
          */
         function sendBallzTurnComplete(player) {
+            // Prevent multiple sends
+            if (player.turnCompleteSent) return;
+            player.turnCompleteSent = true;
+
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                     type: 'ballz_turn_complete',
@@ -4098,6 +4108,9 @@
                 }));
                 console.log('[BALLZ] Sent turn_complete to server');
             }
+
+            // Reset client state for receiving new turn
+            player.turnState = 'waiting_new_turn';
         }
 
         // ========== END CLIENT-SIDE PHYSICS ==========
@@ -4220,8 +4233,8 @@ function renderBallz() {
         ctx.fill();
     }
 
-    // Launch ball (only when aiming/charging)
-    if (player.turnState === 'aiming' || player.turnState === 'charging') {
+    // Launch ball (when aiming, charging, or waiting for new turn)
+    if (player.turnState === 'aiming' || player.turnState === 'charging' || player.turnState === 'waiting_new_turn') {
         const launchX = player.launchX !== null ? player.launchX * fieldWidth : fieldWidth / 2;
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();

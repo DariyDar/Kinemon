@@ -4266,13 +4266,14 @@ function ballzUpdatePlayer(room, player) {
  * CRITICAL FIX: Aiming is ALWAYS free, charging happens silently
  */
 function ballzUpdateAiming(room, player) {
-    // CRITICAL: Full 180° range (10° to 170°) - NO DEAD ZONES!
+    // Full 180° range (10° to 170°)
     const minAngle = 10 * Math.PI / 180;
     const maxAngle = 170 * Math.PI / 180;
     player.aimAngle = minAngle + player.tilt * (maxAngle - minAngle);
 
-    // Dead zone logic COMPLETELY REMOVED - player can aim anywhere
-    player.isInDeadZone = false;
+    // Dead zone check - edges where shooting is not allowed
+    const deadZone = room.deadZoneSize || 0.03; // Default 3%
+    player.isInDeadZone = (player.tilt < deadZone || player.tilt > (1 - deadZone));
 
     // Check if aim is steady (using very small threshold)
     if (player.lastTilt === null) {
@@ -4282,14 +4283,15 @@ function ballzUpdateAiming(room, player) {
 
     const tiltDelta = Math.abs(player.tilt - player.lastTilt);
 
-    if (tiltDelta < room.aimSensitivity) {
-        // Aim is steady - start charging silently
+    // Don't start charging if in dead zone
+    if (tiltDelta < room.aimSensitivity && !player.isInDeadZone) {
+        // Aim is steady and not in dead zone - start charging
         if (!player.chargeStartTime) {
             player.chargeStartTime = Date.now();
             player.turnState = 'charging';
         }
     } else {
-        // Moved - reset charge (but keep aiming free)
+        // Moved or in dead zone - reset charge
         player.chargeStartTime = null;
     }
 
@@ -4298,14 +4300,24 @@ function ballzUpdateAiming(room, player) {
 
 /**
  * CHARGING state: Track charge progress
- * NO DEAD ZONES - only movement sensitivity check
+ * Dead zone check - reset if player moves into dead zone
  */
 function ballzUpdateCharging(room, player) {
     const elapsed = Date.now() - player.chargeStartTime;
     player.chargeProgress = Math.min(1, elapsed / room.chargeTime);
 
-    // Dead zone check REMOVED - always false
-    player.isInDeadZone = false;
+    // Dead zone check - if player is in dead zone, reset charge
+    const deadZone = room.deadZoneSize || 0.03;
+    player.isInDeadZone = (player.tilt < deadZone || player.tilt > (1 - deadZone));
+
+    // If in dead zone, reset charge and go back to aiming
+    if (player.isInDeadZone) {
+        player.turnState = 'aiming';
+        player.chargeStartTime = null;
+        player.chargeProgress = 0;
+        player.lastTilt = player.tilt;
+        return;
+    }
 
     // Check for movement (with threshold to ignore micro-vibrations)
     const tiltDelta = Math.abs(player.tilt - player.lastTilt);

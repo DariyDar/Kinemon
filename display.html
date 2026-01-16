@@ -557,7 +557,7 @@
             <div id="settingsForm">
                 <!-- Settings will be populated by JavaScript based on game type -->
             </div>
-            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.11</div>
+            <div style="position: fixed; bottom: 10px; right: 10px; font-size: 12px; opacity: 0.5;">v3.27.12</div>
         </div>
 
         <!-- Connection Screen -->
@@ -1307,6 +1307,15 @@
                             <option value="25">25%</option>
                         </select>
                     </div>
+                    <div class="setting-group">
+                        <label for="ballzDeadZoneSize">Мёртвая зона по краям</label>
+                        <select id="ballzDeadZoneSize">
+                            <option value="0.01">1%</option>
+                            <option value="0.03" selected>3%</option>
+                            <option value="0.05">5%</option>
+                        </select>
+                        <div class="setting-info">Зона у краёв где нельзя стрелять (курсор красный)</div>
+                    </div>
                 `;
 
                 // Load saved settings
@@ -1320,6 +1329,7 @@
                 gameSettings.ballSpeed = parseFloat(localStorage.getItem('ballzBallSpeed')) || 2;
                 gameSettings.ballLaunchDelay = parseInt(localStorage.getItem('ballzLaunchDelay')) || 150;
                 gameSettings.bonusBallSpawnRate = parseInt(localStorage.getItem('ballzBonusSpawnRate')) || 15;
+                gameSettings.deadZoneSize = parseFloat(localStorage.getItem('ballzDeadZoneSize')) || 0.03;
 
                 // Apply to form
                 document.getElementById('ballzFieldWidth').value = gameSettings.fieldWidth;
@@ -1332,6 +1342,7 @@
                 document.getElementById('ballzBallSpeed').value = gameSettings.ballSpeed;
                 document.getElementById('ballzLaunchDelay').value = gameSettings.ballLaunchDelay;
                 document.getElementById('ballzBonusSpawnRate').value = gameSettings.bonusBallSpawnRate;
+                document.getElementById('ballzDeadZoneSize').value = gameSettings.deadZoneSize;
             } else { // snake
                 gameTitle.textContent = '🐍 Настройки Star Snake';
                 settingsForm.innerHTML = `
@@ -1473,6 +1484,7 @@
                 gameSettings.ballSpeed = parseFloat(document.getElementById('ballzBallSpeed').value);
                 gameSettings.ballLaunchDelay = parseInt(document.getElementById('ballzLaunchDelay').value);
                 gameSettings.bonusBallSpawnRate = parseInt(document.getElementById('ballzBonusSpawnRate').value);
+                gameSettings.deadZoneSize = parseFloat(document.getElementById('ballzDeadZoneSize').value);
                 localStorage.setItem('ballzFieldWidth', gameSettings.fieldWidth);
                 localStorage.setItem('ballzFieldHeight', gameSettings.fieldHeight);
                 localStorage.setItem('ballzHPIncrease', gameSettings.hpIncreaseEveryN);
@@ -1483,6 +1495,7 @@
                 localStorage.setItem('ballzBallSpeed', gameSettings.ballSpeed);
                 localStorage.setItem('ballzLaunchDelay', gameSettings.ballLaunchDelay);
                 localStorage.setItem('ballzBonusSpawnRate', gameSettings.bonusBallSpawnRate);
+                localStorage.setItem('ballzDeadZoneSize', gameSettings.deadZoneSize);
             } else {
                 gameSettings.turnSpeed = parseInt(document.getElementById('snakeTurnSpeed').value);
                 gameSettings.controlMapping = document.getElementById('snakeControlMapping').value;
@@ -4316,30 +4329,56 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
         ballSpeed || 0.33 // Default ballSpeed if not provided
     );
 
-    // Draw trajectory segments with fade after 3 bounces
+    // Draw trajectory with fade based on length (fieldHeight) AND bounces (max 3)
     const color = player.isInDeadZone ? '#FF0000' : '#FFFFFF';
-    const maxBounces = 3;  // Full opacity until 3 bounces
-    const fadeSegments = 3; // Fade over next 3 segments after maxBounces
+    const maxBounces = 3;
+    const maxVisibleLength = fieldHeight; // Visible length = field height
+    const fadeLength = fieldHeight * 0.3; // Fade over 30% additional length
 
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 10]);
 
-    if (trajectory.length > 0) {
-        // Draw each segment with appropriate alpha
-        for (let i = 1; i < trajectory.length; i++) {
-            const bounceIndex = i - 1; // 0 = first segment (no bounce yet)
+    if (trajectory.length > 1) {
+        let currentLength = 0;
+        let bounceCount = 0;
+        let prevVx = null, prevVy = null;
 
-            // Calculate alpha based on bounce count
+        for (let i = 1; i < trajectory.length; i++) {
+            const dx = trajectory[i].x - trajectory[i-1].x;
+            const dy = trajectory[i].y - trajectory[i-1].y;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            // Detect bounces by checking if direction changed
+            if (prevVx !== null) {
+                const dirChangedX = Math.sign(dx) !== Math.sign(prevVx) && Math.abs(prevVx) > 0.001;
+                const dirChangedY = Math.sign(dy) !== Math.sign(prevVy) && Math.abs(prevVy) > 0.001;
+                if (dirChangedX || dirChangedY) {
+                    bounceCount++;
+                }
+            }
+            prevVx = dx;
+            prevVy = dy;
+
+            // Calculate alpha based on length AND bounce count
             let alpha;
-            if (bounceIndex < maxBounces) {
-                alpha = 0.5; // Full visibility for first 3 bounces
+            const lengthExceeded = currentLength >= maxVisibleLength;
+            const bouncesExceeded = bounceCount > maxBounces;
+
+            if (!lengthExceeded && !bouncesExceeded) {
+                alpha = 0.5; // Full visibility
             } else {
-                // Fade out over next segments
-                const fadeProgress = (bounceIndex - maxBounces) / fadeSegments;
+                // Fade out based on whichever limit was exceeded
+                let fadeProgress = 0;
+                if (lengthExceeded) {
+                    fadeProgress = Math.max(fadeProgress, (currentLength - maxVisibleLength) / fadeLength);
+                }
+                if (bouncesExceeded) {
+                    fadeProgress = Math.max(fadeProgress, (bounceCount - maxBounces) / 2);
+                }
                 alpha = Math.max(0, 0.5 * (1 - fadeProgress));
             }
 
-            if (alpha <= 0) break; // Stop drawing when fully faded
+            if (alpha <= 0) break;
 
             ctx.strokeStyle = color;
             ctx.globalAlpha = alpha;
@@ -4347,44 +4386,80 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
             ctx.moveTo(trajectory[i-1].x, trajectory[i-1].y);
             ctx.lineTo(trajectory[i].x, trajectory[i].y);
             ctx.stroke();
+
+            currentLength += segmentLength;
         }
     }
 
     ctx.setLineDash([]);
     ctx.globalAlpha = 1.0;
 
-    // Charge effect (fill line along trajectory) - limited to first 3 bounces
+    // Charge effect - limited to fieldHeight length AND 3 bounces
     if (player.turnState === 'charging' && player.chargeProgress > 0 && !player.isInDeadZone) {
-        // Calculate trajectory length for first 3 bounces only
-        const maxChargeSegments = Math.min(trajectory.length, maxBounces + 1); // +1 for initial segment
-        let totalLength = 0;
-        for (let i = 1; i < maxChargeSegments; i++) {
-            const dx = trajectory[i].x - trajectory[i-1].x;
-            const dy = trajectory[i].y - trajectory[i-1].y;
-            totalLength += Math.sqrt(dx * dx + dy * dy);
-        }
+        // Calculate max charge length (fieldHeight or until 3 bounces)
+        let maxChargeLength = 0;
+        let bounceCount = 0;
+        let prevVx = null, prevVy = null;
 
-        // Find point at chargeProgress along trajectory (limited to 3 bounces)
-        const targetLength = totalLength * player.chargeProgress;
-        let currentLength = 0;
-        let endX = launchX, endY = launchY;
-        let endSegment = 0;
-
-        for (let i = 1; i < maxChargeSegments; i++) {
+        for (let i = 1; i < trajectory.length; i++) {
             const dx = trajectory[i].x - trajectory[i-1].x;
             const dy = trajectory[i].y - trajectory[i-1].y;
             const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            // Check for bounce
+            if (prevVx !== null) {
+                const dirChangedX = Math.sign(dx) !== Math.sign(prevVx) && Math.abs(prevVx) > 0.001;
+                const dirChangedY = Math.sign(dy) !== Math.sign(prevVy) && Math.abs(prevVy) > 0.001;
+                if (dirChangedX || dirChangedY) {
+                    bounceCount++;
+                    if (bounceCount > maxBounces) break;
+                }
+            }
+            prevVx = dx;
+            prevVy = dy;
+
+            maxChargeLength += segmentLength;
+            if (maxChargeLength >= maxVisibleLength) {
+                maxChargeLength = maxVisibleLength;
+                break;
+            }
+        }
+
+        // Find point at chargeProgress along trajectory
+        const targetLength = maxChargeLength * player.chargeProgress;
+        let currentLength = 0;
+        let endX = launchX, endY = launchY;
+        bounceCount = 0;
+        prevVx = null;
+        prevVy = null;
+
+        for (let i = 1; i < trajectory.length; i++) {
+            const dx = trajectory[i].x - trajectory[i-1].x;
+            const dy = trajectory[i].y - trajectory[i-1].y;
+            const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            // Check for bounce
+            if (prevVx !== null) {
+                const dirChangedX = Math.sign(dx) !== Math.sign(prevVx) && Math.abs(prevVx) > 0.001;
+                const dirChangedY = Math.sign(dy) !== Math.sign(prevVy) && Math.abs(prevVy) > 0.001;
+                if (dirChangedX || dirChangedY) {
+                    bounceCount++;
+                    if (bounceCount > maxBounces) break;
+                }
+            }
+            prevVx = dx;
+            prevVy = dy;
 
             if (currentLength + segmentLength >= targetLength) {
                 const t = (targetLength - currentLength) / segmentLength;
                 endX = trajectory[i-1].x + dx * t;
                 endY = trajectory[i-1].y + dy * t;
-                endSegment = i;
                 break;
             }
 
             currentLength += segmentLength;
-            endSegment = i;
+            endX = trajectory[i].x;
+            endY = trajectory[i].y;
         }
 
         // Draw charged portion
@@ -4402,10 +4477,26 @@ function drawBallzAimLine(player, launchX, launchY, fieldWidth, fieldHeight, col
 
         ctx.moveTo(launchX, launchY);
         currentLength = 0;
-        for (let i = 1; i < maxChargeSegments; i++) {
+        bounceCount = 0;
+        prevVx = null;
+        prevVy = null;
+
+        for (let i = 1; i < trajectory.length; i++) {
             const dx = trajectory[i].x - trajectory[i-1].x;
             const dy = trajectory[i].y - trajectory[i-1].y;
             const segmentLength = Math.sqrt(dx * dx + dy * dy);
+
+            // Check for bounce
+            if (prevVx !== null) {
+                const dirChangedX = Math.sign(dx) !== Math.sign(prevVx) && Math.abs(prevVx) > 0.001;
+                const dirChangedY = Math.sign(dy) !== Math.sign(prevVy) && Math.abs(prevVy) > 0.001;
+                if (dirChangedX || dirChangedY) {
+                    bounceCount++;
+                    if (bounceCount > maxBounces) break;
+                }
+            }
+            prevVx = dx;
+            prevVy = dy;
 
             if (currentLength + segmentLength >= targetLength) {
                 ctx.lineTo(endX, endY);
